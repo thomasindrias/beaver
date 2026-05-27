@@ -1,8 +1,7 @@
 {
-  "$schema": "https://schema.tauri.app/config/2",
-  "productName": "osprey",
+  "productName": "Osprey",
   "version": "0.1.0",
-  "identifier": "com.thomasindrias.osprey",
+  "identifier": "se.djtl.osprey",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -10,16 +9,8 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "title": "osprey",
-        "width": 800,
-        "height": 600
-      }
-    ],
-    "security": {
-      "csp": null
-    }
+    "macOSPrivateApi": true,
+    "windows": []
   },
   "bundle": {
     "active": true,
@@ -30,6 +21,18 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "entitlements": "entitlements.plist",
+      "infoPlist": "Info.plist"
+    },
+    "externalBin": ["binaries/ollama"]
+  },
+  "plugins": {
+    "sql": {},
+    "clipboard-manager": {},
+    "global-shortcut": {},
+    "shell": { "open": true },
+    "notification": {}
   }
 }
