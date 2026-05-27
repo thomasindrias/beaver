@@ -1,16 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-function normalizeRect(
-  start: { x: number; y: number },
-  end: { x: number; y: number }
-) {
-  return {
-    x: Math.min(start.x, end.x),
-    y: Math.min(start.y, end.y),
-    width: Math.abs(end.x - start.x),
-    height: Math.abs(end.y - start.y),
-  };
-}
+import { normalizeRect } from "../components/CaptureOverlay";
 
 describe("normalizeRect", () => {
   it("top-left to bottom-right drag", () => {
