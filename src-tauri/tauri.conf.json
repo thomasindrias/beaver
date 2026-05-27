@@ -10,7 +10,10 @@
   },
   "app": {
     "macOSPrivateApi": true,
-    "windows": []
+    "windows": [],
+    "security": {
+      "csp": null
+    }
   },
   "bundle": {
     "active": true,

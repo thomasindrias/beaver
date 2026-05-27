@@ -13,7 +13,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(app.default_window_icon().expect("app bundle must include an icon").clone())
                 .tooltip("Osprey")
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click { .. } = event {
@@ -33,14 +33,14 @@ pub fn run() {
 fn toggle_popover(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("popover") {
         if w.is_visible().unwrap_or(false) {
-            let _ = w.hide();
+            if let Err(e) = w.hide() { eprintln!("Osprey: failed to hide popover: {e}"); }
         } else {
-            let _ = w.show();
-            let _ = w.set_focus();
+            if let Err(e) = w.show() { eprintln!("Osprey: failed to show popover: {e}"); }
+            if let Err(e) = w.set_focus() { eprintln!("Osprey: failed to focus popover: {e}"); }
         }
         return;
     }
-    let _ = tauri::WebviewWindowBuilder::new(
+    let result = tauri::WebviewWindowBuilder::new(
         app,
         "popover",
         tauri::WebviewUrl::App("/".into()),
@@ -50,4 +50,8 @@ fn toggle_popover(app: &tauri::AppHandle) {
     .skip_taskbar(true)
     .inner_size(320.0, 520.0)
     .build();
+
+    if let Err(e) = result {
+        eprintln!("Osprey: failed to create popover window: {e}");
+    }
 }
