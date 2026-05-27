@@ -1,12 +1,27 @@
+import { useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { CaptureOverlay, type Rect } from "./components/CaptureOverlay";
+
 export default function App() {
   const route = window.location.pathname;
 
+  const handleCapture = useCallback(async (region: Rect) => {
+    const win = getCurrentWindow();
+    await win.hide(); // Hide overlay before capturing so it doesn't appear in screenshot
+    try {
+      await invoke("capture_screen_region", { region });
+    } finally {
+      await win.close();
+    }
+  }, []);
+
+  const handleCancel = useCallback(async () => {
+    await getCurrentWindow().close();
+  }, []);
+
   if (route === "/capture") {
-    return (
-      <div style={{ width: "100vw", height: "100vh", background: "rgba(0,0,0,0.3)" }}>
-        {/* Capture overlay — implemented in Task 6 */}
-      </div>
-    );
+    return <CaptureOverlay onCapture={handleCapture} onCancel={handleCancel} />;
   }
 
   return null;
