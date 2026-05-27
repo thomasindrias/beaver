@@ -1,11 +1,13 @@
 mod capture;
 mod db;
+mod shortcut;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use tauri::{
     tray::{TrayIconBuilder, TrayIconEvent},
     Manager,
 };
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,6 +32,13 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            let sc: Shortcut = shortcut::CAPTURE_SHORTCUT.parse().expect("invalid shortcut");
+            app.global_shortcut().on_shortcut(sc, |app, _sc, event| {
+                if event.state == ShortcutState::Pressed {
+                    show_capture_overlay(app);
+                }
+            })?;
 
             Ok(())
         })
@@ -67,5 +76,28 @@ fn toggle_popover(app: &tauri::AppHandle) {
 
     if let Err(e) = result {
         eprintln!("Osprey: failed to create popover window: {e}");
+    }
+}
+
+fn show_capture_overlay(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("capture-overlay") {
+        if let Err(e) = w.show() { eprintln!("Osprey: failed to show capture overlay: {e}"); }
+        if let Err(e) = w.set_focus() { eprintln!("Osprey: failed to focus capture overlay: {e}"); }
+        return;
+    }
+    let result = tauri::WebviewWindowBuilder::new(
+        app,
+        "capture-overlay",
+        tauri::WebviewUrl::App("/capture".into()),
+    )
+    .transparent(true)
+    .decorations(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .fullscreen(true)
+    .build();
+
+    if let Err(e) = result {
+        eprintln!("Osprey: failed to create capture overlay: {e}");
     }
 }
