@@ -29,6 +29,57 @@ pub async fn is_model_installed() -> bool {
     tags.models.iter().any(|m| m.name.starts_with(MODEL_NAME))
 }
 
+pub fn detect_content_type(markdown: &str) -> &'static str {
+    let has_table = markdown.contains("| --- |") || markdown.contains("|---|");
+    let has_code = markdown.contains("```");
+    let has_list = markdown
+        .lines()
+        .any(|l| l.trim_start().starts_with("- ") || l.trim_start().starts_with("* "));
+
+    match (has_table, has_code, has_list) {
+        (true, false, false) => "table",
+        (false, true, false) => "code",
+        (false, false, true) => "list",
+        (false, false, false) => "prose",
+        _ => "mixed",
+    }
+}
+
+const EXTRACTION_PROMPT: &str =
+    "Extract all data visible in this image. Return as Markdown only. \
+     Preserve structure exactly: tables as Markdown tables, lists as Markdown lists, \
+     code in fenced code blocks with language hints. \
+     Output only the extracted content — no commentary or explanation.";
+
+#[derive(serde::Deserialize)]
+struct GenerateResponse {
+    response: String,
+}
+
+pub async fn extract_from_image(image_base64: &str) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let body = serde_json::json!({
+        "model": MODEL_NAME,
+        "prompt": EXTRACTION_PROMPT,
+        "images": [image_base64],
+        "stream": false
+    });
+
+    let resp = client
+        .post(api_url("/api/generate"))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Ollama request failed: {e}"))?;
+
+    let result: GenerateResponse = resp
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse Ollama response: {e}"))?;
+
+    Ok(result.response.trim().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -46,5 +97,30 @@ mod tests {
     #[test]
     fn base_url_uses_localhost_port() {
         assert!(OLLAMA_BASE_URL.contains("127.0.0.1:11434"));
+    }
+
+    #[test]
+    fn detects_table() {
+        assert_eq!(detect_content_type("| A | B |\n|---|---|\n| 1 | 2 |"), "table");
+    }
+
+    #[test]
+    fn detects_code() {
+        assert_eq!(detect_content_type("```rust\nfn main() {}\n```"), "code");
+    }
+
+    #[test]
+    fn detects_list() {
+        assert_eq!(detect_content_type("- item one\n- item two"), "list");
+    }
+
+    #[test]
+    fn detects_prose() {
+        assert_eq!(detect_content_type("Just a paragraph of plain text."), "prose");
+    }
+
+    #[test]
+    fn detects_mixed() {
+        assert_eq!(detect_content_type("Some text\n\n- list\n\n```code```"), "mixed");
     }
 }

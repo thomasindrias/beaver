@@ -55,7 +55,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![capture_screen_region, ollama_is_running, model_is_installed])
+        .invoke_handler(tauri::generate_handler![capture_screen_region, ollama_is_running, model_is_installed, extract_from_image])
         .run(tauri::generate_context!())
         .expect("error while running Osprey");
 }
@@ -68,6 +68,11 @@ async fn ollama_is_running() -> bool {
 #[tauri::command]
 async fn model_is_installed() -> bool {
     ollama::is_model_installed().await
+}
+
+#[tauri::command]
+async fn extract_from_image(image_base64: String) -> Result<String, String> {
+    ollama::extract_from_image(&image_base64).await
 }
 
 #[tauri::command]
