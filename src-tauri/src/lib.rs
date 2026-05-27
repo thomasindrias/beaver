@@ -1,5 +1,6 @@
 mod capture;
 mod db;
+mod ollama;
 mod shortcut;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -8,6 +9,7 @@ use tauri::{
     Manager,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_shell::ShellExt;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -40,11 +42,32 @@ pub fn run() {
                 }
             })?;
 
+            // Start Ollama sidecar
+            let sidecar = app.shell().sidecar("ollama")
+                .expect("ollama sidecar not configured");
+            match sidecar.args(["serve"]).spawn() {
+                Ok(_) => {
+                    // Give Ollama time to initialise
+                    std::thread::sleep(std::time::Duration::from_millis(1500));
+                }
+                Err(e) => eprintln!("Osprey: failed to start Ollama sidecar: {e}"),
+            }
+
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![capture_screen_region])
+        .invoke_handler(tauri::generate_handler![capture_screen_region, ollama_is_running, model_is_installed])
         .run(tauri::generate_context!())
         .expect("error while running Osprey");
+}
+
+#[tauri::command]
+async fn ollama_is_running() -> bool {
+    ollama::is_running().await
+}
+
+#[tauri::command]
+async fn model_is_installed() -> bool {
+    ollama::is_model_installed().await
 }
 
 #[tauri::command]
