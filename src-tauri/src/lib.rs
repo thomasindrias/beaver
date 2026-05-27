@@ -1,5 +1,7 @@
+mod capture;
 mod db;
 
+use base64::{engine::general_purpose::STANDARD, Engine};
 use tauri::{
     tray::{TrayIconBuilder, TrayIconEvent},
     Manager,
@@ -31,9 +33,15 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![])
+        .invoke_handler(tauri::generate_handler![capture_screen_region])
         .run(tauri::generate_context!())
         .expect("error while running Osprey");
+}
+
+#[tauri::command]
+async fn capture_screen_region(region: capture::CaptureRegion) -> Result<String, String> {
+    let bytes = capture::capture_region(&region).map_err(|e| e.to_string())?;
+    Ok(STANDARD.encode(&bytes))
 }
 
 fn toggle_popover(app: &tauri::AppHandle) {
