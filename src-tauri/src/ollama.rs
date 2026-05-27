@@ -29,8 +29,16 @@ pub async fn is_model_installed() -> bool {
     tags.models.iter().any(|m| m.name.starts_with(MODEL_NAME))
 }
 
+fn has_table_separator(markdown: &str) -> bool {
+    use std::sync::OnceLock;
+    use regex::Regex;
+    static TABLE_RE: OnceLock<Regex> = OnceLock::new();
+    let re = TABLE_RE.get_or_init(|| Regex::new(r"\|[-: ]+\|").expect("valid regex"));
+    re.is_match(markdown)
+}
+
 pub fn detect_content_type(markdown: &str) -> &'static str {
-    let has_table = markdown.contains("| --- |") || markdown.contains("|---|");
+    let has_table = has_table_separator(markdown);
     let has_code = markdown.contains("```");
     let has_list = markdown
         .lines()
@@ -73,6 +81,8 @@ pub async fn extract_from_image(image_base64: &str) -> Result<String, String> {
         .map_err(|e| format!("Ollama request failed: {e}"))?;
 
     let result: GenerateResponse = resp
+        .error_for_status()
+        .map_err(|e| format!("Ollama returned error status: {e}"))?
         .json()
         .await
         .map_err(|e| format!("Failed to parse Ollama response: {e}"))?;
@@ -101,7 +111,12 @@ mod tests {
 
     #[test]
     fn detects_table() {
+        // Basic separator
         assert_eq!(detect_content_type("| A | B |\n|---|---|\n| 1 | 2 |"), "table");
+        // Varied separator with spaces
+        assert_eq!(detect_content_type("| Name | Value |\n| --- | --- |\n| foo | bar |"), "table");
+        // Alignment markers
+        assert_eq!(detect_content_type("| Left | Center |\n|:---|:---:|\n| a | b |"), "table");
     }
 
     #[test]
