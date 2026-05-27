@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { CaptureOverlay, type Rect } from "./components/CaptureOverlay";
+import { TrayPopover } from "./components/TrayPopover";
 import { useOsprey } from "./hooks/useOsprey";
 import { useCaptures } from "./hooks/useCaptures";
 
@@ -24,7 +25,5 @@ export default function App() {
     return <CaptureOverlay onCapture={handleCapture} onCancel={handleCancel} />;
   }
 
-  return <div style={{ padding: 16, color: "white", background: "#111" }}>
-    History — Task 10
-  </div>;
+  return <TrayPopover />;
 }
