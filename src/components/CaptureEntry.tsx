@@ -62,16 +62,18 @@ function exportCapture(capture: Capture, format: string) {
       .replace(/^#{1,6}\s+/gm, "")
       .replace(/\*\*(.*?)\*\*/g, "$1")
       .replace(/`+/g, "")
+      .replace(/^\|[-:| ]+\|$/gm, "")
       .replace(/^\|.*\|$/gm, row => row.split("|").filter(Boolean).map(c => c.trim()).join("\t"))
       .replace(/^\s*[-*+]\s+/gm, "")
       .trim();
   } else if (format === "JSON") {
     out = JSON.stringify({ type: capture.content_type, captured_at: capture.created_at, content: capture.content }, null, 2);
   } else if (format === "CSV" && capture.content_type === "table") {
+    const csvCell = (c: string) => `"${c.replace(/"/g, '""')}"`;
     out = capture.content
       .split("\n")
-      .filter(l => l.startsWith("|") && !/^\|[-| ]+\|$/.test(l))
-      .map(l => l.split("|").filter(Boolean).map(c => c.trim()).join(","))
+      .filter(l => l.startsWith("|") && !/^\|[-:| ]+\|$/.test(l))
+      .map(l => l.split("|").filter(Boolean).map(c => csvCell(c.trim())).join(","))
       .join("\n");
   }
 

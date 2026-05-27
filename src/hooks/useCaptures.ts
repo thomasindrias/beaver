@@ -18,7 +18,7 @@ export function useCaptures() {
       const db = await Database.load("sqlite:osprey.db");
       await db.execute(
         `INSERT INTO captures (id, created_at, content, content_type, char_count, app_context)
-         VALUES (?, datetime('now'), ?, ?, ?, ?)`,
+         VALUES (?, strftime('%Y-%m-%dT%H:%M:%SZ','now'), ?, ?, ?, ?)`,
         [
           crypto.randomUUID(),
           capture.content,
