@@ -35,20 +35,20 @@ impl std::fmt::Display for CaptureError {
 ///
 /// `region.x` and `region.y` are absolute screen coordinates (matching the
 /// coordinate space reported by `DisplayInfo`). The function locates the
-/// correct screen via `Screen::from_point`, converts to screen-relative
-/// coordinates, captures the area, and PNG-encodes the result in memory.
+/// correct screen via `Screen::from_point` and passes the absolute coordinates
+/// directly to `capture_area`, which handles the screen-origin offset
+/// internally (screenshots 0.8.x+).
 pub fn capture_region(region: &CaptureRegion) -> Result<Vec<u8>, CaptureError> {
     // Locate the screen that contains the top-left corner of the requested
     // region.  `Screen::from_point` accepts absolute coordinates.
     let screen = Screen::from_point(region.x, region.y)
         .map_err(|_| CaptureError::NoScreenFound)?;
 
-    // `capture_area` expects coordinates relative to the screen's own origin.
-    let rel_x = region.x - screen.display_info.x;
-    let rel_y = region.y - screen.display_info.y;
-
+    // `capture_area` handles the screen-origin offset internally; pass
+    // absolute coordinates directly to avoid double-subtraction on
+    // non-primary monitors.
     let img = screen
-        .capture_area(rel_x, rel_y, region.width, region.height)
+        .capture_area(region.x, region.y, region.width, region.height)
         .map_err(|e| CaptureError::CaptureFailed(e.to_string()))?;
 
     let mut buf = Vec::new();
