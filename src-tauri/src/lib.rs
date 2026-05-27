@@ -55,7 +55,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![capture_screen_region, ollama_is_running, model_is_installed, extract_from_image])
+        .invoke_handler(tauri::generate_handler![capture_screen_region, ollama_is_running, model_is_installed, extract_from_image, write_to_clipboard, show_success_notification])
         .run(tauri::generate_context!())
         .expect("error while running Osprey");
 }
@@ -73,6 +73,23 @@ async fn model_is_installed() -> bool {
 #[tauri::command]
 async fn extract_from_image(image_base64: String) -> Result<String, String> {
     ollama::extract_from_image(&image_base64).await
+}
+
+#[tauri::command]
+async fn write_to_clipboard(app: tauri::AppHandle, text: String) -> Result<(), String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+    app.clipboard().write_text(text).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn show_success_notification(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_notification::NotificationExt;
+    app.notification()
+        .builder()
+        .title("Osprey")
+        .body("Copied to clipboard.")
+        .show()
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
