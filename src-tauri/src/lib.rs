@@ -4,12 +4,16 @@ mod ollama;
 mod shortcut;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
+use std::sync::Mutex;
 use tauri::{
     tray::{TrayIconBuilder, TrayIconEvent},
     Manager,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
-use tauri_plugin_shell::ShellExt;
+use tauri_plugin_shell::{process::CommandChild, ShellExt};
+
+#[allow(dead_code)]
+struct OllamaChild(Mutex<Option<CommandChild>>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -42,15 +46,19 @@ pub fn run() {
                 }
             })?;
 
-            // Start Ollama sidecar
+            // Start Ollama sidecar — keep CommandChild in state so it isn't dropped/killed
             let sidecar = app.shell().sidecar("ollama")
                 .expect("ollama sidecar not configured");
             match sidecar.args(["serve"]).spawn() {
-                Ok(_) => {
+                Ok((_rx, child)) => {
+                    app.manage(OllamaChild(Mutex::new(Some(child))));
                     // Give Ollama time to initialise
-                    std::thread::sleep(std::time::Duration::from_millis(1500));
+                    std::thread::sleep(std::time::Duration::from_millis(2000));
                 }
-                Err(e) => eprintln!("Osprey: failed to start Ollama sidecar: {e}"),
+                Err(e) => {
+                    eprintln!("Osprey: failed to start Ollama sidecar: {e}");
+                    app.manage(OllamaChild(Mutex::new(None)));
+                }
             }
 
             let needs_onboarding = !tauri::async_runtime::block_on(ollama::is_model_installed());

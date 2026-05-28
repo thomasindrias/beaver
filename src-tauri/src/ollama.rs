@@ -29,6 +29,7 @@ pub async fn is_model_installed() -> bool {
     tags.models.iter().any(|m| m.name.starts_with(MODEL_NAME))
 }
 
+#[cfg(test)]
 fn has_table_separator(markdown: &str) -> bool {
     use std::sync::OnceLock;
     use regex::Regex;
@@ -37,6 +38,7 @@ fn has_table_separator(markdown: &str) -> bool {
     re.is_match(markdown)
 }
 
+#[cfg(test)]
 pub fn detect_content_type(markdown: &str) -> &'static str {
     let has_table = has_table_separator(markdown);
     let has_code = markdown.contains("```");
