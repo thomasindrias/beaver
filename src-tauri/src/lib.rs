@@ -12,6 +12,7 @@ use tauri::{
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_shell::{process::CommandChild, ShellExt};
 
+
 #[allow(dead_code)]
 struct OllamaChild(Mutex<Option<CommandChild>>);
 
@@ -28,6 +29,9 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            let _ = app.handle().set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().expect("app bundle must include an icon").clone())
                 .tooltip("Osprey")
@@ -182,15 +186,14 @@ fn show_capture_overlay(app: &tauri::AppHandle) {
     }
 
     // Cover all screens without using macOS full-screen mode (which creates a new Space).
-    // Compute the bounding box of all monitors in logical pixels.
+    // DisplayInfo.width/height are already in logical pixels — do NOT divide by scale_factor.
     let (origin_x, origin_y, total_w, total_h) = screenshots::Screen::all()
         .unwrap_or_default()
         .iter()
         .fold((0i32, 0i32, 0f64, 0f64), |(ox, oy, tw, th), s| {
             let d = &s.display_info;
-            let sf = d.scale_factor as f64;
-            let right  = d.x as f64 + d.width  as f64 / sf;
-            let bottom = d.y as f64 + d.height as f64 / sf;
+            let right  = d.x as f64 + d.width  as f64;
+            let bottom = d.y as f64 + d.height as f64;
             (ox.min(d.x), oy.min(d.y), tw.max(right), th.max(bottom))
         });
 
