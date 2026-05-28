@@ -1,5 +1,5 @@
 pub const OLLAMA_BASE_URL: &str = "http://127.0.0.1:11434";
-pub const MODEL_NAME: &str = "qwen2.5-vl:3b";
+pub const MODEL_NAME: &str = "qwen2.5vl:3b";
 
 pub fn api_url(path: &str) -> String {
     format!("{}{}", OLLAMA_BASE_URL, path)
@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn model_name_is_correct() {
-        assert_eq!(MODEL_NAME, "qwen2.5-vl:3b");
+        assert_eq!(MODEL_NAME, "qwen2.5vl:3b");
     }
 
     #[test]
