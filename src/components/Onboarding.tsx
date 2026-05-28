@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { ModelDownload } from "./ModelDownload";
 
 type Step = "welcome" | "download" | "ready";
@@ -6,6 +6,7 @@ interface Props { onComplete: () => void }
 
 export function Onboarding({ onComplete }: Props) {
   const [step, setStep] = useState<Step>("welcome");
+  const handleDownloadComplete = useCallback(() => setStep("ready"), []);
 
   const style: React.CSSProperties = {
     height: "100vh",
@@ -37,7 +38,7 @@ export function Onboarding({ onComplete }: Props) {
 
   if (step === "download") return (
     <div style={style}>
-      <ModelDownload onComplete={() => setStep("ready")} />
+      <ModelDownload onComplete={handleDownloadComplete} />
     </div>
   );
 

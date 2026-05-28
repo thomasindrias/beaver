@@ -28,11 +28,11 @@ export default function App() {
     await getCurrentWindow().close();
   }, []);
 
-  if (ready === null) return null;
-
   if (route === "/capture") {
     return <CaptureOverlay onCapture={handleCapture} onCancel={handleCancel} />;
   }
+
+  if (ready === null) return null;
 
   if (!ready) {
     return <Onboarding onComplete={() => setReady(true)} />;

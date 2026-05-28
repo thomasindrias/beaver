@@ -57,7 +57,7 @@ pub fn run() {
             if needs_onboarding {
                 let result = tauri::WebviewWindowBuilder::new(
                     app,
-                    "popover",
+                    "onboarding",
                     tauri::WebviewUrl::App("/".into()),
                 )
                 .title("Welcome to Osprey")
@@ -124,7 +124,7 @@ async fn pull_model(window: tauri::WebviewWindow) -> Result<(), String> {
     let client = reqwest::Client::new();
     let mut resp = client
         .post(ollama::api_url("/api/pull"))
-        .json(&serde_json::json!({ "name": ollama::MODEL_NAME, "stream": true }))
+        .json(&serde_json::json!({ "model": ollama::MODEL_NAME, "stream": true }))
         .send()
         .await
         .map_err(|e| e.to_string())?;

@@ -25,7 +25,7 @@ export function ModelDownload({ onComplete }: Props) {
     return () => unlisten?.();
   }, [onComplete]);
 
-  const pct = progress?.total && progress.completed
+  const pct = progress?.total != null && progress.completed != null
     ? Math.round((progress.completed / progress.total) * 100) : 0;
 
   return (
