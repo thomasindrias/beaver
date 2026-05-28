@@ -180,6 +180,20 @@ fn show_capture_overlay(app: &tauri::AppHandle) {
         if let Err(e) = w.set_focus() { eprintln!("Osprey: failed to focus capture overlay: {e}"); }
         return;
     }
+
+    // Cover all screens without using macOS full-screen mode (which creates a new Space).
+    // Compute the bounding box of all monitors in logical pixels.
+    let (origin_x, origin_y, total_w, total_h) = screenshots::Screen::all()
+        .unwrap_or_default()
+        .iter()
+        .fold((0i32, 0i32, 0f64, 0f64), |(ox, oy, tw, th), s| {
+            let d = &s.display_info;
+            let sf = d.scale_factor as f64;
+            let right  = d.x as f64 + d.width  as f64 / sf;
+            let bottom = d.y as f64 + d.height as f64 / sf;
+            (ox.min(d.x), oy.min(d.y), tw.max(right), th.max(bottom))
+        });
+
     let result = tauri::WebviewWindowBuilder::new(
         app,
         "capture-overlay",
@@ -189,7 +203,9 @@ fn show_capture_overlay(app: &tauri::AppHandle) {
     .decorations(false)
     .always_on_top(true)
     .skip_taskbar(true)
-    .fullscreen(true)
+    .resizable(false)
+    .position(origin_x as f64, origin_y as f64)
+    .inner_size(total_w - origin_x as f64, total_h - origin_y as f64)
     .build();
 
     if let Err(e) = result {
