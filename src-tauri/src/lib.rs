@@ -53,9 +53,25 @@ pub fn run() {
                 Err(e) => eprintln!("Osprey: failed to start Ollama sidecar: {e}"),
             }
 
+            let needs_onboarding = !tauri::async_runtime::block_on(ollama::is_model_installed());
+            if needs_onboarding {
+                let result = tauri::WebviewWindowBuilder::new(
+                    app,
+                    "popover",
+                    tauri::WebviewUrl::App("/".into()),
+                )
+                .title("Welcome to Osprey")
+                .inner_size(480.0, 540.0)
+                .center()
+                .build();
+                if let Err(e) = result {
+                    eprintln!("Osprey: failed to create onboarding window: {e}");
+                }
+            }
+
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![capture_screen_region, ollama_is_running, model_is_installed, extract_from_image, write_to_clipboard, show_success_notification])
+        .invoke_handler(tauri::generate_handler![capture_screen_region, ollama_is_running, model_is_installed, extract_from_image, write_to_clipboard, show_success_notification, is_first_launch, pull_model])
         .run(tauri::generate_context!())
         .expect("error while running Osprey");
 }
@@ -96,6 +112,32 @@ async fn show_success_notification(app: tauri::AppHandle) -> Result<(), String> 
 async fn capture_screen_region(region: capture::CaptureRegion) -> Result<String, String> {
     let bytes = capture::capture_region(&region).map_err(|e| e.to_string())?;
     Ok(STANDARD.encode(&bytes))
+}
+
+#[tauri::command]
+async fn is_first_launch() -> bool {
+    !ollama::is_model_installed().await
+}
+
+#[tauri::command]
+async fn pull_model(window: tauri::WebviewWindow) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let mut resp = client
+        .post(ollama::api_url("/api/pull"))
+        .json(&serde_json::json!({ "name": ollama::MODEL_NAME, "stream": true }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    use tauri::Emitter;
+    while let Some(chunk) = resp.chunk().await.map_err(|e| e.to_string())? {
+        if let Ok(text) = std::str::from_utf8(&chunk) {
+            for line in text.lines().filter(|l| !l.is_empty()) {
+                let _ = window.emit("model-pull-progress", line);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn toggle_popover(app: &tauri::AppHandle) {
