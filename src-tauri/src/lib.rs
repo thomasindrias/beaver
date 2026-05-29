@@ -1,5 +1,6 @@
 mod capture;
 mod db;
+mod mlx;
 mod ollama;
 mod shortcut;
 
