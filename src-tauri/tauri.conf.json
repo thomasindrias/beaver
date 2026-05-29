@@ -35,7 +35,5 @@
       "resources/requirements.txt"
     ]
   },
-  "plugins": {
-    "shell": { "open": true }
-  }
+  "plugins": {}
 }

@@ -1,7 +1,6 @@
 mod capture;
 mod db;
 mod mlx;
-mod ollama;
 mod server;
 mod shortcut;
 
@@ -40,7 +39,6 @@ pub fn run() {
         )
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             #[cfg(target_os = "macos")]
