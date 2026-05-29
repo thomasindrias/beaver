@@ -53,8 +53,18 @@ pub fn hf_home(app: &tauri::AppHandle) -> PathBuf {
     app_data(app).join(HF_DIRNAME)
 }
 
+/// Marker written inside the venv after deps install successfully. `uv venv`
+/// alone creates the venv python, so the python existing does NOT mean the
+/// slow, interruptible `uv pip install` finished. Without this, an interrupted
+/// first run leaves a python-but-no-packages venv that looks ready, so the
+/// install is skipped on the next launch and the server crashes on import.
+/// Keeping the marker inside the venv dir means wiping the venv also clears it.
+fn deps_marker(app: &tauri::AppHandle) -> PathBuf {
+    app_data(app).join(VENV_DIRNAME).join(".osprey-deps-installed")
+}
+
 pub fn env_is_ready(app: &tauri::AppHandle) -> bool {
-    venv_python(app).exists()
+    deps_marker(app).exists()
 }
 
 /// Marker written after the server first reaches `ready`. This is the source of
@@ -94,11 +104,16 @@ pub fn resolve_resource(app: &tauri::AppHandle, name: &str) -> PathBuf {
 
 fn uv_command(app: &tauri::AppHandle) -> Command {
     let uv = resolve_resource(app, "uv");
-    // Resource copies don't always keep the exec bit; force it.
+    // Resource copies don't always keep the exec bit; restore it only when it's
+    // actually missing. Re-chmodding an already-executable binary needlessly
+    // touches the file, which makes the `tauri dev` file-watcher rebuild the
+    // app mid-setup (it watches src-tauri/, where the bundled uv lives).
     if let Ok(meta) = std::fs::metadata(&uv) {
-        let mut perms = meta.permissions();
-        perms.set_mode(0o755);
-        let _ = std::fs::set_permissions(&uv, perms);
+        if meta.permissions().mode() & 0o111 == 0 {
+            let mut perms = meta.permissions();
+            perms.set_mode(0o755);
+            let _ = std::fs::set_permissions(&uv, perms);
+        }
     }
     let data = app_data(app);
     let mut cmd = Command::new(uv);
@@ -141,6 +156,8 @@ pub fn build_env(app: &tauri::AppHandle) -> Result<(), String> {
             String::from_utf8_lossy(&install.stderr)
         ));
     }
+
+    std::fs::write(deps_marker(app), b"1").map_err(|e| format!("write deps marker: {e}"))?;
     Ok(())
 }
 
