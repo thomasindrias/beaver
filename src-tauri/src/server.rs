@@ -1,0 +1,181 @@
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
+use std::process::{Child, Command};
+use std::sync::Mutex;
+
+use tauri::Manager;
+
+/// Where the app keeps its self-contained MLX environment + model cache.
+/// Everything lives under the Tauri app-data dir so uninstall is clean.
+const VENV_DIRNAME: &str = "mlx-venv";
+const HF_DIRNAME: &str = "hf-cache";
+const UV_CACHE_DIRNAME: &str = "uv-cache";
+const UV_PYTHON_DIRNAME: &str = "uv-python";
+
+/// Coarse setup phase tracked on the Rust side. The fine-grained
+/// downloading/loading/ready states come from the server's /health.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SetupPhase {
+    BuildingEnv,
+    StartingServer,
+    ServerUp,
+    Failed,
+}
+
+/// Managed app state: the localhost port, the server child handle, and the
+/// current setup phase.
+pub struct MlxServer {
+    pub port: u16,
+    pub child: Mutex<Option<Child>>,
+    pub phase: Mutex<SetupPhase>,
+}
+
+/// Bind to port 0 to let the OS pick a free port, then drop the listener so the
+/// port is available for the server to claim. Localhost-only; the tiny TOCTOU
+/// window is acceptable here.
+pub fn free_port() -> std::io::Result<u16> {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+    let port = listener.local_addr()?.port();
+    Ok(port)
+}
+
+fn app_data(app: &tauri::AppHandle) -> PathBuf {
+    app.path()
+        .app_data_dir()
+        .expect("app data dir must resolve")
+}
+
+pub fn venv_python(app: &tauri::AppHandle) -> PathBuf {
+    app_data(app).join(VENV_DIRNAME).join("bin").join("python")
+}
+
+pub fn hf_home(app: &tauri::AppHandle) -> PathBuf {
+    app_data(app).join(HF_DIRNAME)
+}
+
+pub fn env_is_ready(app: &tauri::AppHandle) -> bool {
+    venv_python(app).exists()
+}
+
+/// Marker written after the server first reaches `ready`. This is the source of
+/// truth for "setup has completed at least once" — more reliable than probing
+/// the HF cache dir, which exists mid-download (an interrupted first run would
+/// otherwise look complete and skip the onboarding progress UI).
+pub fn setup_marker(app: &tauri::AppHandle) -> PathBuf {
+    app_data(app).join(".setup-complete")
+}
+
+pub fn setup_is_complete(app: &tauri::AppHandle) -> bool {
+    setup_marker(app).exists()
+}
+
+pub fn mark_setup_complete(app: &tauri::AppHandle) {
+    if let Err(e) = std::fs::write(setup_marker(app), b"1") {
+        eprintln!("Osprey: failed to write setup marker: {e}");
+    }
+}
+
+/// Resolve a bundled resource. In debug builds resources aren't copied to a
+/// bundle, so read them from the crate's `resources/` dir; in release read from
+/// the app's resource dir.
+pub fn resolve_resource(app: &tauri::AppHandle, name: &str) -> PathBuf {
+    if cfg!(debug_assertions) {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources")
+            .join(name)
+    } else {
+        app.path()
+            .resource_dir()
+            .expect("resource dir must resolve")
+            .join("resources")
+            .join(name)
+    }
+}
+
+fn uv_command(app: &tauri::AppHandle) -> Command {
+    let uv = resolve_resource(app, "uv");
+    // Resource copies don't always keep the exec bit; force it.
+    if let Ok(meta) = std::fs::metadata(&uv) {
+        let mut perms = meta.permissions();
+        perms.set_mode(0o755);
+        let _ = std::fs::set_permissions(&uv, perms);
+    }
+    let data = app_data(app);
+    let mut cmd = Command::new(uv);
+    // Keep uv's downloaded Pythons and cache inside the app-data dir.
+    cmd.env("UV_CACHE_DIR", data.join(UV_CACHE_DIRNAME));
+    cmd.env("UV_PYTHON_INSTALL_DIR", data.join(UV_PYTHON_DIRNAME));
+    cmd
+}
+
+/// Build the Python venv and install mlx-vlm into it. Blocking; run off the
+/// main thread. Idempotent enough to re-run after a partial failure.
+pub fn build_env(app: &tauri::AppHandle) -> Result<(), String> {
+    let data = app_data(app);
+    std::fs::create_dir_all(&data).map_err(|e| format!("create app data dir: {e}"))?;
+
+    let venv = data.join(VENV_DIRNAME);
+    let create = uv_command(app)
+        .args(["venv", "--python", "3.12"])
+        .arg(&venv)
+        .output()
+        .map_err(|e| format!("uv venv spawn failed: {e}"))?;
+    if !create.status.success() {
+        return Err(format!(
+            "uv venv failed: {}",
+            String::from_utf8_lossy(&create.stderr)
+        ));
+    }
+
+    let req = resolve_resource(app, "requirements.txt");
+    let install = uv_command(app)
+        .args(["pip", "install", "--python"])
+        .arg(venv_python(app))
+        .arg("-r")
+        .arg(&req)
+        .output()
+        .map_err(|e| format!("uv pip install spawn failed: {e}"))?;
+    if !install.status.success() {
+        return Err(format!(
+            "uv pip install failed: {}",
+            String::from_utf8_lossy(&install.stderr)
+        ));
+    }
+    Ok(())
+}
+
+/// Spawn the MLX server using the venv's Python, with HF_HOME pinned to the
+/// app-data cache. Returns the child handle to be held in managed state.
+pub fn spawn_server(app: &tauri::AppHandle, port: u16) -> Result<Child, String> {
+    let python = venv_python(app);
+    let script = resolve_resource(app, "mlx_server.py");
+    Command::new(python)
+        .arg(script)
+        .arg("--port")
+        .arg(port.to_string())
+        .env("HF_HOME", hf_home(app))
+        .spawn()
+        .map_err(|e| format!("failed to spawn MLX server: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn free_port_returns_a_bindable_port() {
+        let port = free_port().expect("should find a free port");
+        assert!(port > 0);
+        // The helper must release the port so the caller can bind it.
+        let listener = std::net::TcpListener::bind(("127.0.0.1", port)).expect("port is free");
+        drop(listener);
+    }
+
+    #[test]
+    fn free_port_returns_distinct_ports_usually() {
+        // Not guaranteed distinct, but two sequential calls should both succeed.
+        let a = free_port().unwrap();
+        let b = free_port().unwrap();
+        assert!(a > 0 && b > 0);
+    }
+}

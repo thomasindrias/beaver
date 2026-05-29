@@ -2,6 +2,7 @@ mod capture;
 mod db;
 mod mlx;
 mod ollama;
+mod server;
 mod shortcut;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
