@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { Scan, Sparkles, Lock, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "./Logo";
@@ -7,6 +8,10 @@ import { ModelDownload } from "./ModelDownload";
 
 type Step = "welcome" | "download" | "ready";
 interface Props { onComplete: () => void }
+
+// Time the "You're all set" screen stays up before we close onboarding and pop
+// open the menu-bar window, so the user sees where Osprey now lives.
+const READY_DWELL_MS = 2000;
 
 const FEATURES = [
   { icon: Scan, title: "Draw, don't screenshot", body: "Select any region — get the data inside, not a picture." },
@@ -17,6 +22,18 @@ const FEATURES = [
 export function Onboarding({ onComplete }: Props) {
   const [step, setStep] = useState<Step>("welcome");
   const handleDownloadComplete = useCallback(() => setStep("ready"), []);
+
+  // Closes the onboarding window and opens the popover at the menu bar. Falls
+  // back to the in-window swap if the IPC call rejects.
+  const finish = useCallback(() => {
+    invoke("finish_onboarding").catch(() => onComplete());
+  }, [onComplete]);
+
+  useEffect(() => {
+    if (step !== "ready") return;
+    const t = setTimeout(finish, READY_DWELL_MS);
+    return () => clearTimeout(t);
+  }, [step, finish]);
 
   return (
     <div className="flex h-screen w-full flex-col bg-background px-9 py-10 text-foreground">
@@ -75,7 +92,7 @@ export function Onboarding({ onComplete }: Props) {
             history any time from the <span className="text-foreground">Osprey</span> icon in
             your menu bar.
           </p>
-          <Button size="lg" className="mt-8 w-full" onClick={onComplete}>
+          <Button size="lg" className="mt-8 w-full" onClick={finish}>
             Start using Osprey
           </Button>
         </div>

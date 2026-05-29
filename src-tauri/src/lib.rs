@@ -181,7 +181,8 @@ pub fn run() {
             mlx_status,
             write_to_clipboard,
             show_success_notification,
-            is_first_launch
+            is_first_launch,
+            finish_onboarding
         ])
         .build(tauri::generate_context!())
         .expect("error while building Osprey")
@@ -260,6 +261,22 @@ async fn is_first_launch(app: tauri::AppHandle) -> bool {
     !server::setup_is_complete(&app)
 }
 
+// End onboarding once setup is ready: surface the menu-bar popover so the user
+// discovers where Osprey lives, then close the onboarding window. We re-assert
+// the setup marker first so the popover (which reads is_first_launch on mount)
+// can't race into rendering the onboarding view again.
+#[tauri::command]
+fn finish_onboarding(app: tauri::AppHandle) {
+    server::mark_setup_complete(&app);
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(w) = handle.get_webview_window("onboarding") {
+            let _ = w.close();
+        }
+        open_popover_at_menubar(&handle);
+    });
+}
+
 const POPOVER_W: f64 = 320.0;
 const POPOVER_H: f64 = 520.0;
 
@@ -298,6 +315,24 @@ fn popover_position(app: &tauri::AppHandle, icon_rect: tauri::Rect) -> tauri::Lo
     tauri::LogicalPosition::new(win_x, win_y)
 }
 
+// Fallback popover anchor when there's no tray-click rect (e.g. opened
+// programmatically at the end of onboarding). macOS keeps menu-bar items at the
+// top-right, so tucking the popover under the top-right corner of the primary
+// monitor points the user at the Osprey tray icon.
+fn popover_position_menubar(app: &tauri::AppHandle) -> tauri::LogicalPosition<f64> {
+    let margin = 8.0;
+    let below_menubar = 32.0;
+    if let Some(m) = app.primary_monitor().ok().flatten() {
+        let scale = m.scale_factor();
+        let mon_left = m.position().x as f64 / scale;
+        let mon_right = (m.position().x as f64 + m.size().width as f64) / scale;
+        let x = (mon_right - POPOVER_W - margin).max(mon_left + margin);
+        tauri::LogicalPosition::new(x, below_menubar)
+    } else {
+        tauri::LogicalPosition::new(margin, below_menubar)
+    }
+}
+
 fn toggle_popover(app: &tauri::AppHandle, icon_rect: Option<tauri::Rect>) {
     if let Some(w) = app.get_webview_window("popover") {
         if w.is_visible().unwrap_or(false) {
@@ -327,6 +362,13 @@ fn toggle_popover(app: &tauri::AppHandle, icon_rect: Option<tauri::Rect>) {
         return;
     }
 
+    let pos = icon_rect.map(|rect| popover_position(app, rect));
+    build_popover(app, pos);
+}
+
+// Create the popover window, optionally anchored at `pos` (under the tray icon
+// or a menu-bar fallback). Wires up light-dismiss on focus loss.
+fn build_popover(app: &tauri::AppHandle, pos: Option<tauri::LogicalPosition<f64>>) {
     let mut builder = tauri::WebviewWindowBuilder::new(
         app,
         "popover",
@@ -339,8 +381,7 @@ fn toggle_popover(app: &tauri::AppHandle, icon_rect: Option<tauri::Rect>) {
     .shadow(true)
     .inner_size(POPOVER_W, POPOVER_H);
 
-    if let Some(rect) = icon_rect {
-        let p = popover_position(app, rect);
+    if let Some(p) = pos {
         builder = builder.position(p.x, p.y);
     }
 
@@ -368,6 +409,19 @@ fn toggle_popover(app: &tauri::AppHandle, icon_rect: Option<tauri::Rect>) {
             let _ = window.set_focus();
         }
         Err(e) => eprintln!("Osprey: failed to create popover window: {e}"),
+    }
+}
+
+// Show the popover anchored near the menu bar, creating it if needed. Used to
+// reveal the tray location at the end of onboarding.
+fn open_popover_at_menubar(app: &tauri::AppHandle) {
+    let pos = popover_position_menubar(app);
+    if let Some(w) = app.get_webview_window("popover") {
+        let _ = w.set_position(pos);
+        let _ = w.show();
+        let _ = w.set_focus();
+    } else {
+        build_popover(app, Some(pos));
     }
 }
 
