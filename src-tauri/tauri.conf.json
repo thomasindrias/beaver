@@ -29,7 +29,11 @@
       "entitlements": "entitlements.plist",
       "infoPlist": "Info.plist"
     },
-    "externalBin": ["binaries/ollama"]
+    "resources": [
+      "resources/uv",
+      "resources/mlx_server.py",
+      "resources/requirements.txt"
+    ]
   },
   "plugins": {
     "shell": { "open": true }
