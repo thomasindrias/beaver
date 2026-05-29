@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Python (MLX vision server bytecode)
+__pycache__/
+*.pyc
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
