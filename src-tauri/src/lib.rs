@@ -12,11 +12,6 @@ use tauri::{
     Manager,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
-use tauri_plugin_shell::{process::CommandChild, ShellExt};
-
-
-#[allow(dead_code)]
-struct OllamaChild(Mutex<Option<CommandChild>>);
 
 // Tracks when the popover was last auto-hidden on focus loss, so a tray-icon
 // click that triggered that blur doesn't immediately re-open the window.
@@ -79,40 +74,25 @@ pub fn run() {
                 }
             })?;
 
-            // Start Ollama sidecar — keep CommandChild in state so it isn't dropped/killed
-            let sidecar = app.shell().sidecar("ollama")
-                .expect("ollama sidecar not configured")
-                // Never hold more than one model resident at a time.
-                .env("OLLAMA_MAX_LOADED_MODELS", "1");
-            match sidecar.args(["serve"]).spawn() {
-                Ok((_rx, child)) => {
-                    app.manage(OllamaChild(Mutex::new(Some(child))));
-                }
-                Err(e) => {
-                    eprintln!("Osprey: failed to start Ollama sidecar: {e}");
-                    app.manage(OllamaChild(Mutex::new(None)));
-                }
-            }
+            // Pick a free localhost port and register server state up front so
+            // commands can read it immediately.
+            let port = server::free_port().unwrap_or(11500);
+            app.manage(server::MlxServer {
+                port,
+                child: Mutex::new(None),
+                phase: Mutex::new(server::SetupPhase::BuildingEnv),
+            });
 
-            // Wait for Ollama and decide on onboarding OFF the main thread, so the
-            // tray icon and app become usable immediately instead of blocking on a
-            // sidecar that can take several seconds to bind its port.
+            // Build the venv (first run only), spawn the server, and poll it to
+            // readiness — all off the main thread so the tray is usable at once.
+            // Show onboarding immediately when the model isn't cached yet, so the
+            // user watches setup progress instead of a blank app.
             let handle = app.handle().clone();
             std::thread::spawn(move || {
-                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
-                let mut ready = false;
-                while std::time::Instant::now() < deadline {
-                    if tauri::async_runtime::block_on(ollama::is_running()) {
-                        ready = true;
-                        break;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(300));
-                }
-                if !ready {
-                    eprintln!("Osprey: Ollama is not reachable — captures will fail");
-                    return;
-                }
-                if !tauri::async_runtime::block_on(ollama::is_model_installed()) {
+                let state = handle.state::<server::MlxServer>();
+                let first_launch = !server::setup_is_complete(&handle);
+
+                if first_launch {
                     let h = handle.clone();
                     let _ = handle.run_on_main_thread(move || {
                         let result = tauri::WebviewWindowBuilder::new(
@@ -129,33 +109,134 @@ pub fn run() {
                         }
                     });
                 }
+
+                if !server::env_is_ready(&handle) {
+                    *state.phase.lock().unwrap() = server::SetupPhase::BuildingEnv;
+                    if let Err(e) = server::build_env(&handle) {
+                        eprintln!("Osprey: MLX env build failed: {e}");
+                        *state.phase.lock().unwrap() = server::SetupPhase::Failed;
+                        return;
+                    }
+                }
+
+                *state.phase.lock().unwrap() = server::SetupPhase::StartingServer;
+                match server::spawn_server(&handle, state.port) {
+                    Ok(child) => {
+                        *state.child.lock().unwrap() = Some(child);
+                    }
+                    Err(e) => {
+                        eprintln!("Osprey: failed to spawn MLX server: {e}");
+                        *state.phase.lock().unwrap() = server::SetupPhase::Failed;
+                        return;
+                    }
+                }
+
+                // Poll to readiness. Do NOT impose a wall-clock deadline while the
+                // server is reachable and reports progress — the first run can
+                // download a few hundred MB of deps plus a ~3 GB model on a slow
+                // link. Only fail if the server stays UNREACHABLE for a sustained
+                // window (the process likely died), with a generous absolute cap
+                // as a final backstop.
+                let started = std::time::Instant::now();
+                let mut last_reachable = std::time::Instant::now();
+                let unreachable_grace = std::time::Duration::from_secs(60);
+                let absolute_cap = std::time::Duration::from_secs(3600);
+                loop {
+                    match tauri::async_runtime::block_on(mlx::health(state.port)) {
+                        Ok(h) => {
+                            last_reachable = std::time::Instant::now();
+                            match h.status {
+                                mlx::ServerStatus::Ready => {
+                                    *state.phase.lock().unwrap() = server::SetupPhase::ServerUp;
+                                    server::mark_setup_complete(&handle);
+                                    break;
+                                }
+                                mlx::ServerStatus::Error => {
+                                    *state.phase.lock().unwrap() = server::SetupPhase::Failed;
+                                    break;
+                                }
+                                // downloading / loading — keep waiting.
+                                _ => {}
+                            }
+                        }
+                        Err(_) => {
+                            if last_reachable.elapsed() > unreachable_grace {
+                                eprintln!("Osprey: MLX server unreachable — giving up");
+                                *state.phase.lock().unwrap() = server::SetupPhase::Failed;
+                                break;
+                            }
+                        }
+                    }
+                    if started.elapsed() > absolute_cap {
+                        eprintln!("Osprey: MLX server setup exceeded the time cap");
+                        *state.phase.lock().unwrap() = server::SetupPhase::Failed;
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
             });
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![capture_and_extract, ollama_is_running, model_is_installed, write_to_clipboard, show_success_notification, is_first_launch, pull_model])
-        .run(tauri::generate_context!())
-        .expect("error while running Osprey");
+        .invoke_handler(tauri::generate_handler![
+            capture_and_extract,
+            mlx_status,
+            write_to_clipboard,
+            show_success_notification,
+            is_first_launch
+        ])
+        .build(tauri::generate_context!())
+        .expect("error while building Osprey")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                if let Some(state) = app.try_state::<server::MlxServer>() {
+                    if let Ok(mut guard) = state.child.lock() {
+                        if let Some(mut child) = guard.take() {
+                            let _ = child.kill();
+                        }
+                    }
+                }
+            }
+        });
 }
 
 #[tauri::command]
-async fn ollama_is_running() -> bool {
-    ollama::is_running().await
-}
+async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<String, ()> {
+    // Copy the cheap bits out before any await so we never hold the lock across it.
+    let phase = *state.phase.lock().unwrap();
+    let port = state.port;
 
-#[tauri::command]
-async fn model_is_installed() -> bool {
-    ollama::is_model_installed().await
+    let label = match phase {
+        server::SetupPhase::BuildingEnv => "preparing".to_string(),
+        server::SetupPhase::Failed => "error".to_string(),
+        server::SetupPhase::StartingServer | server::SetupPhase::ServerUp => {
+            match mlx::health(port).await {
+                Ok(h) => match h.status {
+                    mlx::ServerStatus::Downloading => "downloading",
+                    mlx::ServerStatus::Loading => "loading",
+                    mlx::ServerStatus::Ready => "ready",
+                    mlx::ServerStatus::Error => "error",
+                }
+                .to_string(),
+                Err(_) => "starting".to_string(),
+            }
+        }
+    };
+    Ok(label)
 }
 
 // Capture and extract in one hop: the (multi-MB) image bytes stay in Rust and
-// are base64-encoded once for Ollama, instead of round-tripping to the frontend
-// and back across the IPC boundary as a giant string.
+// are base64-encoded once for the MLX server, instead of round-tripping to the
+// frontend and back across the IPC boundary as a giant string.
 #[tauri::command]
-async fn capture_and_extract(region: capture::CaptureRegion) -> Result<String, String> {
+async fn capture_and_extract(
+    region: capture::CaptureRegion,
+    state: tauri::State<'_, server::MlxServer>,
+) -> Result<String, String> {
+    let port = state.port;
     let bytes = capture::capture_region(&region).map_err(|e| e.to_string())?;
     let image_base64 = STANDARD.encode(&bytes);
-    ollama::extract_from_image(&image_base64).await
+    mlx::extract_from_image(port, &image_base64).await
 }
 
 #[tauri::command]
@@ -175,31 +256,10 @@ async fn show_success_notification(app: tauri::AppHandle) -> Result<(), String> 
         .map_err(|e| e.to_string())
 }
 
-
+// First launch == setup has never completed (no marker), so onboarding runs.
 #[tauri::command]
-async fn is_first_launch() -> bool {
-    !ollama::is_model_installed().await
-}
-
-#[tauri::command]
-async fn pull_model(window: tauri::WebviewWindow) -> Result<(), String> {
-    let client = reqwest::Client::new();
-    let mut resp = client
-        .post(ollama::api_url("/api/pull"))
-        .json(&serde_json::json!({ "model": ollama::MODEL_NAME, "stream": true }))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    use tauri::Emitter;
-    while let Some(chunk) = resp.chunk().await.map_err(|e| e.to_string())? {
-        if let Ok(text) = std::str::from_utf8(&chunk) {
-            for line in text.lines().filter(|l| !l.is_empty()) {
-                let _ = window.emit("model-pull-progress", line);
-            }
-        }
-    }
-    Ok(())
+async fn is_first_launch(app: tauri::AppHandle) -> bool {
+    !server::setup_is_complete(&app)
 }
 
 const POPOVER_W: f64 = 320.0;
@@ -314,10 +374,6 @@ fn toggle_popover(app: &tauri::AppHandle, icon_rect: Option<tauri::Rect>) {
 }
 
 fn show_capture_overlay(app: &tauri::AppHandle) {
-    // Warm the vision model now so the cold-load happens while the user drags
-    // the selection, not after they release.
-    tauri::async_runtime::spawn(ollama::warm_model());
-
     if let Some(w) = app.get_webview_window("capture-overlay") {
         if let Err(e) = w.show() { eprintln!("Osprey: failed to show capture overlay: {e}"); }
         if let Err(e) = w.set_focus() { eprintln!("Osprey: failed to focus capture overlay: {e}"); }
