@@ -5,6 +5,10 @@
   "windows": ["popover", "main", "capture-overlay", "onboarding"],
   "permissions": [
     "core:default",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-close",
+    "core:window:allow-set-focus",
     "sql:default",
     "sql:allow-execute",
     "clipboard-manager:allow-read-text",

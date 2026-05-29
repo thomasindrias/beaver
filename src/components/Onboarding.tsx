@@ -1,62 +1,85 @@
 import { useState, useCallback } from "react";
+import { Scan, Sparkles, Lock, ArrowRight, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Logo } from "./Logo";
+import { Kbd } from "./Kbd";
 import { ModelDownload } from "./ModelDownload";
 
 type Step = "welcome" | "download" | "ready";
 interface Props { onComplete: () => void }
 
+const FEATURES = [
+  { icon: Scan, title: "Draw, don't screenshot", body: "Select any region — get the data inside, not a picture." },
+  { icon: Sparkles, title: "Structured by AI", body: "Tables, code and lists come out clean and ready to paste." },
+  { icon: Lock, title: "Fully on-device", body: "Your screen never leaves your Mac. No cloud, no accounts." },
+];
+
 export function Onboarding({ onComplete }: Props) {
   const [step, setStep] = useState<Step>("welcome");
   const handleDownloadComplete = useCallback(() => setStep("ready"), []);
 
-  const style: React.CSSProperties = {
-    height: "100vh",
-    background: "#0d0d0d",
-    color: "#f5f5f5",
-    fontFamily: "system-ui",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 48,
-    textAlign: "center",
-  };
-
-  if (step === "welcome") return (
-    <div style={style}>
-      <div style={{ fontSize: 52, marginBottom: 16 }}>🦅</div>
-      <h1 style={{ fontWeight: 700, fontSize: 26, marginBottom: 10 }}>Meet Osprey.</h1>
-      <p style={{ color: "#666", lineHeight: 1.7, marginBottom: 32, maxWidth: 380 }}>
-        Press <kbd style={{ background: "#1f1f1f", padding: "2px 6px", borderRadius: 4 }}>⌘⇧D</kbd> anywhere,
-        draw around anything on your screen, and get the data — not a screenshot.
-        Fully local. Never leaves your Mac.
-      </p>
-      <button onClick={() => setStep("download")} style={btnStyle}>
-        Get started
-      </button>
-    </div>
-  );
-
-  if (step === "download") return (
-    <div style={style}>
-      <ModelDownload onComplete={handleDownloadComplete} />
-    </div>
-  );
-
   return (
-    <div style={style}>
-      <div style={{ fontSize: 52, marginBottom: 16 }}>✓</div>
-      <h1 style={{ fontWeight: 700, fontSize: 26, marginBottom: 10 }}>You're set.</h1>
-      <p style={{ color: "#666", lineHeight: 1.7, marginBottom: 32, maxWidth: 380 }}>
-        Press <kbd style={{ background: "#1f1f1f", padding: "2px 6px", borderRadius: 4 }}>⌘⇧D</kbd> anywhere
-        to capture. Click the Osprey icon in your menu bar to see your history.
-      </p>
-      <button onClick={onComplete} style={btnStyle}>Start using Osprey</button>
+    <div className="flex h-screen w-full flex-col bg-background px-9 py-10 text-foreground">
+      {step === "welcome" && (
+        <div key="welcome" className="animate-rise flex flex-1 flex-col">
+          <div className="flex flex-col items-center text-center">
+            <Logo size={64} live className="mb-5" />
+            <h1 className="text-[26px] font-semibold tracking-tight">
+              Meet <span className="text-primary">Osprey</span>
+            </h1>
+            <p className="mt-2 max-w-[320px] text-sm leading-relaxed text-muted-foreground">
+              Capture the data on your screen — not a screenshot of it.
+            </p>
+          </div>
+
+          <div className="mt-8 flex flex-col gap-3">
+            {FEATURES.map(({ icon: Icon, title, body }) => (
+              <div
+                key={title}
+                className="flex items-start gap-3 rounded-xl border border-border bg-card/60 p-3"
+              >
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                  <Icon className="size-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium leading-tight">{title}</p>
+                  <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-auto pt-8">
+            <Button size="lg" className="w-full" onClick={() => setStep("download")}>
+              Get started
+              <ArrowRight className="size-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {step === "download" && (
+        <div key="download" className="animate-rise flex flex-1 flex-col items-center justify-center text-center">
+          <ModelDownload onComplete={handleDownloadComplete} />
+        </div>
+      )}
+
+      {step === "ready" && (
+        <div key="ready" className="animate-rise flex flex-1 flex-col items-center justify-center text-center">
+          <div className="relative mb-6 flex size-16 items-center justify-center rounded-2xl bg-primary/12">
+            <Check className="size-8 text-primary" strokeWidth={2.5} />
+          </div>
+          <h1 className="text-[26px] font-semibold tracking-tight">You're all set</h1>
+          <p className="mt-3 max-w-[320px] text-sm leading-relaxed text-muted-foreground">
+            Press <Kbd>⌘</Kbd> <Kbd>⇧</Kbd> <Kbd>D</Kbd> anywhere to capture. Find your
+            history any time from the <span className="text-foreground">Osprey</span> icon in
+            your menu bar.
+          </p>
+          <Button size="lg" className="mt-8 w-full" onClick={onComplete}>
+            Start using Osprey
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
-
-const btnStyle: React.CSSProperties = {
-  background: "#f59e0b", color: "#000", border: "none",
-  padding: "10px 28px", borderRadius: 6, fontWeight: 700,
-  cursor: "pointer", fontSize: 15,
-};

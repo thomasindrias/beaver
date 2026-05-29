@@ -1,0 +1,144 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+/* ── Osprey design tokens ─────────────────────────────────────────────
+   A single, always-dark identity. Warm-gold accent (the osprey's eye)
+   against a near-black slate. Precise, calm, premium. */
+:root {
+  --radius: 0.75rem;
+
+  --background: oklch(0.165 0.006 285);
+  --foreground: oklch(0.97 0.004 286);
+
+  --card: oklch(0.205 0.007 285);
+  --card-foreground: oklch(0.97 0.004 286);
+
+  --popover: oklch(0.19 0.007 285);
+  --popover-foreground: oklch(0.97 0.004 286);
+
+  --primary: oklch(0.81 0.155 78);
+  --primary-foreground: oklch(0.2 0.03 60);
+
+  --secondary: oklch(0.27 0.008 285);
+  --secondary-foreground: oklch(0.95 0.004 286);
+
+  --muted: oklch(0.25 0.007 285);
+  --muted-foreground: oklch(0.65 0.012 286);
+
+  --accent: oklch(0.28 0.01 285);
+  --accent-foreground: oklch(0.97 0.004 286);
+
+  --destructive: oklch(0.62 0.21 25);
+  --destructive-foreground: oklch(0.98 0.004 286);
+
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.81 0.155 78);
+
+  --chart-1: oklch(0.81 0.155 78);
+  --chart-2: oklch(0.68 0.15 230);
+  --chart-3: oklch(0.7 0.16 150);
+  --chart-4: oklch(0.66 0.18 300);
+  --chart-5: oklch(0.62 0.21 25);
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --font-sans: "Geist Variable", ui-sans-serif, -apple-system,
+    BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: transparent;
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    margin: 0;
+    overflow: hidden;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.42 0.01 285);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.52 0.01 285);
+    background-clip: content-box;
+  }
+}
+
+/* Subtle entrance used across surfaces */
+@keyframes osprey-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-rise {
+  animation: osprey-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Soft amber pulse for the live capture/processing state */
+@keyframes osprey-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.animate-osprey-pulse {
+  animation: osprey-pulse 1.6s ease-in-out infinite;
+}

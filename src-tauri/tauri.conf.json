@@ -32,10 +32,6 @@
     "externalBin": ["binaries/ollama"]
   },
   "plugins": {
-    "sql": {},
-    "clipboard-manager": {},
-    "global-shortcut": {},
-    "shell": { "open": true },
-    "notification": {}
+    "shell": { "open": true }
   }
 }

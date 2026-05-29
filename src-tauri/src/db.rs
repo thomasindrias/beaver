@@ -1,10 +1,11 @@
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 pub fn migrations() -> Vec<Migration> {
-    vec![Migration {
-        version: 1,
-        description: "create captures table",
-        sql: "CREATE TABLE IF NOT EXISTS captures (
+    vec![
+        Migration {
+            version: 1,
+            description: "create captures table",
+            sql: "CREATE TABLE IF NOT EXISTS captures (
             id TEXT PRIMARY KEY,
             created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
             content TEXT NOT NULL,
@@ -13,8 +14,16 @@ pub fn migrations() -> Vec<Migration> {
             char_count INTEGER NOT NULL,
             app_context TEXT
         );",
-        kind: MigrationKind::Up,
-    }]
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "index captures by created_at for history ordering",
+            sql: "CREATE INDEX IF NOT EXISTS idx_captures_created_at
+                  ON captures (created_at DESC);",
+            kind: MigrationKind::Up,
+        },
+    ]
 }
 
 #[cfg(test)]
@@ -22,13 +31,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn migration_count_is_one() {
-        assert_eq!(migrations().len(), 1);
+    fn has_table_and_index_migrations() {
+        let m = migrations();
+        assert_eq!(m.len(), 2);
+        assert_eq!(m[0].version, 1);
+        assert_eq!(m[1].version, 2);
     }
 
     #[test]
-    fn migration_version_is_one() {
-        assert_eq!(migrations()[0].version, 1);
+    fn second_migration_indexes_created_at() {
+        let sql = migrations()[1].sql;
+        assert!(sql.contains("CREATE INDEX IF NOT EXISTS idx_captures_created_at"));
+        assert!(sql.contains("created_at"));
     }
 
     #[test]

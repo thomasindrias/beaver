@@ -1,6 +1,13 @@
 pub const OLLAMA_BASE_URL: &str = "http://127.0.0.1:11434";
 pub const MODEL_NAME: &str = "qwen2.5vl:3b";
 
+// How long Ollama keeps the vision model resident after a request. A short
+// idle window means a burst of captures reuses the already-loaded model (no
+// repeated cold-start), while still freeing the ~several-GB footprint once the
+// user stops capturing. keep_alive:0 (unload immediately) made every single
+// capture pay the full load cost.
+pub const KEEP_ALIVE: &str = "90s";
+
 pub fn api_url(path: &str) -> String {
     format!("{}{}", OLLAMA_BASE_URL, path)
 }
@@ -67,12 +74,18 @@ struct GenerateResponse {
 }
 
 pub async fn extract_from_image(image_base64: &str) -> Result<String, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
     let body = serde_json::json!({
         "model": MODEL_NAME,
         "prompt": EXTRACTION_PROMPT,
         "images": [image_base64],
-        "stream": false
+        "stream": false,
+        // Hold the model for a short window so a burst of captures stays fast,
+        // then let Ollama free the RAM. See KEEP_ALIVE.
+        "keep_alive": KEEP_ALIVE
     });
 
     let resp = client
@@ -90,6 +103,25 @@ pub async fn extract_from_image(image_base64: &str) -> Result<String, String> {
         .map_err(|e| format!("Failed to parse Ollama response: {e}"))?;
 
     Ok(result.response.trim().to_string())
+}
+
+/// Loads the model into memory ahead of an extraction. Fired when the capture
+/// overlay opens, so the cold-load happens while the user is selecting a region.
+/// Uses the same KEEP_ALIVE window as extraction so the model stays resident
+/// from warm-up through the request and any follow-up captures.
+pub async fn warm_model() {
+    let Ok(client) = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+    else {
+        return;
+    };
+    // An empty prompt makes Ollama load the model and return without generating.
+    let _ = client
+        .post(api_url("/api/generate"))
+        .json(&serde_json::json!({ "model": MODEL_NAME, "keep_alive": KEEP_ALIVE }))
+        .send()
+        .await;
 }
 
 #[cfg(test)]

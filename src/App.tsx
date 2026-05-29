@@ -1,16 +1,25 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { CaptureOverlay, type Rect } from "./components/CaptureOverlay";
-import { TrayPopover } from "./components/TrayPopover";
-import { Onboarding } from "./components/Onboarding";
 import { useOsprey } from "./hooks/useOsprey";
 import { useCaptures } from "./hooks/useCaptures";
+
+// The capture overlay opens on a global shortcut and must paint instantly, so
+// it stays eager. The popover and onboarding load only in their own windows.
+const TrayPopover = lazy(() =>
+  import("./components/TrayPopover").then(m => ({ default: m.TrayPopover }))
+);
+const Onboarding = lazy(() =>
+  import("./components/Onboarding").then(m => ({ default: m.Onboarding }))
+);
 
 export default function App() {
   const route = window.location.pathname;
   const [ready, setReady] = useState<boolean | null>(null);
-  const { saveCapture } = useCaptures();
+  // App never renders the history list itself (TrayPopover does), so it only
+  // needs saveCapture — skip the redundant history fetch.
+  const { saveCapture } = useCaptures({ autoLoad: false });
   const { runCapture } = useOsprey(saveCapture);
 
   useEffect(() => {
@@ -19,9 +28,12 @@ export default function App() {
 
   const handleCapture = useCallback(async (region: Rect) => {
     const win = getCurrentWindow();
-    await win.hide();
-    await runCapture(region);
-    await win.close();
+    try {
+      await win.hide();
+      await runCapture(region);
+    } finally {
+      await win.close().catch(() => {});
+    }
   }, [runCapture]);
 
   const handleCancel = useCallback(async () => {
@@ -34,9 +46,9 @@ export default function App() {
 
   if (ready === null) return null;
 
-  if (!ready) {
-    return <Onboarding onComplete={() => setReady(true)} />;
-  }
-
-  return <TrayPopover />;
+  return (
+    <Suspense fallback={null}>
+      {ready ? <TrayPopover /> : <Onboarding onComplete={() => setReady(true)} />}
+    </Suspense>
+  );
 }

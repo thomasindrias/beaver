@@ -1,57 +1,121 @@
+import { useState } from "react";
+import {
+  Table2,
+  Code2,
+  List,
+  AlignLeft,
+  Layers,
+  Copy,
+  Check,
+  ChevronDown,
+} from "lucide-react";
 import type { Capture, ContentType } from "../types";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-const BADGE: Record<ContentType, string> = {
-  table: "#3b82f6", code: "#10b981", list: "#8b5cf6",
-  prose: "#6b7280", mixed: "#f59e0b",
+const TYPE_META: Record<
+  ContentType,
+  { label: string; Icon: typeof Table2; dot: string; text: string }
+> = {
+  table: { label: "Table", Icon: Table2, dot: "bg-sky-400", text: "text-sky-300" },
+  code: { label: "Code", Icon: Code2, dot: "bg-emerald-400", text: "text-emerald-300" },
+  list: { label: "List", Icon: List, dot: "bg-violet-400", text: "text-violet-300" },
+  prose: { label: "Text", Icon: AlignLeft, dot: "bg-zinc-400", text: "text-zinc-300" },
+  mixed: { label: "Mixed", Icon: Layers, dot: "bg-primary", text: "text-primary" },
 };
 
 interface Props { capture: Capture; onCopy: (content: string) => void }
 
 export function CaptureEntry({ capture, onCopy }: Props) {
-  const preview = capture.content.split("\n").slice(0, 2).join(" ").slice(0, 80);
+  const [copied, setCopied] = useState(false);
+  const meta = TYPE_META[capture.content_type];
+  const preview = capture.content.split("\n").slice(0, 2).join(" ").slice(0, 90);
   const ago = formatAgo(capture.created_at);
 
+  const handleCopy = () => {
+    onCopy(capture.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
   return (
-    <div style={{ padding: "10px 12px", borderBottom: "1px solid #1f1f1f", display: "flex", flexDirection: "column", gap: 4 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, padding: "1px 6px", borderRadius: 3, background: BADGE[capture.content_type], color: "#fff" }}>
-          {capture.content_type}
+    <div className="group rounded-xl border border-border bg-card/50 p-2.5 transition-colors hover:border-white/15 hover:bg-card">
+      <div className="flex items-center gap-2">
+        <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium ${meta.text}`}>
+          <meta.Icon className="size-3.5" />
+          {meta.label}
         </span>
-        {capture.app_context && <span style={{ fontSize: 11, color: "#555" }}>{capture.app_context}</span>}
-        <span style={{ fontSize: 11, color: "#444", marginLeft: "auto" }}>{ago}</span>
+        {capture.app_context && (
+          <span className="truncate text-[11px] text-muted-foreground/70">
+            {capture.app_context}
+          </span>
+        )}
+        <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
+          {ago}
+        </span>
       </div>
 
-      <p style={{ fontSize: 12, color: "#888", margin: 0, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {preview}
+      <p className="mt-1.5 line-clamp-2 font-mono text-[11.5px] leading-snug text-muted-foreground">
+        {preview || "—"}
       </p>
 
-      <div style={{ display: "flex", gap: 6 }}>
-        <button
-          aria-label="Copy"
-          onClick={() => onCopy(capture.content)}
-          style={{ fontSize: 12, padding: "2px 8px", background: "#2a2a2a", border: "none", borderRadius: 3, color: "#ccc", cursor: "pointer" }}
+      <div className="mt-2 flex items-center gap-1.5">
+        <Button
+          size="xs"
+          variant="secondary"
+          onClick={handleCopy}
+          className="gap-1"
+          aria-label="Copy capture"
         >
-          Copy
-        </button>
-        <ExportSelect capture={capture} />
+          {copied ? (
+            <>
+              <Check className="size-3 text-primary" /> Copied
+            </>
+          ) : (
+            <>
+              <Copy className="size-3" /> Copy
+            </>
+          )}
+        </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button size="xs" variant="ghost" className="gap-1 text-muted-foreground" />
+            }
+          >
+            Export
+            <ChevronDown className="size-3" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-36">
+            {exportFormats(capture).map((f) => (
+              <DropdownMenuItem key={f} onClick={() => exportCapture(capture, f)}>
+                {f}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <span className="ml-auto text-[10px] tabular-nums text-muted-foreground/60">
+          {capture.char_count.toLocaleString()} chars
+        </span>
       </div>
     </div>
   );
 }
 
-function ExportSelect({ capture }: { capture: Capture }) {
-  const formats = ["Markdown", "Plain text", "JSON", ...(capture.content_type === "table" ? ["CSV"] : [])];
-
-  return (
-    <select
-      defaultValue=""
-      onChange={(e) => { exportCapture(capture, e.target.value); e.target.value = ""; }}
-      style={{ fontSize: 12, background: "#2a2a2a", border: "none", borderRadius: 3, color: "#ccc", cursor: "pointer" }}
-    >
-      <option value="" disabled>Export</option>
-      {formats.map(f => <option key={f} value={f}>{f}</option>)}
-    </select>
-  );
+function exportFormats(capture: Capture): string[] {
+  return [
+    "Markdown",
+    "Plain text",
+    "JSON",
+    ...(capture.content_type === "table" ? ["CSV"] : []),
+  ];
 }
 
 function exportCapture(capture: Capture, format: string) {
@@ -63,17 +127,23 @@ function exportCapture(capture: Capture, format: string) {
       .replace(/\*\*(.*?)\*\*/g, "$1")
       .replace(/`+/g, "")
       .replace(/^\|[-:| ]+\|$/gm, "")
-      .replace(/^\|.*\|$/gm, row => row.split("|").filter(Boolean).map(c => c.trim()).join("\t"))
+      .replace(/^\|.*\|$/gm, (row) =>
+        row.split("|").filter(Boolean).map((c) => c.trim()).join("\t"),
+      )
       .replace(/^\s*[-*+]\s+/gm, "")
       .trim();
   } else if (format === "JSON") {
-    out = JSON.stringify({ type: capture.content_type, captured_at: capture.created_at, content: capture.content }, null, 2);
+    out = JSON.stringify(
+      { type: capture.content_type, captured_at: capture.created_at, content: capture.content },
+      null,
+      2,
+    );
   } else if (format === "CSV" && capture.content_type === "table") {
     const csvCell = (c: string) => `"${c.replace(/"/g, '""')}"`;
     out = capture.content
       .split("\n")
-      .filter(l => l.startsWith("|") && !/^\|[-:| ]+\|$/.test(l))
-      .map(l => l.split("|").filter(Boolean).map(c => csvCell(c.trim())).join(","))
+      .filter((l) => l.startsWith("|") && !/^\|[-:| ]+\|$/.test(l))
+      .map((l) => l.split("|").filter(Boolean).map((c) => csvCell(c.trim())).join(","))
       .join("\n");
   }
 

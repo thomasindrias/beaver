@@ -1,6 +1,9 @@
 import { useCallback } from "react";
 import type { Capture } from "../types";
 import { CaptureEntry } from "./CaptureEntry";
+import { Logo } from "./Logo";
+import { Kbd } from "./Kbd";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Props { captures: Capture[] }
 
@@ -11,17 +14,24 @@ export function HistoryList({ captures }: Props) {
 
   if (captures.length === 0) {
     return (
-      <div style={{ padding: 24, textAlign: "center", color: "#444", fontSize: 13 }}>
-        No captures yet —{" "}
-        <kbd style={{ background: "#222", padding: "1px 5px", borderRadius: 3, color: "#888" }}>⌘⇧D</kbd>{" "}
-        anywhere to start.
+      <div className="flex h-full flex-col items-center justify-center px-8 text-center">
+        <Logo size={44} className="opacity-40" />
+        <p className="mt-4 text-sm font-medium text-foreground">No captures yet</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+          Press <Kbd>⌘</Kbd> <Kbd>⇧</Kbd> <Kbd>D</Kbd> and draw around anything on your
+          screen to pull the data out.
+        </p>
       </div>
     );
   }
 
   return (
-    <div style={{ overflowY: "auto", maxHeight: 460 }}>
-      {captures.map(c => <CaptureEntry key={c.id} capture={c} onCopy={handleCopy} />)}
-    </div>
+    <ScrollArea className="h-full">
+      <div className="flex flex-col gap-1.5 p-2">
+        {captures.map((c) => (
+          <CaptureEntry key={c.id} capture={c} onCopy={handleCopy} />
+        ))}
+      </div>
+    </ScrollArea>
   );
 }

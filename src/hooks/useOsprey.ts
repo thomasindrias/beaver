@@ -10,8 +10,7 @@ export function useOsprey(onSave?: (capture: Omit<Capture, "id" | "created_at">)
   const runCapture = useCallback(async (region: CaptureRegion) => {
     setState("processing");
     try {
-      const imageBase64: string = await invoke("capture_screen_region", { region });
-      const markdown: string = await invoke("extract_from_image", { imageBase64 });
+      const markdown: string = await invoke("capture_and_extract", { region });
       const contentType = detectContentType(markdown);
 
       await invoke("write_to_clipboard", { text: markdown });

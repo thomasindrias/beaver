@@ -2,9 +2,14 @@
 // type-mismatch that arises because our Cargo.toml also depends on `image`
 // 0.25.x.  `RgbaImage` returned by the screenshots crate is defined in
 // 0.24.x, so we must use the same version's `ImageOutputFormat`.
-use screenshots::image::ImageOutputFormat;
+use screenshots::image::{imageops::FilterType, ImageOutputFormat, RgbaImage};
 use screenshots::Screen;
 use std::io::Cursor;
+
+/// Cap the long edge of a capture before it goes to the vision model. The model
+/// downsamples internally anyway; sending fewer pixels means a smaller PNG, less
+/// IPC/JSON, and fewer image tokens — without hurting text legibility.
+const MAX_EDGE: u32 = 1568;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct CaptureRegion {
@@ -51,11 +56,26 @@ pub fn capture_region(region: &CaptureRegion) -> Result<Vec<u8>, CaptureError> {
         .capture_area(region.x, region.y, region.width, region.height)
         .map_err(|e| CaptureError::CaptureFailed(e.to_string()))?;
 
+    let img = downscale_to_max_edge(img, MAX_EDGE);
+
     let mut buf = Vec::new();
     img.write_to(&mut Cursor::new(&mut buf), ImageOutputFormat::Png)
         .map_err(|e| CaptureError::EncodeFailed(e.to_string()))?;
 
     Ok(buf)
+}
+
+/// Scale the image down so its longest edge is at most `max_edge`, preserving
+/// aspect ratio. Images already within the limit are returned untouched.
+fn downscale_to_max_edge(img: RgbaImage, max_edge: u32) -> RgbaImage {
+    let longest = img.width().max(img.height());
+    if longest <= max_edge {
+        return img;
+    }
+    let scale = max_edge as f32 / longest as f32;
+    let nw = ((img.width() as f32 * scale).round() as u32).max(1);
+    let nh = ((img.height() as f32 * scale).round() as u32).max(1);
+    screenshots::image::imageops::resize(&img, nw, nh, FilterType::Lanczos3)
 }
 
 #[cfg(test)]
@@ -79,5 +99,20 @@ mod tests {
     fn capture_error_displays_failed_message_with_detail() {
         let e = CaptureError::CaptureFailed("timeout".into());
         assert!(e.to_string().contains("timeout"));
+    }
+
+    #[test]
+    fn downscale_leaves_small_images_untouched() {
+        let img = RgbaImage::new(800, 600);
+        let out = downscale_to_max_edge(img, MAX_EDGE);
+        assert_eq!((out.width(), out.height()), (800, 600));
+    }
+
+    #[test]
+    fn downscale_caps_long_edge_and_keeps_aspect() {
+        let img = RgbaImage::new(4000, 2000);
+        let out = downscale_to_max_edge(img, 1568);
+        assert_eq!(out.width(), 1568);
+        assert_eq!(out.height(), 784);
     }
 }

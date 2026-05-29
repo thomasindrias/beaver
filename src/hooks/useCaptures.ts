@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import Database from "@tauri-apps/plugin-sql";
 import type { Capture } from "../types";
 
-export function useCaptures() {
+// `autoLoad` controls whether history is fetched. The capture overlay only
+// needs to INSERT, so it passes false to skip the SELECT-500 on mount.
+export function useCaptures({ autoLoad = true }: { autoLoad?: boolean } = {}) {
   const [captures, setCaptures] = useState<Capture[]>([]);
 
   const refresh = useCallback(async () => {
@@ -27,12 +29,14 @@ export function useCaptures() {
           capture.app_context ?? null,
         ]
       );
-      await refresh();
+      if (autoLoad) await refresh();
     },
-    [refresh]
+    [autoLoad, refresh]
   );
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    if (autoLoad) refresh();
+  }, [autoLoad, refresh]);
 
   return { captures, refresh, saveCapture };
 }

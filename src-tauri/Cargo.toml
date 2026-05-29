@@ -34,4 +34,5 @@ reqwest = { version = "0.12", features = ["json"] }
 base64 = "0.22.1"
 chrono = { version = "0.4.44", features = ["serde"] }
 regex = "1"
+window-vibrancy = "0.7.1"
 

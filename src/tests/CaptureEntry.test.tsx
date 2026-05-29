@@ -15,7 +15,7 @@ const mockCapture: Capture = {
 describe("CaptureEntry", () => {
   it("shows content type badge", () => {
     render(<CaptureEntry capture={mockCapture} onCopy={vi.fn()} />);
-    expect(screen.getByText("table")).toBeInTheDocument();
+    expect(screen.getByText("Table")).toBeInTheDocument();
   });
 
   it("shows app context", () => {
