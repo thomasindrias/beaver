@@ -39,3 +39,19 @@ describe("release wiring", () => {
     expect(existsSync(".env.release.example")).toBe(true);
   });
 });
+
+describe("headless dmg packaging", () => {
+  it("packages the DMG with dmgbuild (no Finder/AppleScript)", () => {
+    const sh = readFileSync("scripts/release-macos.sh", "utf8");
+    expect(sh).toContain("dmgbuild");
+    expect(sh).toContain("scripts/dmgbuild-settings.py");
+  });
+
+  it("ships a dmgbuild settings file with the install layout", () => {
+    const s = readFileSync("scripts/dmgbuild-settings.py", "utf8");
+    expect(s).toContain("symlinks");
+    expect(s).toContain("Applications");
+    expect(s).toContain("icon_locations");
+    expect(s).toContain("BEAVER_APP");
+  });
+});

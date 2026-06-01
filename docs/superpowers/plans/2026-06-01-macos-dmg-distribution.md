@@ -4,7 +4,9 @@
 
 **Goal:** Produce a branded, signing-ready `Beaver.dmg` via `pnpm release:mac` that builds unsigned today and notarizes once a Developer ID cert is present.
 
-**Architecture:** Configure Tauri's native DMG bundler (background, window, icon positions), regenerate the app icon from the beaver head, generate a branded background with Pillow, and wrap `tauri build` in a two-mode (signed/unsigned) shell script with artifact verification. Signing is driven entirely by env vars so the same config builds both modes.
+> **Implementation update (2026-06-01):** Tauri's native DMG bundler drives Finder via AppleScript and fails non-interactively (`AppleEvent timed out -1712`). DMG packaging was moved to **`dmgbuild`** (headless; writes `.DS_Store` directly), run via `uv run --with dmgbuild`. Tauri now builds only `["app"]`; the window/background/icon layout lives in `scripts/dmgbuild-settings.py`. See the design spec's Components 1 & 4 for details.
+
+**Architecture:** Build the signed `.app` with Tauri, regenerate the app icon from the beaver head, generate a branded background with Pillow, then package a branded DMG headlessly with `dmgbuild` — all wrapped in a two-mode (signed/unsigned) shell script with artifact verification. Signing is driven entirely by env vars so the same config builds both modes.
 
 **Tech Stack:** Tauri 2, Rust (aarch64-apple-darwin), pnpm, Pillow (in `/tmp/beaver-venv`), vitest for verification tests, bash.
 

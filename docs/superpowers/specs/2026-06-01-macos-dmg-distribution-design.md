@@ -49,28 +49,32 @@ defaults to unsigned until credentials are present.
 
 ### 1. Tauri bundle config (`src-tauri/tauri.conf.json`)
 
-Add a `bundle.macOS.dmg` block and tighten the macOS bundle:
+> **Update (2026-06-01, during implementation):** Tauri's built-in `dmg` target
+> drives Finder via AppleScript to lay out the window, which fails non-interactively
+> (`AppleEvent timed out (-1712)` — the build ran while no one could approve the
+> Finder automation prompt). DMG packaging was therefore moved out of Tauri to
+> **`dmgbuild`** (see Component 4), which writes the `.DS_Store` layout directly
+> with no Finder dependency. Net effect: `targets` is `["app"]` only, and the
+> `bundle.macOS.dmg` block is removed (its window/background/icon-position settings
+> now live in `scripts/dmgbuild-settings.py`).
+
+Tighten the macOS bundle to build just the signed `.app`:
 
 ```jsonc
 "bundle": {
-  "targets": ["app", "dmg"],          // was "all"
+  "targets": ["app"],                 // was "all"; DMG packaged by dmgbuild
   "macOS": {
     "minimumSystemVersion": "13.0",
     "entitlements": "entitlements.plist",
-    "infoPlist": "Info.plist",
-    "dmg": {
-      "background": "dmg/background.png",
-      "windowSize":  { "width": 660, "height": 420 },
-      "appPosition": { "x": 180, "y": 210 },
-      "applicationFolderPosition": { "x": 480, "y": 210 }
-    }
+    "infoPlist": "Info.plist"
   }
 }
 ```
 
 - `signingIdentity` is **not** hardcoded. Signing is driven by the
   `APPLE_SIGNING_IDENTITY` env var so the same config builds signed or unsigned.
-- `targets` narrowed to `["app", "dmg"]` to skip irrelevant bundle types.
+- `targets` narrowed to `["app"]` to skip irrelevant bundle types; the DMG is a
+  separate headless step.
 
 ### 2. App icon rebrand
 
@@ -103,17 +107,25 @@ A single orchestrator with two modes, auto-selected by credential presence:
    `APPLE_PASSWORD`, `APPLE_TEAM_ID`, **or** `APPLE_API_KEY` / `APPLE_API_ISSUER`
    / `APPLE_API_KEY_PATH`).
 2. Detect mode:
-   - **Signed mode** — `APPLE_SIGNING_IDENTITY` set → Tauri signs, and if
-     notarization creds are present it notarizes + staples automatically during
-     `tauri build`.
-   - **Unsigned mode** — no identity → build the DMG unsigned (for local testing
-     of the full flow today). Print a clear banner stating it's unsigned.
-3. Run `pnpm tauri build --target aarch64-apple-darwin`.
-4. **Verify the artifact** (signed mode only, fail loudly on any miss):
+   - **Signed mode** — `APPLE_SIGNING_IDENTITY` set → Tauri signs the `.app`; the
+     script then signs the DMG, notarizes with `notarytool --wait`, and staples.
+   - **Unsigned mode** — no identity → build an unsigned (ad-hoc) DMG for local
+     testing of the full flow today. Print a clear banner stating it's unsigned.
+3. Run `pnpm tauri build --target aarch64-apple-darwin` (builds + signs the `.app`).
+4. **Package the branded DMG headlessly** — compose a HiDPI background
+   (`tiffutil -cathidpicheck` of the 1x + @2x PNGs) and run
+   `dmgbuild -s scripts/dmgbuild-settings.py` via `uv run --with dmgbuild`. This
+   writes the window layout (`.DS_Store`) directly — no Finder, works in CI.
+5. **Verify the artifact** (signed mode only, fail loudly on any miss):
    - `codesign --verify --deep --strict --verbose=2 <app>`
-   - `spctl -a -t exec -vvv <app>` (Gatekeeper accepts)
+   - `spctl -a -t open --context context:primary-signature -vvv <dmg>` (Gatekeeper)
    - `stapler validate <dmg>` (notarization ticket stapled)
-5. Print the final DMG path and the mode it ran in.
+6. Print the final DMG path and the mode it ran in.
+
+The DMG layout (`scripts/dmgbuild-settings.py`) reads the app path, background, and
+volume icon from env vars set by the script, defines the `Applications` drop-link,
+and positions the app icon (180, 210) and Applications (480, 210) to match the
+background art.
 
 ### 5. Credentials handling
 
