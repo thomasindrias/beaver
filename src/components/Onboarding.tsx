@@ -34,7 +34,14 @@ export function Onboarding() {
   }, [step, finish]);
 
   return (
-    <div className="flex h-screen w-full flex-col bg-background px-9 py-8 text-foreground">
+    <div className="relative flex h-screen w-full flex-col bg-background px-9 py-8 text-foreground">
+      {/* The window is frameless (overlay title bar), so the webview covers the
+          native drag area. This strip gives back a title-bar-height handle to
+          move the window; it sits over only the empty top padding. */}
+      <div
+        data-tauri-drag-region
+        className="absolute inset-x-0 top-0 z-20 h-11"
+      />
       {step === "welcome" && (
         <div key="welcome" className="animate-rise flex flex-1 flex-col">
           <div className="flex flex-col items-center text-center">

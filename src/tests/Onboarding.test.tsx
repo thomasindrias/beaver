@@ -39,6 +39,11 @@ describe("Onboarding", () => {
     expect(img?.getAttribute("src")).toContain("beaver-wave.webp");
   });
 
+  it("exposes a drag region so the frameless window can be moved", () => {
+    const { container } = render(<Onboarding />);
+    expect(container.querySelector("[data-tauri-drag-region]")).not.toBeNull();
+  });
+
   it("invokes finish_onboarding when the ready button is clicked", () => {
     render(<Onboarding />);
     reachReadyStep();
