@@ -12,10 +12,10 @@ describe("BeaverAnimation", () => {
     );
   });
 
-  it("sizes from the portrait aspect ratio", () => {
-    const { container } = render(<BeaverAnimation mood="singing" size={323} />);
+  it("sizes by height and lets width follow each animation's own aspect", () => {
+    const { container } = render(<BeaverAnimation mood="singing" size={128} />);
     const img = container.querySelector("img")!;
-    expect(img.getAttribute("height")).toBe("323");
-    expect(img.getAttribute("width")).toBe("299");
+    expect(img.style.height).toBe("128px");
+    expect(img.style.width).toBe("auto");
   });
 });

@@ -8,17 +8,16 @@ export type BeaverMood =
   | "playful"
   | "angry";
 
-// Intrinsic portrait canvas of the source webp loops; width follows from it so
-// the element reserves the right box before the image decodes.
-const ASPECT = 299 / 323;
-
 interface Props {
   mood: BeaverMood;
-  /** Rendered height in px; width follows the portrait aspect ratio. */
+  /** Rendered height in px; width follows each animation's own aspect ratio. */
   size?: number;
   className?: string;
 }
 
+// Each mood's webp has its own canvas (some portrait, some landscape), so we
+// fix only the height and let width track the intrinsic aspect — a single
+// hardcoded ratio would distort the wider moods.
 /** A looping beaver mood animation from public/beaver-animations. */
 export function BeaverAnimation({ mood, size = 120, className }: Props) {
   return (
@@ -27,8 +26,7 @@ export function BeaverAnimation({ mood, size = 120, className }: Props) {
       alt=""
       aria-hidden
       draggable={false}
-      height={size}
-      width={Math.round(size * ASPECT)}
+      style={{ height: size, width: "auto" }}
       className={className}
     />
   );
