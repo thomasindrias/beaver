@@ -21,7 +21,7 @@
     "noFallthroughCasesInSwitch": true,
 
     /* Vitest globals */
-    "types": ["vitest/globals"],
+    "types": ["vitest/globals", "node"],
 
     /* Path alias */
     "baseUrl": ".",
