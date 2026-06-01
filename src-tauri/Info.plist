@@ -4,7 +4,7 @@
 <plist version="1.0">
 <dict>
     <key>NSScreenRecordingUsageDescription</key>
-    <string>Osprey needs screen access to capture selected regions.</string>
+    <string>Beaver needs screen access to capture selected regions.</string>
     <key>LSUIElement</key>
     <true/>
 </dict>

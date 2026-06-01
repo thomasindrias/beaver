@@ -7,11 +7,10 @@ import { Kbd } from "./Kbd";
 import { ModelDownload } from "./ModelDownload";
 
 type Step = "welcome" | "download" | "ready";
-interface Props { onComplete: () => void }
 
 // Time the "You're all set" screen stays up before we close onboarding and pop
-// open the menu-bar window, so the user sees where Osprey now lives.
-const READY_DWELL_MS = 2000;
+// open the menu-bar window, so the user sees where Beaver now lives.
+export const READY_DWELL_MS = 2000;
 
 const FEATURES = [
   { icon: Scan, title: "Draw, don't screenshot", body: "Select any region — get the data inside, not a picture." },
@@ -19,15 +18,14 @@ const FEATURES = [
   { icon: Lock, title: "Fully on-device", body: "Your screen never leaves your Mac. No cloud, no accounts." },
 ];
 
-export function Onboarding({ onComplete }: Props) {
+export function Onboarding() {
   const [step, setStep] = useState<Step>("welcome");
   const handleDownloadComplete = useCallback(() => setStep("ready"), []);
 
-  // Closes the onboarding window and opens the popover at the menu bar. Falls
-  // back to the in-window swap if the IPC call rejects.
+  // Closes the onboarding window and opens the popover at the menu bar.
   const finish = useCallback(() => {
-    invoke("finish_onboarding").catch(() => onComplete());
-  }, [onComplete]);
+    invoke("finish_onboarding").catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (step !== "ready") return;
@@ -42,7 +40,7 @@ export function Onboarding({ onComplete }: Props) {
           <div className="flex flex-col items-center text-center">
             <Logo size={64} live className="mb-5" />
             <h1 className="text-[26px] font-semibold tracking-tight">
-              Meet <span className="text-primary">Osprey</span>
+              Meet <span className="text-primary">Beaver</span>
             </h1>
             <p className="mt-2 max-w-[320px] text-sm leading-relaxed text-muted-foreground">
               Capture the data on your screen — not a screenshot of it.
@@ -89,11 +87,11 @@ export function Onboarding({ onComplete }: Props) {
           <h1 className="text-[26px] font-semibold tracking-tight">You're all set</h1>
           <p className="mt-3 max-w-[320px] text-sm leading-relaxed text-muted-foreground">
             Press <Kbd>⌘</Kbd> <Kbd>⇧</Kbd> <Kbd>D</Kbd> anywhere to capture. Find your
-            history any time from the <span className="text-foreground">Osprey</span> icon in
+            history any time from the <span className="text-foreground">Beaver</span> icon in
             your menu bar.
           </p>
           <Button size="lg" className="mt-8 w-full" onClick={finish}>
-            Start using Osprey
+            Start using Beaver
           </Button>
         </div>
       )}

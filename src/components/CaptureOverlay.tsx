@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 
-interface Point { x: number; y: number }
+export interface Point { x: number; y: number }
 export interface Rect { x: number; y: number; width: number; height: number }
 
 export function normalizeRect(start: Point, end: Point): Rect {
@@ -13,7 +13,7 @@ export function normalizeRect(start: Point, end: Point): Rect {
 }
 
 interface Props {
-  onCapture: (region: Rect) => void;
+  onCapture: (region: Rect, origin: Point) => void;
   onCancel: () => void;
 }
 
@@ -44,7 +44,7 @@ export function CaptureOverlay({ onCapture, onCancel }: Props) {
     if (!dragging || !start || !current) return;
     setDragging(false);
     const rect = normalizeRect(start, current);
-    if (rect.width > 5 && rect.height > 5) onCapture(rect);
+    if (rect.width > 5 && rect.height > 5) onCapture(rect, current);
     else onCancel();
   }, [dragging, start, current, onCapture, onCancel]);
 
@@ -111,7 +111,7 @@ export function CaptureOverlay({ onCapture, onCancel }: Props) {
       {!hasSel && (
         <div className="pointer-events-none absolute left-1/2 top-7 -translate-x-1/2">
           <div className="animate-rise flex items-center gap-2 rounded-full border border-white/10 bg-black/70 px-3.5 py-1.5 text-[13px] text-white/90 shadow-xl backdrop-blur-md">
-            <span className="size-1.5 animate-osprey-pulse rounded-full bg-primary" />
+            <span className="size-1.5 animate-beaver-pulse rounded-full bg-primary" />
             Drag to capture the data
             <span className="text-white/40">·</span>
             <span className="text-white/55">Esc to cancel</span>

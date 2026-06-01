@@ -3,8 +3,8 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
-/* ── Osprey design tokens ─────────────────────────────────────────────
-   A single, always-dark identity. Warm-gold accent (the osprey's eye)
+/* ── Beaver design tokens ─────────────────────────────────────────────
+   A single, always-dark identity. Warm-gold accent (the beaver's eye)
    against a near-black slate. Precise, calm, premium. */
 :root {
   --radius: 0.75rem;
@@ -115,7 +115,7 @@
 }
 
 /* Subtle entrance used across surfaces */
-@keyframes osprey-rise {
+@keyframes beaver-rise {
   from {
     opacity: 0;
     transform: translateY(6px) scale(0.99);
@@ -126,11 +126,29 @@
   }
 }
 .animate-rise {
-  animation: osprey-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: beaver-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Playful spring pop for the cursor toast — overshoots, then settles */
+@keyframes beaver-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translateY(4px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.04) translateY(0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-pop {
+  animation: beaver-pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 /* Soft amber pulse for the live capture/processing state */
-@keyframes osprey-pulse {
+@keyframes beaver-pulse {
   0%,
   100% {
     opacity: 1;
@@ -139,6 +157,6 @@
     opacity: 0.45;
   }
 }
-.animate-osprey-pulse {
-  animation: osprey-pulse 1.6s ease-in-out infinite;
+.animate-beaver-pulse {
+  animation: beaver-pulse 1.6s ease-in-out infinite;
 }

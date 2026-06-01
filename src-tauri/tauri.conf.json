@@ -1,7 +1,7 @@
 {
-  "productName": "Osprey",
+  "productName": "Beaver",
   "version": "0.1.0",
-  "identifier": "se.djtl.osprey",
+  "identifier": "se.djtl.beaver",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",

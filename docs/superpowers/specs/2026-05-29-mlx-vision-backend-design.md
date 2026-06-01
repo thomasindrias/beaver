@@ -1,4 +1,4 @@
-# Osprey MLX Vision Backend — Design Spec
+# Beaver MLX Vision Backend — Design Spec
 
 **Date:** 2026-05-29
 **Status:** Approved (design); pending spec review before planning
@@ -8,14 +8,14 @@
 
 ## Problem
 
-Osprey extracts structured Markdown from a captured screen region using a local vision model. The current backend runs **Ollama + qwen2.5vl:3b**, which has two real problems on the target hardware (a 16 GB Apple Silicon Mac):
+Beaver extracts structured Markdown from a captured screen region using a local vision model. The current backend runs **Ollama + qwen2.5vl:3b**, which has two real problems on the target hardware (a 16 GB Apple Silicon Mac):
 
 1. **Memory pressure.** The Ollama model is ~10.5 GiB resident. On a 16 GB machine that leaves almost nothing for macOS + the app + the dev tooling, causing swap thrashing and multi-second lag on warm-up. This is the friction users feel on first capture.
 2. **Reliability.** During benchmarking, Ollama crashed on a specific capture with a Metal/ggml assertion (`GGML_ASSERT(a->ne[2] * 4 == b->ne[0])`), returning HTTP 500 after a 2-minute hang. MLX processed the same image without issue.
 
 ### Benchmark (decisive)
 
-Same image (`/tmp/osprey-bench.png`, 1568×1015), same extraction prompt:
+Same image (`/tmp/beaver-bench.png`, 1568×1015), same extraction prompt:
 
 | Backend | Resident RAM | Load time | Generation | Outcome |
 |---|---|---|---|---|
@@ -50,7 +50,7 @@ Replace the Ollama sidecar with a **persistent local MLX vision server** written
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ Osprey (Tauri)                                            │
+│ Beaver (Tauri)                                            │
 │                                                           │
 │  React frontend ── invoke ──▶ capture_and_extract (Rust)  │
 │                                      │                     │
@@ -134,7 +134,7 @@ The capture pipeline and the frontend contract do **not** change:
 1. User triggers capture (⌘⇧D) → overlay → region select → screenshot.
 2. Rust `capture_and_extract` command base64-encodes the image and calls `mlx::extract_from_image` (was `ollama::extract_from_image`).
 3. Markdown result is stored in SQLite and copied to clipboard.
-4. Frontend `useOsprey` / `useCaptures` hooks are untouched — same command names, same return shapes.
+4. Frontend `useBeaver` / `useCaptures` hooks are untouched — same command names, same return shapes.
 
 ---
 

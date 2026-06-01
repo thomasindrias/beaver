@@ -1,4 +1,4 @@
-"""Osprey MLX vision server.
+"""Beaver MLX vision server.
 
 Loads Qwen2.5-VL-3B-Instruct-4bit once and exposes:
   GET  /health  -> {"status": "downloading"|"loading"|"ready"|"error", "progress": float|None}
@@ -21,10 +21,56 @@ import threading
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from tqdm import tqdm as _tqdm
 
 MODEL_REPO = "mlx-community/Qwen2.5-VL-3B-Instruct-4bit"
 
 STATE = {"status": "loading", "progress": None}
+
+
+class _ProgressTqdm(_tqdm):
+    """Aggregates download progress for the onboarding UI.
+
+    snapshot_download opens one tqdm bar per file (unit="B") plus an outer
+    "Fetching N files" bar (unit != "B"); we sum bytes across the byte bars and
+    publish the fraction into STATE["progress"]. We track counts in our own
+    registry rather than tqdm's self.n because the server runs headless, where
+    tqdm disables itself and stops advancing self.n.
+    """
+
+    _lock = threading.Lock()
+    _bars: dict = {}  # id(bar) -> [done_bytes, total_bytes, unit]
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("disable", True)  # headless: suppress terminal render
+        # tqdm's disabled path skips setting self.unit, so capture it here.
+        self._unit = kwargs.get("unit", "it")
+        self._total = kwargs.get("total") or 0
+        super().__init__(*args, **kwargs)
+        with _ProgressTqdm._lock:
+            _ProgressTqdm._bars[id(self)] = [0, self._total, self._unit]
+        _recompute_progress()
+
+    def update(self, n=1):
+        with _ProgressTqdm._lock:
+            rec = _ProgressTqdm._bars.get(id(self))
+            if rec is not None:
+                rec[0] += n
+        _recompute_progress()
+        return super().update(n)
+
+    @classmethod
+    def reset(cls):
+        with cls._lock:
+            cls._bars.clear()
+
+
+def _recompute_progress():
+    with _ProgressTqdm._lock:
+        byte_bars = [r for r in _ProgressTqdm._bars.values() if r[2] == "B"]
+        total = sum(r[1] for r in byte_bars)
+        done = sum(r[0] for r in byte_bars)
+    STATE["progress"] = min(done / total, 1.0) if total > 0 else None
 # Inference jobs: (prompt, image_path, result_holder, done_event). The single
 # worker thread drains this, which also serializes the burst of captures the
 # global shortcut can fire.
@@ -74,9 +120,12 @@ def _worker():
         from huggingface_hub import snapshot_download
 
         STATE["status"] = "downloading"
-        local_path = snapshot_download(MODEL_REPO)
+        STATE["progress"] = 0.0
+        _ProgressTqdm.reset()
+        local_path = snapshot_download(MODEL_REPO, tqdm_class=_ProgressTqdm)
 
         STATE["status"] = "loading"
+        STATE["progress"] = None  # loading into memory has no measurable %
         from mlx_vlm import load
 
         model, processor = load(local_path)

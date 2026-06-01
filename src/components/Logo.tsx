@@ -8,7 +8,7 @@ interface Props {
 }
 
 /**
- * Osprey mark — a focus reticle wrapped around a sharp amber eye.
+ * Beaver mark — a focus reticle wrapped around a sharp amber eye.
  * Reads as "precise capture": the bird's gaze locking onto a target.
  */
 export function Logo({ size = 40, className, live = false }: Props) {
@@ -41,14 +41,14 @@ export function Logo({ size = 40, className, live = false }: Props) {
         r="10.5"
         stroke="var(--primary)"
         strokeWidth={2.4}
-        className={cn(live && "animate-osprey-pulse")}
+        className={cn(live && "animate-beaver-pulse")}
       />
 
-      {/* sharp pupil — the osprey's gaze */}
+      {/* sharp pupil — the beaver's gaze */}
       <path
         d="M24 18.5 29.5 24 24 29.5 18.5 24Z"
         fill="var(--primary)"
-        className={cn(live && "animate-osprey-pulse")}
+        className={cn(live && "animate-beaver-pulse")}
       />
     </svg>
   );

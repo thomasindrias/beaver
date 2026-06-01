@@ -60,7 +60,7 @@ pub fn hf_home(app: &tauri::AppHandle) -> PathBuf {
 /// install is skipped on the next launch and the server crashes on import.
 /// Keeping the marker inside the venv dir means wiping the venv also clears it.
 fn deps_marker(app: &tauri::AppHandle) -> PathBuf {
-    app_data(app).join(VENV_DIRNAME).join(".osprey-deps-installed")
+    app_data(app).join(VENV_DIRNAME).join(".beaver-deps-installed")
 }
 
 pub fn env_is_ready(app: &tauri::AppHandle) -> bool {
@@ -81,7 +81,7 @@ pub fn setup_is_complete(app: &tauri::AppHandle) -> bool {
 
 pub fn mark_setup_complete(app: &tauri::AppHandle) {
     if let Err(e) = std::fs::write(setup_marker(app), b"1") {
-        eprintln!("Osprey: failed to write setup marker: {e}");
+        eprintln!("Beaver: failed to write setup marker: {e}");
     }
 }
 

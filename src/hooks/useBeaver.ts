@@ -4,7 +4,16 @@ import type { AppState, Capture } from "../types";
 
 interface CaptureRegion { x: number; y: number; width: number; height: number }
 
-export function useOsprey(onSave?: (capture: Omit<Capture, "id" | "created_at">) => Promise<void>) {
+// How long the result bubble lingers before the overlay window closes. Kept
+// short because the window stays interactive (it tracks the cursor), so it
+// briefly blocks the screen.
+export const SUCCESS_DWELL_MS = 1500;
+export const ERROR_DWELL_MS = 2500;
+
+export function useBeaver(
+  onSave?: (capture: Omit<Capture, "id" | "created_at">) => Promise<void>,
+  onComplete?: () => void,
+) {
   const [state, setState] = useState<AppState>("idle");
 
   const runCapture = useCallback(async (region: CaptureRegion) => {
@@ -14,7 +23,6 @@ export function useOsprey(onSave?: (capture: Omit<Capture, "id" | "created_at">)
       const contentType = detectContentType(markdown);
 
       await invoke("write_to_clipboard", { text: markdown });
-      await invoke("show_success_notification");
 
       if (onSave) {
         await onSave({
@@ -26,12 +34,18 @@ export function useOsprey(onSave?: (capture: Omit<Capture, "id" | "created_at">)
       }
 
       setState("success");
-      setTimeout(() => setState("idle"), 2000);
+      setTimeout(() => {
+        setState("idle");
+        onComplete?.();
+      }, SUCCESS_DWELL_MS);
     } catch {
       setState("error");
-      setTimeout(() => setState("idle"), 3000);
+      setTimeout(() => {
+        setState("idle");
+        onComplete?.();
+      }, ERROR_DWELL_MS);
     }
-  }, [onSave]);
+  }, [onSave, onComplete]);
 
   return { state, runCapture };
 }

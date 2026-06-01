@@ -7,6 +7,7 @@ mod shortcut;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::sync::Mutex;
 use tauri::{
+    menu::MenuBuilder,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager,
 };
@@ -25,7 +26,7 @@ fn apply_popover_vibrancy(window: &tauri::WebviewWindow) {
         Some(NSVisualEffectState::Active),
         Some(18.0),
     ) {
-        eprintln!("Osprey: failed to apply vibrancy: {e}");
+        eprintln!("Beaver: failed to apply vibrancy: {e}");
     }
 }
 
@@ -34,21 +35,36 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(
             tauri_plugin_sql::Builder::default()
-                .add_migrations("sqlite:osprey.db", db::migrations())
+                .add_migrations("sqlite:beaver.db", db::migrations())
                 .build(),
         )
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             #[cfg(target_os = "macos")]
             let _ = app.handle().set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             app.manage(PopoverHideTime(Mutex::new(None)));
 
+            // Right-click tray menu. Beaver stays alive when its windows close
+            // (see the ExitRequested guard in `run`), so this Quit item is the
+            // only way out. A custom item firing `app.exit(0)` is used instead of
+            // the predefined Quit, whose OS-level terminate would be swallowed by
+            // that same guard.
+            let tray_menu = MenuBuilder::new(app).text("quit", "Quit Beaver").build()?;
+
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().expect("app bundle must include an icon").clone())
-                .tooltip("Osprey")
+                .tooltip("Beaver")
+                .menu(&tray_menu)
+                // Keep left-click for toggling the popover; the menu opens on
+                // right-click only.
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| {
+                    if event.id().as_ref() == "quit" {
+                        app.exit(0);
+                    }
+                })
                 .on_tray_icon_event(|tray, event| {
                     // Click fires for both press and release — only act on the
                     // left-button release so the popover toggles once per click.
@@ -93,17 +109,26 @@ pub fn run() {
                 if first_launch {
                     let h = handle.clone();
                     let _ = handle.run_on_main_thread(move || {
-                        let result = tauri::WebviewWindowBuilder::new(
+                        let mut builder = tauri::WebviewWindowBuilder::new(
                             &h,
                             "onboarding",
                             tauri::WebviewUrl::App("/".into()),
                         )
-                        .title("Welcome to Osprey")
+                        .title("Welcome to Beaver")
                         .inner_size(480.0, 540.0)
-                        .center()
-                        .build();
+                        .center();
+                        // Borderless chrome: let the dark UI fill to the top edge
+                        // with the traffic lights floating over it, instead of a
+                        // white system title bar.
+                        #[cfg(target_os = "macos")]
+                        {
+                            builder = builder
+                                .hidden_title(true)
+                                .title_bar_style(tauri::TitleBarStyle::Overlay);
+                        }
+                        let result = builder.build();
                         if let Err(e) = result {
-                            eprintln!("Osprey: failed to create onboarding window: {e}");
+                            eprintln!("Beaver: failed to create onboarding window: {e}");
                         }
                     });
                 }
@@ -111,7 +136,7 @@ pub fn run() {
                 if !server::env_is_ready(&handle) {
                     *state.phase.lock().unwrap() = server::SetupPhase::BuildingEnv;
                     if let Err(e) = server::build_env(&handle) {
-                        eprintln!("Osprey: MLX env build failed: {e}");
+                        eprintln!("Beaver: MLX env build failed: {e}");
                         *state.phase.lock().unwrap() = server::SetupPhase::Failed;
                         return;
                     }
@@ -123,7 +148,7 @@ pub fn run() {
                         *state.child.lock().unwrap() = Some(child);
                     }
                     Err(e) => {
-                        eprintln!("Osprey: failed to spawn MLX server: {e}");
+                        eprintln!("Beaver: failed to spawn MLX server: {e}");
                         *state.phase.lock().unwrap() = server::SetupPhase::Failed;
                         return;
                     }
@@ -159,14 +184,14 @@ pub fn run() {
                         }
                         Err(_) => {
                             if last_reachable.elapsed() > unreachable_grace {
-                                eprintln!("Osprey: MLX server unreachable — giving up");
+                                eprintln!("Beaver: MLX server unreachable — giving up");
                                 *state.phase.lock().unwrap() = server::SetupPhase::Failed;
                                 break;
                             }
                         }
                     }
                     if started.elapsed() > absolute_cap {
-                        eprintln!("Osprey: MLX server setup exceeded the time cap");
+                        eprintln!("Beaver: MLX server setup exceeded the time cap");
                         *state.phase.lock().unwrap() = server::SetupPhase::Failed;
                         break;
                     }
@@ -180,14 +205,21 @@ pub fn run() {
             capture_and_extract,
             mlx_status,
             write_to_clipboard,
-            show_success_notification,
-            is_first_launch,
             finish_onboarding
         ])
         .build(tauri::generate_context!())
-        .expect("error while building Osprey")
-        .run(|app, event| {
-            if let tauri::RunEvent::Exit = event {
+        .expect("error while building Beaver")
+        .run(|app, event| match event {
+            // Beaver lives in the menu bar (Accessory activation policy) with no
+            // persistent window. Closing the last window — e.g. the capture
+            // overlay dismissing itself after a capture — must NOT quit the app.
+            // `code: None` marks a window-close/user-initiated exit; a
+            // programmatic `app.exit(code)` carries a code and is left to proceed
+            // so the app stays quittable.
+            tauri::RunEvent::ExitRequested { code: None, api, .. } => {
+                api.prevent_exit();
+            }
+            tauri::RunEvent::Exit => {
                 if let Some(state) = app.try_state::<server::MlxServer>() {
                     if let Ok(mut guard) = state.child.lock() {
                         if let Some(mut child) = guard.take() {
@@ -196,32 +228,46 @@ pub fn run() {
                     }
                 }
             }
+            _ => {}
         });
 }
 
+#[derive(serde::Serialize)]
+struct MlxStatus {
+    phase: String,
+    /// Download progress 0.0–1.0 during the downloading phase; `None` otherwise.
+    progress: Option<f64>,
+}
+
 #[tauri::command]
-async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<String, ()> {
+async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<MlxStatus, ()> {
     // Copy the cheap bits out before any await so we never hold the lock across it.
     let phase = *state.phase.lock().unwrap();
     let port = state.port;
 
-    let label = match phase {
-        server::SetupPhase::BuildingEnv => "preparing".to_string(),
-        server::SetupPhase::Failed => "error".to_string(),
+    let (label, progress) = match phase {
+        server::SetupPhase::BuildingEnv => ("preparing".to_string(), None),
+        server::SetupPhase::Failed => ("error".to_string(), None),
         server::SetupPhase::StartingServer | server::SetupPhase::ServerUp => {
             match mlx::health(port).await {
-                Ok(h) => match h.status {
-                    mlx::ServerStatus::Downloading => "downloading",
-                    mlx::ServerStatus::Loading => "loading",
-                    mlx::ServerStatus::Ready => "ready",
-                    mlx::ServerStatus::Error => "error",
+                Ok(h) => {
+                    let label = match h.status {
+                        mlx::ServerStatus::Downloading => "downloading",
+                        mlx::ServerStatus::Loading => "loading",
+                        mlx::ServerStatus::Ready => "ready",
+                        mlx::ServerStatus::Error => "error",
+                    }
+                    .to_string();
+                    (label, h.progress)
                 }
-                .to_string(),
-                Err(_) => "starting".to_string(),
+                Err(_) => ("starting".to_string(), None),
             }
         }
     };
-    Ok(label)
+    Ok(MlxStatus {
+        phase: label,
+        progress,
+    })
 }
 
 // Capture and extract in one hop: the (multi-MB) image bytes stay in Rust and
@@ -244,27 +290,9 @@ async fn write_to_clipboard(app: tauri::AppHandle, text: String) -> Result<(), S
     app.clipboard().write_text(text).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-async fn show_success_notification(app: tauri::AppHandle) -> Result<(), String> {
-    use tauri_plugin_notification::NotificationExt;
-    app.notification()
-        .builder()
-        .title("Osprey")
-        .body("Copied to clipboard.")
-        .show()
-        .map_err(|e| e.to_string())
-}
-
-// First launch == setup has never completed (no marker), so onboarding runs.
-#[tauri::command]
-async fn is_first_launch(app: tauri::AppHandle) -> bool {
-    !server::setup_is_complete(&app)
-}
-
 // End onboarding once setup is ready: surface the menu-bar popover so the user
-// discovers where Osprey lives, then close the onboarding window. We re-assert
-// the setup marker first so the popover (which reads is_first_launch on mount)
-// can't race into rendering the onboarding view again.
+// discovers where Beaver lives, then close the onboarding window. Writing the
+// setup marker here is what keeps onboarding from reappearing on later launches.
 #[tauri::command]
 fn finish_onboarding(app: tauri::AppHandle) {
     server::mark_setup_complete(&app);
@@ -318,7 +346,7 @@ fn popover_position(app: &tauri::AppHandle, icon_rect: tauri::Rect) -> tauri::Lo
 // Fallback popover anchor when there's no tray-click rect (e.g. opened
 // programmatically at the end of onboarding). macOS keeps menu-bar items at the
 // top-right, so tucking the popover under the top-right corner of the primary
-// monitor points the user at the Osprey tray icon.
+// monitor points the user at the Beaver tray icon.
 fn popover_position_menubar(app: &tauri::AppHandle) -> tauri::LogicalPosition<f64> {
     let margin = 8.0;
     let below_menubar = 32.0;
@@ -336,7 +364,7 @@ fn popover_position_menubar(app: &tauri::AppHandle) -> tauri::LogicalPosition<f6
 fn toggle_popover(app: &tauri::AppHandle, icon_rect: Option<tauri::Rect>) {
     if let Some(w) = app.get_webview_window("popover") {
         if w.is_visible().unwrap_or(false) {
-            if let Err(e) = w.hide() { eprintln!("Osprey: failed to hide popover: {e}"); }
+            if let Err(e) = w.hide() { eprintln!("Beaver: failed to hide popover: {e}"); }
         } else {
             // If the window was just auto-hidden on focus loss (because this
             // very tray click stole focus), treat the click as a dismiss and
@@ -353,11 +381,11 @@ fn toggle_popover(app: &tauri::AppHandle, icon_rect: Option<tauri::Rect>) {
             }
             if let Some(rect) = icon_rect {
                 if let Err(e) = w.set_position(popover_position(app, rect)) {
-                    eprintln!("Osprey: failed to reposition popover: {e}");
+                    eprintln!("Beaver: failed to reposition popover: {e}");
                 }
             }
-            if let Err(e) = w.show() { eprintln!("Osprey: failed to show popover: {e}"); }
-            if let Err(e) = w.set_focus() { eprintln!("Osprey: failed to focus popover: {e}"); }
+            if let Err(e) = w.show() { eprintln!("Beaver: failed to show popover: {e}"); }
+            if let Err(e) = w.set_focus() { eprintln!("Beaver: failed to focus popover: {e}"); }
         }
         return;
     }
@@ -408,7 +436,7 @@ fn build_popover(app: &tauri::AppHandle, pos: Option<tauri::LogicalPosition<f64>
 
             let _ = window.set_focus();
         }
-        Err(e) => eprintln!("Osprey: failed to create popover window: {e}"),
+        Err(e) => eprintln!("Beaver: failed to create popover window: {e}"),
     }
 }
 
@@ -427,8 +455,8 @@ fn open_popover_at_menubar(app: &tauri::AppHandle) {
 
 fn show_capture_overlay(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("capture-overlay") {
-        if let Err(e) = w.show() { eprintln!("Osprey: failed to show capture overlay: {e}"); }
-        if let Err(e) = w.set_focus() { eprintln!("Osprey: failed to focus capture overlay: {e}"); }
+        if let Err(e) = w.show() { eprintln!("Beaver: failed to show capture overlay: {e}"); }
+        if let Err(e) = w.set_focus() { eprintln!("Beaver: failed to focus capture overlay: {e}"); }
         return;
     }
 
@@ -451,6 +479,7 @@ fn show_capture_overlay(app: &tauri::AppHandle) {
     )
     .transparent(true)
     .decorations(false)
+    .shadow(false)
     .always_on_top(true)
     .skip_taskbar(true)
     .resizable(false)
@@ -459,6 +488,6 @@ fn show_capture_overlay(app: &tauri::AppHandle) {
     .build();
 
     if let Err(e) = result {
-        eprintln!("Osprey: failed to create capture overlay: {e}");
+        eprintln!("Beaver: failed to create capture overlay: {e}");
     }
 }

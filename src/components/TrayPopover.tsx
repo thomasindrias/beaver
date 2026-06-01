@@ -26,7 +26,7 @@ export function TrayPopover() {
       {/* Header */}
       <header className="flex items-center gap-2.5 px-4 pb-3 pt-3.5">
         <Logo size={22} />
-        <span className="text-[15px] font-semibold tracking-tight">Osprey</span>
+        <span className="text-[15px] font-semibold tracking-tight">Beaver</span>
         <span className="ml-auto rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
           {captures.length} {captures.length === 1 ? "capture" : "captures"}
         </span>

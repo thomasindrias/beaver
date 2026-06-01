@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace Osprey's Ollama vision backend with a persistent, Rust-supervised local MLX vision server so the app fits comfortably on a 16 GB Apple Silicon Mac (~1.6 GB resident vs ~10.5 GiB).
+**Goal:** Replace Beaver's Ollama vision backend with a persistent, Rust-supervised local MLX vision server so the app fits comfortably on a 16 GB Apple Silicon Mac (~1.6 GB resident vs ~10.5 GiB).
 
 **Architecture:** A small Python FastAPI server (`mlx_server.py`) loads `mlx-community/Qwen2.5-VL-3B-Instruct-4bit` once and exposes `GET /health` + `POST /extract` on a localhost port. The Rust core builds a Python venv on first run using a bundled `uv` binary, spawns the server as a `std::process::Child` held in managed state, polls it to readiness, and kills it on app exit. The existing capture → extract → clipboard flow and the frontend command contract are unchanged.
 
@@ -12,7 +12,7 @@
 
 ## Context the implementer needs
 
-- **Repo:** `/Users/thomasindrias/osprey` (NOTE: the shell cwd may be `/Users/thomasindrias/djtl` — always `cd /Users/thomasindrias/osprey` first).
+- **Repo:** `/Users/thomasindrias/beaver` (NOTE: the shell cwd may be `/Users/thomasindrias/djtl` — always `cd /Users/thomasindrias/beaver` first).
 - **This is a macOS menu-bar (tray) Tauri app.** `tauri.conf.json` has `"windows": []`; windows are created at runtime in `src-tauri/src/lib.rs` (`popover`, `capture-overlay`, `onboarding`).
 - **The model is already cached** during prior benchmarking at the user's default HF cache. The plan routes the server's cache to a self-contained `HF_HOME` under the app data dir, so first run will re-download (~2.9 GB on disk). This is intentional for a clean, uninstall-friendly layout.
 - **A working reference venv** exists at `/tmp/mlx-bench-venv` (Python 3.12, mlx-vlm 0.5.0, fastapi 0.136.3, uvicorn 0.48.0). The `generate(model, processor, formatted, image=[path], max_tokens=1024)` call and `apply_chat_template(processor, config, prompt, num_images=1)` are validated against this version.
@@ -52,14 +52,14 @@
 - [ ] **Step 1: Create the feature branch**
 
 ```bash
-cd /Users/thomasindrias/osprey
+cd /Users/thomasindrias/beaver
 git checkout -b feature/mlx-vision-backend
 ```
 
 - [ ] **Step 2: Copy the `uv` binary into resources and add pinned requirements**
 
 ```bash
-cd /Users/thomasindrias/osprey
+cd /Users/thomasindrias/beaver
 mkdir -p src-tauri/resources
 cp /Users/thomasindrias/.local/bin/uv src-tauri/resources/uv
 chmod +x src-tauri/resources/uv
@@ -126,14 +126,14 @@ These let the notarized, hardened-runtime release load the venv's unsigned dylib
 - [ ] **Step 5: Verify the build still configures (no Rust changes yet)**
 
 ```bash
-cd /Users/thomasindrias/osprey/src-tauri && cargo check
+cd /Users/thomasindrias/beaver/src-tauri && cargo check
 ```
 Expected: compiles (Ollama code still present and untouched).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/thomasindrias/osprey
+cd /Users/thomasindrias/beaver
 git add src-tauri/resources/uv src-tauri/resources/requirements.txt src-tauri/tauri.conf.json src-tauri/entitlements.plist
 git commit -m "chore: bundle uv + requirements, add MLX entitlements"
 ```
@@ -151,8 +151,8 @@ git commit -m "chore: bundle uv + requirements, add MLX entitlements"
 The server imports `fastapi`, `pydantic`, `uvicorn` at module load; `mlx`/`huggingface_hub` are imported lazily inside functions, so the test needs only the three light deps.
 
 ```bash
-/Users/thomasindrias/.local/bin/uv venv /tmp/osprey-pytest-venv --python 3.12
-/Users/thomasindrias/.local/bin/uv pip install --python /tmp/osprey-pytest-venv/bin/python fastapi uvicorn pydantic
+/Users/thomasindrias/.local/bin/uv venv /tmp/beaver-pytest-venv --python 3.12
+/Users/thomasindrias/.local/bin/uv pip install --python /tmp/beaver-pytest-venv/bin/python fastapi uvicorn pydantic
 ```
 
 - [ ] **Step 2: Write the failing test**
@@ -190,7 +190,7 @@ if __name__ == "__main__":
 - [ ] **Step 3: Run the test to verify it fails**
 
 ```bash
-cd /Users/thomasindrias/osprey/src-tauri/resources && /tmp/osprey-pytest-venv/bin/python test_mlx_server.py
+cd /Users/thomasindrias/beaver/src-tauri/resources && /tmp/beaver-pytest-venv/bin/python test_mlx_server.py
 ```
 Expected: FAIL with `ModuleNotFoundError: No module named 'mlx_server'`.
 
@@ -199,7 +199,7 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'mlx_server'`.
 Create `src-tauri/resources/mlx_server.py`:
 
 ```python
-"""Osprey MLX vision server.
+"""Beaver MLX vision server.
 
 Loads Qwen2.5-VL-3B-Instruct-4bit once and exposes:
   GET  /health  -> {"status": "downloading"|"loading"|"ready"|"error", "progress": float|None}
@@ -299,14 +299,14 @@ if __name__ == "__main__":
 - [ ] **Step 5: Run the test to verify it passes**
 
 ```bash
-cd /Users/thomasindrias/osprey/src-tauri/resources && /tmp/osprey-pytest-venv/bin/python test_mlx_server.py
+cd /Users/thomasindrias/beaver/src-tauri/resources && /tmp/beaver-pytest-venv/bin/python test_mlx_server.py
 ```
 Expected: prints `OK`.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/thomasindrias/osprey
+cd /Users/thomasindrias/beaver
 git add src-tauri/resources/mlx_server.py src-tauri/resources/test_mlx_server.py
 git commit -m "feat: add MLX vision server (FastAPI) with health/extract"
 ```
@@ -368,7 +368,7 @@ mod tests {
 - [ ] **Step 2: Run tests to verify they fail**
 
 ```bash
-cd /Users/thomasindrias/osprey/src-tauri && cargo test --lib mlx
+cd /Users/thomasindrias/beaver/src-tauri && cargo test --lib mlx
 ```
 Expected: FAIL to compile — `api_url`, `HealthStatus`, `ServerStatus` not found.
 
@@ -460,14 +460,14 @@ pub async fn extract_from_image(port: u16, image_base64: &str) -> Result<String,
 - [ ] **Step 4: Run tests to verify they pass**
 
 ```bash
-cd /Users/thomasindrias/osprey/src-tauri && cargo test --lib mlx
+cd /Users/thomasindrias/beaver/src-tauri && cargo test --lib mlx
 ```
 Expected: 4 tests pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/thomasindrias/osprey
+cd /Users/thomasindrias/beaver
 git add src-tauri/src/mlx.rs src-tauri/src/lib.rs
 git commit -m "feat: add mlx.rs HTTP client for the vision server"
 ```
@@ -522,7 +522,7 @@ mod tests {
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-cd /Users/thomasindrias/osprey/src-tauri && cargo test --lib server
+cd /Users/thomasindrias/beaver/src-tauri && cargo test --lib server
 ```
 Expected: FAIL to compile — `free_port` not found.
 
@@ -604,7 +604,7 @@ pub fn setup_is_complete(app: &tauri::AppHandle) -> bool {
 
 pub fn mark_setup_complete(app: &tauri::AppHandle) {
     if let Err(e) = std::fs::write(setup_marker(app), b"1") {
-        eprintln!("Osprey: failed to write setup marker: {e}");
+        eprintln!("Beaver: failed to write setup marker: {e}");
     }
 }
 
@@ -695,14 +695,14 @@ pub fn spawn_server(app: &tauri::AppHandle, port: u16) -> Result<Child, String> 
 - [ ] **Step 4: Run the test to verify it passes**
 
 ```bash
-cd /Users/thomasindrias/osprey/src-tauri && cargo test --lib server
+cd /Users/thomasindrias/beaver/src-tauri && cargo test --lib server
 ```
 Expected: 2 tests pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/thomasindrias/osprey
+cd /Users/thomasindrias/beaver
 git add src-tauri/src/server.rs src-tauri/src/lib.rs
 git commit -m "feat: add server.rs (venv build, free port, server spawn)"
 ```
@@ -765,12 +765,12 @@ In the `.setup(|app| { ... })` closure, replace everything from the comment `// 
                             "onboarding",
                             tauri::WebviewUrl::App("/".into()),
                         )
-                        .title("Welcome to Osprey")
+                        .title("Welcome to Beaver")
                         .inner_size(480.0, 540.0)
                         .center()
                         .build();
                         if let Err(e) = result {
-                            eprintln!("Osprey: failed to create onboarding window: {e}");
+                            eprintln!("Beaver: failed to create onboarding window: {e}");
                         }
                     });
                 }
@@ -778,7 +778,7 @@ In the `.setup(|app| { ... })` closure, replace everything from the comment `// 
                 if !server::env_is_ready(&handle) {
                     *state.phase.lock().unwrap() = server::SetupPhase::BuildingEnv;
                     if let Err(e) = server::build_env(&handle) {
-                        eprintln!("Osprey: MLX env build failed: {e}");
+                        eprintln!("Beaver: MLX env build failed: {e}");
                         *state.phase.lock().unwrap() = server::SetupPhase::Failed;
                         return;
                     }
@@ -790,7 +790,7 @@ In the `.setup(|app| { ... })` closure, replace everything from the comment `// 
                         *state.child.lock().unwrap() = Some(child);
                     }
                     Err(e) => {
-                        eprintln!("Osprey: failed to spawn MLX server: {e}");
+                        eprintln!("Beaver: failed to spawn MLX server: {e}");
                         *state.phase.lock().unwrap() = server::SetupPhase::Failed;
                         return;
                     }
@@ -826,14 +826,14 @@ In the `.setup(|app| { ... })` closure, replace everything from the comment `// 
                         }
                         Err(_) => {
                             if last_reachable.elapsed() > unreachable_grace {
-                                eprintln!("Osprey: MLX server unreachable — giving up");
+                                eprintln!("Beaver: MLX server unreachable — giving up");
                                 *state.phase.lock().unwrap() = server::SetupPhase::Failed;
                                 break;
                             }
                         }
                     }
                     if started.elapsed() > absolute_cap {
-                        eprintln!("Osprey: MLX server setup exceeded the time cap");
+                        eprintln!("Beaver: MLX server setup exceeded the time cap");
                         *state.phase.lock().unwrap() = server::SetupPhase::Failed;
                         break;
                     }
@@ -862,7 +862,7 @@ Replace line 135 (`.run(tauri::generate_context!())` and its `.expect(...)`) wit
 
 ```rust
         .build(tauri::generate_context!())
-        .expect("error while building Osprey")
+        .expect("error while building Beaver")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
                 if let Some(state) = app.try_state::<server::MlxServer>() {
@@ -931,7 +931,7 @@ async fn show_success_notification(app: tauri::AppHandle) -> Result<(), String> 
     use tauri_plugin_notification::NotificationExt;
     app.notification()
         .builder()
-        .title("Osprey")
+        .title("Beaver")
         .body("Copied to clipboard.")
         .show()
         .map_err(|e| e.to_string())
@@ -947,21 +947,21 @@ async fn is_first_launch(app: tauri::AppHandle) -> bool {
 - [ ] **Step 6: Verify it compiles**
 
 ```bash
-cd /Users/thomasindrias/osprey/src-tauri && cargo check
+cd /Users/thomasindrias/beaver/src-tauri && cargo check
 ```
 Expected: compiles. If `ShellExt` or the `tauri_plugin_shell::init()` plugin registration is now flagged unused, leave the plugin registered (it provides `shell.open` for links) but remove the unused `use tauri_plugin_shell::ShellExt;` import if the compiler warns it is unused.
 
 - [ ] **Step 7: Run the Rust test suite**
 
 ```bash
-cd /Users/thomasindrias/osprey/src-tauri && cargo test
+cd /Users/thomasindrias/beaver/src-tauri && cargo test
 ```
 Expected: all tests pass (ollama.rs tests still present and passing — removed in Task 7).
 
 - [ ] **Step 8: Commit**
 
 ```bash
-cd /Users/thomasindrias/osprey
+cd /Users/thomasindrias/beaver
 git add src-tauri/src/lib.rs
 git commit -m "feat: wire lib.rs to MLX server; kill child on exit"
 ```
@@ -1001,7 +1001,7 @@ describe("formatPhase", () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-cd /Users/thomasindrias/osprey && pnpm test:run ModelDownload
+cd /Users/thomasindrias/beaver && pnpm test:run ModelDownload
 ```
 Expected: FAIL — `formatPhase` is not exported / file shape differs.
 (Note: use `test:run`, not `test` — the `test` script is `vitest` in watch mode and will not exit.)
@@ -1070,8 +1070,8 @@ export function ModelDownload({ onComplete }: Props) {
         </div>
         <h2 className="text-lg font-semibold tracking-tight">Setup didn't finish</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Osprey couldn't finish setting up its local AI. Check your internet
-          connection and restart Osprey to try again.
+          Beaver couldn't finish setting up its local AI. Check your internet
+          connection and restart Beaver to try again.
         </p>
         <Button className="mt-6 w-full" onClick={onComplete}>
           Continue anyway
@@ -1086,7 +1086,7 @@ export function ModelDownload({ onComplete }: Props) {
       <h2 className="text-lg font-semibold tracking-tight">Setting up your local AI</h2>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
         First run downloads a ~3&nbsp;GB vision model and prepares an on-device
-        environment. This is the only time Osprey needs the internet — everything
+        environment. This is the only time Beaver needs the internet — everything
         after runs offline.
       </p>
 
@@ -1107,7 +1107,7 @@ export function ModelDownload({ onComplete }: Props) {
 - [ ] **Step 4: Run the test to verify it passes**
 
 ```bash
-cd /Users/thomasindrias/osprey && pnpm test:run ModelDownload
+cd /Users/thomasindrias/beaver && pnpm test:run ModelDownload
 ```
 Expected: both `formatPhase` tests pass.
 
@@ -1118,14 +1118,14 @@ In `src/components/Onboarding.tsx`, the `FEATURES` array's third item currently 
 - [ ] **Step 6: Run the full frontend test suite**
 
 ```bash
-cd /Users/thomasindrias/osprey && pnpm test:run
+cd /Users/thomasindrias/beaver && pnpm test:run
 ```
-Expected: all tests pass (existing CaptureOverlay/HistoryList/useOsprey tests unaffected).
+Expected: all tests pass (existing CaptureOverlay/HistoryList/useBeaver tests unaffected).
 
 - [ ] **Step 7: Commit**
 
 ```bash
-cd /Users/thomasindrias/osprey
+cd /Users/thomasindrias/beaver
 git add src/components/ModelDownload.tsx src/components/ModelDownload.test.tsx
 git commit -m "feat: poll mlx_status for setup progress in onboarding"
 ```
@@ -1147,13 +1147,13 @@ The Ollama sidecar (`lib.rs:81`) was the **only** consumer of `tauri-plugin-shel
 - [ ] **Step 1: Confirm no remaining references to Ollama in source**
 
 ```bash
-cd /Users/thomasindrias/osprey
+cd /Users/thomasindrias/beaver
 grep -rn "ollama" src src-tauri/src src-tauri/capabilities src-tauri/tauri.conf.json 2>/dev/null
 grep -rn "warm_model\|pull_model\|model_is_installed\|ollama_is_running\|OllamaChild\|OLLAMA_MAX_LOADED_MODELS\|model-pull-progress" src src-tauri/src 2>/dev/null
 ```
 Expected: the only hits are `mod ollama;` in `lib.rs` and matches inside `ollama.rs` itself. If the frontend (`src/`) has any hit (e.g. an old `listen("model-pull-progress")`), it was removed in Task 6 — re-check and fix before deleting.
 
-Note on intentionally dropped tests: `ollama.rs` contained `#[cfg(test)]`-only `detect_content_type` / `has_table_separator` helpers and their unit tests. These were never called by production code (the real content-type detection lives in `src/hooks/useOsprey.ts` and is covered by frontend tests). They are deliberately dropped, not ported — do not recreate them in `mlx.rs`.
+Note on intentionally dropped tests: `ollama.rs` contained `#[cfg(test)]`-only `detect_content_type` / `has_table_separator` helpers and their unit tests. These were never called by production code (the real content-type detection lives in `src/hooks/useBeaver.ts` and is covered by frontend tests). They are deliberately dropped, not ported — do not recreate them in `mlx.rs`.
 
 - [ ] **Step 2: Remove the module declaration**
 
@@ -1170,7 +1170,7 @@ mod shortcut;
 - [ ] **Step 3: Delete the Ollama files**
 
 ```bash
-cd /Users/thomasindrias/osprey
+cd /Users/thomasindrias/beaver
 git rm src-tauri/src/ollama.rs
 git rm src-tauri/binaries/ollama-aarch64-apple-darwin src-tauri/binaries/ollama-x86_64-apple-darwin
 rmdir src-tauri/binaries 2>/dev/null || true
@@ -1181,7 +1181,7 @@ rmdir src-tauri/binaries 2>/dev/null || true
 First confirm the frontend never imports it (expect no output):
 
 ```bash
-cd /Users/thomasindrias/osprey
+cd /Users/thomasindrias/beaver
 grep -rn "plugin-shell" src/ package.json
 ```
 Expect: only the `package.json` dependency line (no `src/` import). If `src/` has a hit, stop and reassess — something still uses it.
@@ -1211,25 +1211,25 @@ tauri-plugin-shell = "2.3.5"
 5. In `package.json`, delete the `"@tauri-apps/plugin-shell": "^2.3.5",` dependency line, then refresh the lockfile:
 
 ```bash
-cd /Users/thomasindrias/osprey && pnpm install
+cd /Users/thomasindrias/beaver && pnpm install
 ```
 
 - [ ] **Step 5: Verify the workspace compiles and tests pass**
 
 ```bash
-cd /Users/thomasindrias/osprey/src-tauri && cargo check && cargo test
+cd /Users/thomasindrias/beaver/src-tauri && cargo check && cargo test
 ```
 Expected: compiles clean; all remaining tests pass (capture, db, mlx, server).
 
 ```bash
-cd /Users/thomasindrias/osprey && pnpm test:run
+cd /Users/thomasindrias/beaver && pnpm test:run
 ```
 Expected: all frontend tests pass.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/thomasindrias/osprey
+cd /Users/thomasindrias/beaver
 git add -A
 git commit -m "refactor: remove Ollama backend, binaries, and dead shell plugin"
 ```
@@ -1245,17 +1245,17 @@ No code changes — this validates the full first-run and warm-run behavior. UI/
 ```bash
 # Remove the app's self-contained env + model cache + setup marker so first-run
 # setup triggers. Leaves the SQLite capture history intact.
-rm -rf "$HOME/Library/Application Support/se.djtl.osprey/mlx-venv" \
-       "$HOME/Library/Application Support/se.djtl.osprey/hf-cache" \
-       "$HOME/Library/Application Support/se.djtl.osprey/uv-cache" \
-       "$HOME/Library/Application Support/se.djtl.osprey/uv-python"
-rm -f  "$HOME/Library/Application Support/se.djtl.osprey/.setup-complete"
+rm -rf "$HOME/Library/Application Support/se.djtl.beaver/mlx-venv" \
+       "$HOME/Library/Application Support/se.djtl.beaver/hf-cache" \
+       "$HOME/Library/Application Support/se.djtl.beaver/uv-cache" \
+       "$HOME/Library/Application Support/se.djtl.beaver/uv-python"
+rm -f  "$HOME/Library/Application Support/se.djtl.beaver/.setup-complete"
 ```
 
 - [ ] **Step 2: Launch the dev build and watch setup**
 
 ```bash
-cd /Users/thomasindrias/osprey && pnpm tauri dev
+cd /Users/thomasindrias/beaver && pnpm tauri dev
 ```
 Expected, in order:
 1. Onboarding window appears (model not cached).
@@ -1277,7 +1277,7 @@ Expected: roughly ~1.6 GB resident for the server process (vs ~10.5 GiB under Ol
 
 - [ ] **Step 5: Verify the server dies with the app**
 
-- Quit Osprey (tray → quit, or stop `pnpm tauri dev`).
+- Quit Beaver (tray → quit, or stop `pnpm tauri dev`).
 - Run the `ps ... python` check again. Expected: the `mlx_server.py` process is gone (killed by the `RunEvent::Exit` hook). If it lingers, the kill hook needs fixing before this task is done.
 
 - [ ] **Step 6: Verify a warm restart**
@@ -1298,7 +1298,7 @@ These are out of scope for the dev-MVP this plan delivers, but are real and shou
 - **The release resource path is never exercised here.** `resolve_resource` uses `CARGO_MANIFEST_DIR/resources` in debug and `resource_dir()/resources` in release; Task 8 only runs the debug branch. A `pnpm tauri build` smoke test (launch the bundled `.app`, confirm it finds `uv`/`mlx_server.py`) should be added when moving toward release.
 - **"Still loading" captures show a generic error.** If a capture fires before the model is `ready`, `/extract` returns 503 → `extract_from_image` returns an error string → the frontend shows its existing generic error animation, not a "model still loading, try again" message. Acceptable for MVP; a nicer message is a small follow-up (the 503 is already distinguishable from other failures by status code).
 - **First run also downloads CPython 3.12 via `uv`** (tens of MB) in addition to the model and pip deps. Offline first-run fails cleanly (env build → `Failed` → onboarding error), but the onboarding copy frames this only as a model download.
-- **No in-app retry on setup failure.** A failed setup surfaces the error UI; recovery is "restart Osprey," which re-runs the (resumable) setup. An in-app retry button + a `retry_setup` command is a deliberate follow-up, not MVP.
+- **No in-app retry on setup failure.** A failed setup surfaces the error UI; recovery is "restart Beaver," which re-runs the (resumable) setup. An in-app retry button + a `retry_setup` command is a deliberate follow-up, not MVP.
 
 ## Self-Review (completed by plan author)
 
@@ -1310,7 +1310,7 @@ These are out of scope for the dev-MVP this plan delivers, but are real and shou
 - lib.rs setup: env build → spawn → readiness poll; commands swapped → Task 5. ✓
 - Onboarding reworked for env+model progress → Task 6. ✓
 - Removed: ollama.rs, OllamaChild, warm_model, pull_model/model_is_installed, ollama binaries, OLLAMA_MAX_LOADED_MODELS, KEEP_ALIVE, and the orphaned `tauri-plugin-shell` (Cargo dep + `init()` + `shell:default` capability + `plugins.shell` config + JS dep) → Tasks 5, 7. ✓
-- Unchanged data flow / frontend contract (`capture_and_extract`, `useOsprey`) → Task 5 keeps the command name/signature shape; `useCaptures`/`useOsprey` untouched. ✓
+- Unchanged data flow / frontend contract (`capture_and_extract`, `useBeaver`) → Task 5 keeps the command name/signature shape; `useCaptures`/`useBeaver` untouched. ✓
 - Open questions resolved: port = dynamic free port (Task 4); capture failure = server returns 503 → clean error string, no hang (Tasks 2, 3); respawn policy = none for MVP, kill-on-exit only, error surfaces via onboarding/error state (Tasks 5, 6). ✓
 - First-launch detection uses a Rust-written `.setup-complete` marker (written after first `ready`), not HF-cache-dir existence, so an interrupted first download can't false-positively skip onboarding (Tasks 4, 5). Readiness poll never times out while the server is reachable and reporting progress; it fails only on sustained unreachability or a 60-min backstop (Task 5). ✓
 

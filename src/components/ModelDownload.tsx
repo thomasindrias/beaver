@@ -19,8 +19,14 @@ export function formatPhase(phase: string): string {
   }
 }
 
+interface StatusReport {
+  phase: Phase;
+  progress: number | null;
+}
+
 export function ModelDownload({ onComplete }: Props) {
   const [phase, setPhase] = useState<Phase>("preparing");
+  const [progress, setProgress] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -28,14 +34,15 @@ export function ModelDownload({ onComplete }: Props) {
 
     const poll = async () => {
       try {
-        const status = await invoke<string>("mlx_status");
+        const status = await invoke<StatusReport>("mlx_status");
         if (!active) return;
-        setPhase(status as Phase);
-        if (status === "ready") {
+        setPhase(status.phase);
+        setProgress(status.progress);
+        if (status.phase === "ready") {
           onComplete();
           return;
         }
-        if (status === "error") return; // stop polling; show error UI
+        if (status.phase === "error") return; // stop polling; show error UI
       } catch {
         // server not up yet — keep polling
       }
@@ -57,8 +64,8 @@ export function ModelDownload({ onComplete }: Props) {
         </div>
         <h2 className="text-lg font-semibold tracking-tight">Setup didn't finish</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Osprey couldn't finish setting up its local AI. Check your internet
-          connection and restart Osprey to try again.
+          Beaver couldn't finish setting up its local AI. Check your internet
+          connection and restart Beaver to try again.
         </p>
         <Button className="mt-6 w-full" onClick={onComplete}>
           Continue anyway
@@ -73,16 +80,32 @@ export function ModelDownload({ onComplete }: Props) {
       <h2 className="text-lg font-semibold tracking-tight">Setting up your local AI</h2>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
         First run downloads a ~3&nbsp;GB vision model and prepares an on-device
-        environment. This is the only time Osprey needs the internet — everything
+        environment. This is the only time Beaver needs the internet — everything
         after runs offline.
       </p>
 
       <div className="mt-7 w-full">
-        <div className="h-1.5 w-full animate-pulse rounded-full bg-primary/60" />
+        {progress != null ? (
+          <div
+            role="progressbar"
+            aria-valuenow={Math.round(progress * 100)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            className="h-1.5 w-full overflow-hidden rounded-full bg-primary/20"
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+              style={{ width: `${Math.round(progress * 100)}%` }}
+            />
+          </div>
+        ) : (
+          <div className="h-1.5 w-full animate-pulse rounded-full bg-primary/60" />
+        )}
         <div className="mt-2.5 flex items-center justify-center text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <Download className="size-3.5" />
             {formatPhase(phase)}
+            {progress != null && ` ${Math.round(progress * 100)}%`}
           </span>
         </div>
       </div>

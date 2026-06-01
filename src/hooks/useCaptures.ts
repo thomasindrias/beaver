@@ -8,7 +8,7 @@ export function useCaptures({ autoLoad = true }: { autoLoad?: boolean } = {}) {
   const [captures, setCaptures] = useState<Capture[]>([]);
 
   const refresh = useCallback(async () => {
-    const db = await Database.load("sqlite:osprey.db");
+    const db = await Database.load("sqlite:beaver.db");
     const rows = await db.select<Capture[]>(
       "SELECT * FROM captures ORDER BY created_at DESC LIMIT 500"
     );
@@ -17,7 +17,7 @@ export function useCaptures({ autoLoad = true }: { autoLoad?: boolean } = {}) {
 
   const saveCapture = useCallback(
     async (capture: Omit<Capture, "id" | "created_at">) => {
-      const db = await Database.load("sqlite:osprey.db");
+      const db = await Database.load("sqlite:beaver.db");
       await db.execute(
         `INSERT INTO captures (id, created_at, content, content_type, char_count, app_context)
          VALUES (?, strftime('%Y-%m-%dT%H:%M:%SZ','now'), ?, ?, ?, ?)`,

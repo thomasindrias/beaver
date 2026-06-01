@@ -1,7 +1,5 @@
 use std::time::Duration;
 
-pub const MODEL_REPO: &str = "mlx-community/Qwen2.5-VL-3B-Instruct-4bit";
-
 pub const EXTRACTION_PROMPT: &str =
     "Extract all data visible in this image. Return as Markdown only. \
      Preserve structure exactly: tables as Markdown tables, lists as Markdown lists, \
@@ -24,6 +22,7 @@ pub enum ServerStatus {
 #[derive(serde::Deserialize, Debug)]
 pub struct HealthStatus {
     pub status: ServerStatus,
+    /// Download progress 0.0–1.0; `None` outside the downloading phase.
     #[serde(default)]
     pub progress: Option<f64>,
 }
@@ -87,16 +86,28 @@ mod tests {
     }
 
     #[test]
-    fn health_deserializes_ready_with_null_progress() {
-        let h: HealthStatus = serde_json::from_str(r#"{"status":"ready","progress":null}"#).unwrap();
+    fn health_deserializes_ready_ignoring_extra_fields() {
+        let h: HealthStatus = serde_json::from_str(r#"{"status":"ready","progress":0.5}"#).unwrap();
         assert_eq!(h.status, ServerStatus::Ready);
-        assert_eq!(h.progress, None);
     }
 
     #[test]
-    fn health_deserializes_downloading_without_progress_field() {
+    fn health_deserializes_downloading() {
         let h: HealthStatus = serde_json::from_str(r#"{"status":"downloading"}"#).unwrap();
         assert_eq!(h.status, ServerStatus::Downloading);
+    }
+
+    #[test]
+    fn health_reads_download_progress() {
+        let h: HealthStatus =
+            serde_json::from_str(r#"{"status":"downloading","progress":0.42}"#).unwrap();
+        assert_eq!(h.status, ServerStatus::Downloading);
+        assert_eq!(h.progress, Some(0.42));
+    }
+
+    #[test]
+    fn health_progress_defaults_to_none_when_absent() {
+        let h: HealthStatus = serde_json::from_str(r#"{"status":"loading"}"#).unwrap();
         assert_eq!(h.progress, None);
     }
 
