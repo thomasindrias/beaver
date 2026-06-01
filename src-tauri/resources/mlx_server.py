@@ -71,6 +71,24 @@ def _recompute_progress():
         total = sum(r[1] for r in byte_bars)
         done = sum(r[0] for r in byte_bars)
     STATE["progress"] = min(done / total, 1.0) if total > 0 else None
+
+
+def _resolve_model(snapshot_download):
+    """Return the model's local path, downloading only if it isn't fully cached.
+
+    A complete cache (e.g. a dev re-run of onboarding via BEAVER_FORCE_ONBOARDING)
+    skips the "downloading" phase entirely and goes straight to loading, instead
+    of flashing a download UI for a model that's already on disk.
+    """
+    try:
+        return snapshot_download(MODEL_REPO, local_files_only=True)
+    except Exception:
+        STATE["status"] = "downloading"
+        STATE["progress"] = 0.0
+        _ProgressTqdm.reset()
+        return snapshot_download(MODEL_REPO, tqdm_class=_ProgressTqdm)
+
+
 # Inference jobs: (prompt, image_path, result_holder, done_event). The single
 # worker thread drains this, which also serializes the burst of captures the
 # global shortcut can fire.
@@ -119,10 +137,7 @@ def _worker():
     try:
         from huggingface_hub import snapshot_download
 
-        STATE["status"] = "downloading"
-        STATE["progress"] = 0.0
-        _ProgressTqdm.reset()
-        local_path = snapshot_download(MODEL_REPO, tqdm_class=_ProgressTqdm)
+        local_path = _resolve_model(snapshot_download)
 
         STATE["status"] = "loading"
         STATE["progress"] = None  # loading into memory has no measurable %

@@ -33,6 +33,12 @@ describe("Onboarding", () => {
     vi.useRealTimers();
   });
 
+  it("headlines the welcome screen with the wave animation", () => {
+    const { container } = render(<Onboarding />);
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("src")).toContain("beaver-wave.webp");
+  });
+
   it("invokes finish_onboarding when the ready button is clicked", () => {
     render(<Onboarding />);
     reachReadyStep();

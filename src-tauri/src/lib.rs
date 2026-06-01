@@ -30,6 +30,19 @@ fn apply_popover_vibrancy(window: &tauri::WebviewWindow) {
     }
 }
 
+fn is_truthy(val: Option<String>) -> bool {
+    !matches!(val.as_deref().map(str::trim), None | Some("") | Some("0") | Some("false") | Some("no"))
+}
+
+// Dev/test override: when `BEAVER_FORCE_ONBOARDING` is set to a truthy value,
+// show onboarding on every launch regardless of the setup-complete marker, so
+// the flow can be re-tested without wiping app data. The model-download phase
+// skips a cached model (see `_resolve_model` in mlx_server.py), so re-running is
+// cheap.
+fn force_onboarding_enabled() -> bool {
+    is_truthy(std::env::var("BEAVER_FORCE_ONBOARDING").ok())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -54,7 +67,11 @@ pub fn run() {
             let tray_menu = MenuBuilder::new(app).text("quit", "Quit Beaver").build()?;
 
             let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().expect("app bundle must include an icon").clone())
+                // Dedicated menu-bar glyph (the beaver head, white circle masked
+                // off) rather than the full app-icon squircle. Colored, so it's
+                // not rendered as a monochrome template.
+                .icon(tauri::include_image!("icons/tray.png"))
+                .icon_as_template(false)
                 .tooltip("Beaver")
                 .menu(&tray_menu)
                 // Keep left-click for toggling the popover; the menu opens on
@@ -104,7 +121,7 @@ pub fn run() {
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 let state = handle.state::<server::MlxServer>();
-                let first_launch = !server::setup_is_complete(&handle);
+                let first_launch = !server::setup_is_complete(&handle) || force_onboarding_enabled();
 
                 if first_launch {
                     let h = handle.clone();
@@ -115,7 +132,7 @@ pub fn run() {
                             tauri::WebviewUrl::App("/".into()),
                         )
                         .title("Welcome to Beaver")
-                        .inner_size(480.0, 540.0)
+                        .inner_size(480.0, 640.0)
                         .center();
                         // Borderless chrome: let the dark UI fill to the top edge
                         // with the traffic lights floating over it, instead of a
@@ -489,5 +506,29 @@ fn show_capture_overlay(app: &tauri::AppHandle) {
 
     if let Err(e) = result {
         eprintln!("Beaver: failed to create capture overlay: {e}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_truthy_treats_set_values_as_on() {
+        assert!(is_truthy(Some("1".into())));
+        assert!(is_truthy(Some("true".into())));
+        assert!(is_truthy(Some("yes".into())));
+        assert!(is_truthy(Some("anything".into())));
+        assert!(is_truthy(Some("  1  ".into())));
+    }
+
+    #[test]
+    fn is_truthy_treats_unset_and_falsey_as_off() {
+        assert!(!is_truthy(None));
+        assert!(!is_truthy(Some("".into())));
+        assert!(!is_truthy(Some("0".into())));
+        assert!(!is_truthy(Some("false".into())));
+        assert!(!is_truthy(Some("no".into())));
+        assert!(!is_truthy(Some("  ".into())));
     }
 }

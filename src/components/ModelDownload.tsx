@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { AlertCircle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Logo } from "./Logo";
+import { BeaverAnimation } from "./BeaverAnimation";
 
 interface Props { onComplete: () => void }
 
@@ -76,7 +76,7 @@ export function ModelDownload({ onComplete }: Props) {
 
   return (
     <div className="flex w-full max-w-[340px] flex-col items-center text-center">
-      <Logo size={56} live className="mb-5" />
+      <BeaverAnimation mood="singing" size={128} className="mb-2 drop-shadow-sm" />
       <h2 className="text-lg font-semibold tracking-tight">Setting up your local AI</h2>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
         First run downloads a ~3&nbsp;GB vision model and prepares an on-device

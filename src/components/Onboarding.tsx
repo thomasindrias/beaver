@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Scan, Sparkles, Lock, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Logo } from "./Logo";
+import { BeaverAnimation } from "./BeaverAnimation";
 import { Kbd } from "./Kbd";
 import { ModelDownload } from "./ModelDownload";
 
@@ -34,12 +34,19 @@ export function Onboarding() {
   }, [step, finish]);
 
   return (
-    <div className="flex h-screen w-full flex-col bg-background px-9 py-10 text-foreground">
+    <div className="flex h-screen w-full flex-col bg-background px-9 py-8 text-foreground">
       {step === "welcome" && (
         <div key="welcome" className="animate-rise flex flex-1 flex-col">
           <div className="flex flex-col items-center text-center">
-            <Logo size={64} live className="mb-5" />
-            <h1 className="text-[26px] font-semibold tracking-tight">
+            <div className="relative flex items-center justify-center">
+              <div className="absolute size-20 rounded-full bg-primary/10 blur-2xl" />
+              <BeaverAnimation
+                mood="wave"
+                size={96}
+                className="relative drop-shadow-sm"
+              />
+            </div>
+            <h1 className="mt-1 text-[26px] font-semibold tracking-tight">
               Meet <span className="text-primary">Beaver</span>
             </h1>
             <p className="mt-2 max-w-[320px] text-sm leading-relaxed text-muted-foreground">
@@ -47,7 +54,7 @@ export function Onboarding() {
             </p>
           </div>
 
-          <div className="mt-8 flex flex-col gap-3">
+          <div className="mt-6 flex flex-col gap-2.5">
             {FEATURES.map(({ icon: Icon, title, body }) => (
               <div
                 key={title}
@@ -64,7 +71,7 @@ export function Onboarding() {
             ))}
           </div>
 
-          <div className="mt-auto pt-8">
+          <div className="mt-auto pt-6">
             <Button size="lg" className="w-full" onClick={() => setStep("download")}>
               Get started
               <ArrowRight className="size-4" />

@@ -48,10 +48,44 @@ def test_extract_raises_503_when_not_ready():
         assert e.status_code == 503
 
 
+def test_resolve_model_skips_download_when_cached():
+    # A warm cache must not flip the UI into the "downloading" phase.
+    m.STATE["status"] = "loading"
+    calls = []
+
+    def fake(repo, **kw):
+        calls.append(kw)
+        return "/cache/path"  # local_files_only check succeeds
+
+    assert m._resolve_model(fake) == "/cache/path"
+    assert m.STATE["status"] == "loading"
+    assert calls == [{"local_files_only": True}]
+
+
+def test_resolve_model_downloads_when_not_cached():
+    m.STATE["status"] = "loading"
+    calls = []
+
+    def fake(repo, **kw):
+        calls.append(kw)
+        if kw.get("local_files_only"):
+            raise RuntimeError("not fully cached")
+        return "/downloaded/path"
+
+    assert m._resolve_model(fake) == "/downloaded/path"
+    assert m.STATE["status"] == "downloading"
+    assert m.STATE["progress"] == 0.0
+    assert len(calls) == 2
+    assert calls[0] == {"local_files_only": True}
+    assert "tqdm_class" in calls[1]
+
+
 if __name__ == "__main__":
     test_health_reflects_state()
     test_progress_aggregates_byte_bars()
     test_progress_ignores_non_byte_bars()
     test_progress_clamps_to_one()
     test_extract_raises_503_when_not_ready()
+    test_resolve_model_skips_download_when_cached()
+    test_resolve_model_downloads_when_not_cached()
     print("OK")

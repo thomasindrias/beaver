@@ -25,6 +25,15 @@ describe("ModelDownload progress", () => {
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
+  it("plays the singing beaver while setting up", async () => {
+    invokeMock.mockResolvedValue({ phase: "downloading", progress: 0.1 });
+    const { container } = render(<ModelDownload onComplete={() => {}} />);
+
+    await screen.findByRole("progressbar");
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("src")).toContain("beaver-singing.webp");
+  });
+
   it("calls onComplete once the phase is ready", async () => {
     invokeMock.mockResolvedValue({ phase: "ready", progress: null });
     const onComplete = vi.fn();
