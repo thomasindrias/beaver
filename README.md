@@ -9,6 +9,15 @@ captures never leave your machine.
 > Apple Silicon only. The vision model runs on Apple's MLX framework, which
 > requires an M-series Mac.
 
+## Install (macOS, Apple Silicon)
+
+1. Download `Beaver_<version>_aarch64.dmg`.
+2. Open the DMG and drag **Beaver** into **Applications**.
+3. Launch Beaver from Applications. Grant Screen Recording permission when asked.
+
+> Unsigned builds: the first launch needs right-click → **Open** (one time) to get
+> past Gatekeeper. Signed/notarized builds open normally.
+
 ## How it works
 
 1. `Cmd+Shift+D` opens a full-screen capture overlay.
@@ -64,6 +73,19 @@ cd src-tauri/resources && \
 pnpm build              # type-check + bundle the frontend
 pnpm tauri build        # produce the signed .app / .dmg
 ```
+
+## Building a release
+
+Requires Apple Silicon, Rust, and pnpm.
+
+```bash
+pnpm release:mac
+```
+
+Without credentials this produces an **unsigned** DMG for local testing. To sign
+and notarize, copy `.env.release.example` to `.env.release`, fill in your Developer
+ID identity and notarization credentials, and re-run. The script verifies the
+signature, Gatekeeper acceptance, and notarization staple before finishing.
 
 ## Project layout
 
