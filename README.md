@@ -1,7 +1,87 @@
-# Tauri + React + Typescript
+# Beaver
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+A macOS menu-bar utility that turns a screenshot into structured data. Press a
+shortcut, drag a box around anything on screen, and Beaver extracts what's
+inside it as clean Markdown — tables stay tables, lists stay lists, code stays
+code. Vision runs **fully on-device** after a one-time model download, so
+captures never leave your machine.
 
-## Recommended IDE Setup
+> Apple Silicon only. The vision model runs on Apple's MLX framework, which
+> requires an M-series Mac.
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+## How it works
+
+1. `Cmd+Shift+D` opens a full-screen capture overlay.
+2. You drag a bounding box around the region of interest.
+3. The cropped image is sent to a local FastAPI server running
+   `Qwen2.5-VL-3B-Instruct-4bit` via MLX.
+4. The extracted Markdown is returned, stored in a local SQLite history, and
+   copied to your clipboard.
+
+On first launch Beaver downloads the ~3 GB vision model and prepares an
+on-device Python environment (the only time it needs the internet). A progress
+bar tracks the download; everything after runs offline.
+
+## Stack
+
+- **Shell:** [Tauri 2](https://tauri.app) (Rust core, macOS menu-bar app)
+- **Frontend:** React 19 + TypeScript + Vite 7, Tailwind CSS v4, shadcn
+- **Vision backend:** Python FastAPI + [MLX](https://github.com/ml-explore/mlx) (`mlx-vlm`)
+- **Storage:** SQLite via `tauri-plugin-sql`
+
+## Prerequisites
+
+- macOS on Apple Silicon
+- [Rust](https://rustup.rs) (stable)
+- [Node.js](https://nodejs.org) + [pnpm](https://pnpm.io)
+- [uv](https://github.com/astral-sh/uv) — used to provision the Python vision environment
+
+## Development
+
+```bash
+pnpm install            # install frontend deps
+pnpm tauri dev          # run the app (builds Rust + serves the frontend)
+```
+
+`pnpm dev` runs the Vite frontend alone (no native shell), which is handy for
+UI-only work.
+
+## Testing
+
+```bash
+pnpm test               # frontend (vitest, watch mode)
+pnpm test:run           # frontend, single run
+cargo test              # Rust (run inside src-tauri/)
+# Python vision server:
+cd src-tauri/resources && \
+  uv run --no-project --with fastapi --with uvicorn --with pydantic --with tqdm \
+  python test_mlx_server.py
+```
+
+## Build
+
+```bash
+pnpm build              # type-check + bundle the frontend
+pnpm tauri build        # produce the signed .app / .dmg
+```
+
+## Project layout
+
+```
+src/                       React frontend
+  components/              UI (capture overlay, onboarding, toast, …)
+  hooks/                   useBeaver (capture flow), useCaptures (history)
+  tests/                   vitest specs
+src-tauri/                 Rust core
+  src/
+    lib.rs                 app setup, Tauri commands, window wiring
+    capture.rs             screen capture + region crop
+    server.rs              MLX server lifecycle (venv build, spawn, health)
+    mlx.rs                 HTTP client for the vision server
+    shortcut.rs            global shortcut binding
+    db.rs                  SQLite schema + migrations
+  resources/
+    mlx_server.py          FastAPI vision server (Qwen2.5-VL via MLX)
+public/
+  beaver-animations/       per-mood beaver animations (PNG frames + WebP)
+```
