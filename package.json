@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "tauri:onboarding": "BEAVER_FORCE_ONBOARDING=1 tauri dev",
     "test": "vitest",
-    "test:run": "vitest run --passWithNoTests"
+    "test:run": "vitest run --passWithNoTests",
+    "release:mac": "bash scripts/release-macos.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

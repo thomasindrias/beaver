@@ -26,3 +26,6 @@ __pycache__/
 *.njsproj
 *.sln
 *.sw?
+
+# Release credentials (never commit real secrets)
+.env.release
