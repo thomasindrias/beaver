@@ -29,16 +29,43 @@ if [[ "$MODE" == "unsigned" ]]; then
   echo "!!  First launch needs right-click > Open. Add creds to .env.release to notarize."
 fi
 
-# 1. Build the .app. Tauri signs it when APPLE_SIGNING_IDENTITY is set.
-#    The DMG itself is packaged below by dmgbuild — Tauri's DMG bundler drives
-#    Finder via AppleScript, which can't run headless / while logged out.
-pnpm tauri build --target "$TARGET"
+# 1. Build the .app UNSIGNED. We sign everything ourselves below so the bundled
+#    `uv` helper (which Tauri leaves ad-hoc / linker-signed) gets a proper
+#    Developer ID + hardened-runtime + timestamped signature. Unset every Apple
+#    credential for this step so Tauri neither signs the main binary nor tries to
+#    notarize prematurely (it would notarize before `uv` is signed and fail).
+#    The DMG is packaged headlessly by dmgbuild — Tauri's DMG bundler drives
+#    Finder via AppleScript, which can't run while logged out.
+env -u APPLE_SIGNING_IDENTITY -u APPLE_ID -u APPLE_PASSWORD -u APPLE_TEAM_ID \
+    -u APPLE_API_KEY -u APPLE_API_ISSUER -u APPLE_API_KEY_PATH \
+    pnpm tauri build --target "$TARGET"
 
 BUNDLE="src-tauri/target/${TARGET}/release/bundle"
 APP="$(/usr/bin/find "$BUNDLE/macos" -maxdepth 1 -name '*.app' 2>/dev/null | head -1)"
 if [[ -z "$APP" ]]; then
   echo "error: no .app found under $BUNDLE/macos" >&2
   exit 1
+fi
+
+# 1a. Sign the app inside-out (signed mode only). Every nested Mach-O binary —
+#     notably the bundled `uv` helper, which Tauri ships ad-hoc — must carry a
+#     Developer ID signature with hardened runtime (--options runtime) and a
+#     secure timestamp (--timestamp), or notarization rejects the whole app.
+#     Sign the nested binaries first, then seal the .app last with entitlements.
+if [[ "$MODE" == "signed" ]]; then
+  echo "==> Signing nested Mach-O binaries (hardened runtime, timestamped)"
+  while IFS= read -r macho; do
+    echo "    sign: ${macho#"$APP"/}"
+    codesign --force --options runtime --timestamp \
+      --sign "$APPLE_SIGNING_IDENTITY" "$macho"
+  done < <(find "$APP" -type f -exec sh -c 'file "$1" | grep -q "Mach-O"' _ {} \; -print)
+
+  echo "==> Sealing the .app (entitlements, hardened runtime, timestamped)"
+  codesign --force --options runtime --timestamp \
+    --entitlements src-tauri/entitlements.plist \
+    --sign "$APPLE_SIGNING_IDENTITY" "$APP"
+
+  codesign --verify --deep --strict --verbose=2 "$APP"
 fi
 
 VERSION="$(node -p "require('./package.json').version")"
