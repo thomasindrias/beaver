@@ -29,3 +29,6 @@ __pycache__/
 
 # Release credentials (never commit real secrets)
 .env.release
+
+# Workspace tool caches
+.turbo/

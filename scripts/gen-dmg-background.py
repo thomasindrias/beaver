@@ -3,9 +3,10 @@
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
-ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "src-tauri" / "dmg"
-HEAD = ROOT / "public" / "beaver-head.webp"
+ROOT = Path(__file__).resolve().parents[1]
+DESKTOP = ROOT / "apps" / "desktop"
+OUT = DESKTOP / "src-tauri" / "dmg"
+HEAD = DESKTOP / "public" / "beaver-head.webp"
 
 W, H = 660, 420
 BG = (26, 23, 20)       # #1a1714

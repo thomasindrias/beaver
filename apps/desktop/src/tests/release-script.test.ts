@@ -1,11 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../..");
+
+function rootPath(path: string): string {
+  return join(workspaceRoot, path);
+}
 
 function printMode(identity: string): string {
-  return execFileSync("bash", ["scripts/release-macos.sh", "--print-mode"], {
+  return execFileSync("bash", [rootPath("scripts/release-macos.sh"), "--print-mode"], {
+    cwd: workspaceRoot,
     encoding: "utf8",
-    env: { ...process.env, APPLE_SIGNING_IDENTITY: identity },
+    env: {
+      ...process.env,
+      BEAVER_RELEASE_ENV_FILE: "/dev/null",
+      APPLE_SIGNING_IDENTITY: identity,
+    },
   }).trim();
 }
 
@@ -21,34 +34,34 @@ describe("release-macos.sh", () => {
 
 describe("release wiring", () => {
   it("documents credentials in .env.release.example", () => {
-    const ex = readFileSync(".env.release.example", "utf8");
+    const ex = readFileSync(rootPath(".env.release.example"), "utf8");
     expect(ex).toContain("APPLE_SIGNING_IDENTITY");
     expect(ex).toContain("APPLE_TEAM_ID");
   });
 
   it("gitignores the real .env.release", () => {
-    expect(readFileSync(".gitignore", "utf8")).toContain(".env.release");
+    expect(readFileSync(rootPath(".gitignore"), "utf8")).toContain(".env.release");
   });
 
-  it("exposes a release:mac script", () => {
-    const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+  it("exposes a release:mac script at the workspace root", () => {
+    const pkg = JSON.parse(readFileSync(rootPath("package.json"), "utf8"));
     expect(pkg.scripts["release:mac"]).toContain("release-macos.sh");
   });
 
-  it("keeps the example file", () => {
-    expect(existsSync(".env.release.example")).toBe(true);
+  it("keeps the example file at the workspace root", () => {
+    expect(existsSync(rootPath(".env.release.example"))).toBe(true);
   });
 });
 
 describe("headless dmg packaging", () => {
   it("packages the DMG with dmgbuild (no Finder/AppleScript)", () => {
-    const sh = readFileSync("scripts/release-macos.sh", "utf8");
+    const sh = readFileSync(rootPath("scripts/release-macos.sh"), "utf8");
     expect(sh).toContain("dmgbuild");
     expect(sh).toContain("scripts/dmgbuild-settings.py");
   });
 
   it("ships a dmgbuild settings file with the install layout", () => {
-    const s = readFileSync("scripts/dmgbuild-settings.py", "utf8");
+    const s = readFileSync(rootPath("scripts/dmgbuild-settings.py"), "utf8");
     expect(s).toContain("symlinks");
     expect(s).toContain("Applications");
     expect(s).toContain("icon_locations");

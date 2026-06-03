@@ -1,16 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
+WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DESKTOP_DIR="$WORKSPACE_ROOT/apps/desktop"
+cd "$WORKSPACE_ROOT"
 
-# Load gitignored release credentials if present.
-if [[ -f .env.release ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source .env.release
-  set +a
-fi
+load_release_env() {
+  if [[ -n "${BEAVER_RELEASE_ENV_FILE:-}" ]]; then
+    if [[ -f "$BEAVER_RELEASE_ENV_FILE" ]]; then
+      set -a
+      # shellcheck disable=SC1090
+      source "$BEAVER_RELEASE_ENV_FILE"
+      set +a
+    fi
+    return
+  fi
+
+  local candidate
+  for candidate in "$WORKSPACE_ROOT/.env.release" "$DESKTOP_DIR/.env.release"; do
+    if [[ -f "$candidate" ]]; then
+      set -a
+      # shellcheck disable=SC1090
+      source "$candidate"
+      set +a
+      return
+    fi
+  done
+}
+
+load_release_env
 
 print_mode() {
   if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then echo "signed"; else echo "unsigned"; fi
@@ -38,9 +56,9 @@ fi
 #    Finder via AppleScript, which can't run while logged out.
 env -u APPLE_SIGNING_IDENTITY -u APPLE_ID -u APPLE_PASSWORD -u APPLE_TEAM_ID \
     -u APPLE_API_KEY -u APPLE_API_ISSUER -u APPLE_API_KEY_PATH \
-    pnpm tauri build --target "$TARGET"
+    pnpm --filter @beaver/desktop exec tauri build --target "$TARGET"
 
-BUNDLE="src-tauri/target/${TARGET}/release/bundle"
+BUNDLE="$DESKTOP_DIR/src-tauri/target/${TARGET}/release/bundle"
 APP="$(/usr/bin/find "$BUNDLE/macos" -maxdepth 1 -name '*.app' 2>/dev/null | head -1)"
 if [[ -z "$APP" ]]; then
   echo "error: no .app found under $BUNDLE/macos" >&2
@@ -62,13 +80,13 @@ if [[ "$MODE" == "signed" ]]; then
 
   echo "==> Sealing the .app (entitlements, hardened runtime, timestamped)"
   codesign --force --options runtime --timestamp \
-    --entitlements src-tauri/entitlements.plist \
+    --entitlements "$DESKTOP_DIR/src-tauri/entitlements.plist" \
     --sign "$APPLE_SIGNING_IDENTITY" "$APP"
 
   codesign --verify --deep --strict --verbose=2 "$APP"
 fi
 
-VERSION="$(node -p "require('./package.json').version")"
+VERSION="$(node -p "require('./apps/desktop/package.json').version")"
 DMG_DIR="$BUNDLE/dmg"
 DMG="${DMG_DIR}/Beaver_${VERSION}_${TARGET%%-*}.dmg"
 mkdir -p "$DMG_DIR"
@@ -77,15 +95,15 @@ rm -f "$DMG"
 # 2. Compose a HiDPI background (1x + @2x) so it stays crisp on retina displays.
 BG_TIFF="${DMG_DIR}/background.tiff"
 tiffutil -cathidpicheck \
-  src-tauri/dmg/background.png \
-  src-tauri/dmg/background@2x.png \
+  "$DESKTOP_DIR/src-tauri/dmg/background.png" \
+  "$DESKTOP_DIR/src-tauri/dmg/background@2x.png" \
   -out "$BG_TIFF" >/dev/null
 
 # 3. Package the branded DMG headlessly (writes .DS_Store directly; no Finder).
 echo "==> Packaging branded DMG with dmgbuild"
 BEAVER_APP="$APP" \
 BEAVER_DMG_BG="$BG_TIFF" \
-BEAVER_VOLICON="src-tauri/icons/icon.icns" \
+BEAVER_VOLICON="$DESKTOP_DIR/src-tauri/icons/icon.icns" \
   uv run --no-project --with dmgbuild -- \
     dmgbuild -s scripts/dmgbuild-settings.py "Beaver" "$DMG"
 
