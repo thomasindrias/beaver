@@ -1,0 +1,30 @@
+{
+  "name": "@beaver/ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "vitest --environment jsdom",
+    "test:run": "vitest run --environment jsdom",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@beaver/brand": "workspace:*",
+    "clsx": "catalog:",
+    "react": "catalog:",
+    "tailwind-merge": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/react": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

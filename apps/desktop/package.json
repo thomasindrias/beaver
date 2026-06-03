@@ -14,16 +14,15 @@
   },
   "dependencies": {
     "@base-ui/react": "catalog:",
+    "@beaver/ui": "workspace:*",
     "@fontsource-variable/geist": "catalog:",
     "@tauri-apps/api": "catalog:",
     "@tauri-apps/plugin-sql": "catalog:",
     "class-variance-authority": "catalog:",
-    "clsx": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "shadcn": "catalog:",
-    "tailwind-merge": "catalog:",
     "tw-animate-css": "catalog:"
   },
   "devDependencies": {

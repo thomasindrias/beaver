@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { BrandMark, cn } from "@beaver/ui";
 
 interface Props {
   size?: number;
@@ -12,14 +12,10 @@ interface Props {
  */
 export function Logo({ size = 40, className, live = false }: Props) {
   return (
-    <img
-      src="/beaver-head.webp"
-      alt=""
-      aria-hidden
-      width={size}
-      height={size}
-      draggable={false}
-      className={cn("select-none", live && "animate-beaver-pulse", className)}
+    <BrandMark
+      size={size}
+      decorative
+      className={cn(live && "animate-beaver-pulse", className)}
     />
   );
 }

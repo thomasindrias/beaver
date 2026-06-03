@@ -3,6 +3,8 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
+@source "../../../packages/ui/src";
+
 /* ── Beaver design tokens ─────────────────────────────────────────────
    A single, always-dark identity. Warm-gold accent (the beaver's eye)
    against a near-black slate. Precise, calm, premium. */

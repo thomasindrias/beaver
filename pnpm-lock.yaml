@@ -107,6 +107,9 @@ importers:
       '@base-ui/react':
         specifier: 'catalog:'
         version: 1.5.0(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@beaver/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@fontsource-variable/geist':
         specifier: 'catalog:'
         version: 5.2.9
@@ -119,9 +122,6 @@ importers:
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
-      clsx:
-        specifier: 'catalog:'
-        version: 2.1.1
       lucide-react:
         specifier: 'catalog:'
         version: 1.17.0(react@19.2.6)
@@ -134,9 +134,6 @@ importers:
       shadcn:
         specifier: 'catalog:'
         version: 4.9.0(@types/node@25.9.1)(typescript@5.8.3)
-      tailwind-merge:
-        specifier: 'catalog:'
-        version: 3.6.0
       tw-animate-css:
         specifier: 'catalog:'
         version: 1.4.0
@@ -192,6 +189,43 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.8.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.7(@types/node@25.9.1)(@vitest/ui@4.1.7)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.14.6(@types/node@25.9.1)(typescript@5.8.3))(vite@7.3.3(@types/node@25.9.1)(jiti@2.7.0)(lightningcss@1.32.0))
+
+  packages/ui:
+    dependencies:
+      '@beaver/brand':
+        specifier: workspace:*
+        version: link:../brand
+      clsx:
+        specifier: 'catalog:'
+        version: 2.1.1
+      react:
+        specifier: 'catalog:'
+        version: 19.2.6
+      tailwind-merge:
+        specifier: 'catalog:'
+        version: 3.6.0
+    devDependencies:
+      '@testing-library/react':
+        specifier: 'catalog:'
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.1
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.15
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.3(@types/react@19.2.15)
+      jsdom:
+        specifier: 'catalog:'
+        version: 29.1.1(@noble/hashes@1.8.0)
       typescript:
         specifier: 'catalog:'
         version: 5.8.3
