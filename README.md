@@ -48,21 +48,22 @@ bar tracks the download; everything after runs offline.
 ## Development
 
 ```bash
-pnpm install            # install frontend deps
-pnpm tauri dev          # run the app (builds Rust + serves the frontend)
+pnpm install
+pnpm dev          # run all app dev servers; currently the desktop Vite frontend
+pnpm tauri dev    # run the native macOS app
 ```
 
-`pnpm dev` runs the Vite frontend alone (no native shell), which is handy for
-UI-only work.
+`pnpm dev` uses the workspace `apps/*` pattern. Today that starts the desktop
+frontend only; a future website app can join by adding its own `dev` script.
 
 ## Testing
 
 ```bash
-pnpm test               # frontend (vitest, watch mode)
-pnpm test:run           # frontend, single run
-cargo test              # Rust (run inside src-tauri/)
+pnpm test:run
+pnpm typecheck
+cd apps/desktop/src-tauri && cargo test
 # Python vision server:
-cd src-tauri/resources && \
+cd apps/desktop/src-tauri/resources && \
   uv run --no-project --with fastapi --with uvicorn --with pydantic --with tqdm \
   python test_mlx_server.py
 ```
@@ -70,8 +71,8 @@ cd src-tauri/resources && \
 ## Build
 
 ```bash
-pnpm build              # type-check + bundle the frontend
-pnpm tauri build        # produce the signed .app / .dmg
+pnpm build
+pnpm tauri build
 ```
 
 ## Building a release
@@ -89,21 +90,15 @@ signature, Gatekeeper acceptance, and notarization staple before finishing.
 
 ## Project layout
 
-```
-src/                       React frontend
-  components/              UI (capture overlay, onboarding, toast, …)
-  hooks/                   useBeaver (capture flow), useCaptures (history)
-  tests/                   vitest specs
-src-tauri/                 Rust core
-  src/
-    lib.rs                 app setup, Tauri commands, window wiring
-    capture.rs             screen capture + region crop
-    server.rs              MLX server lifecycle (venv build, spawn, health)
-    mlx.rs                 HTTP client for the vision server
-    shortcut.rs            global shortcut binding
-    db.rs                  SQLite schema + migrations
-  resources/
-    mlx_server.py          FastAPI vision server (Qwen2.5-VL via MLX)
-public/
-  beaver-animations/       per-mood beaver animations (PNG frames + WebP)
+```text
+apps/
+  desktop/                 React frontend and Tauri shell
+    src/                   UI, hooks, and vitest specs
+    src-tauri/             Rust core and MLX server resources
+    public/                Desktop public assets and mood animations
+packages/
+  brand/                   Product metadata and canonical brand assets
+  ui/                      Shared React primitives
+scripts/                   Workspace automation and release scripts
+tests/                     Workspace contract tests
 ```
