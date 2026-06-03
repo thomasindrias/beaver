@@ -1,228 +1,210 @@
-# pnpm Monorepo Refactor Implementation Plan
+# Beaver Desktop pnpm Monorepo Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Convert Beaver into a pnpm/Turborepo monorepo with desktop and website apps, focused shared brand and UI packages, one lockfile, and preserved desktop development and release commands.
+**Goal:** Convert Beaver into a pnpm/Turborepo monorepo for the existing desktop app, with focused shared brand/UI packages and no website app.
 
-**Architecture:** Move the Vite/Tauri desktop app and Next.js website into `apps/`, then add `@beaver/brand` for framework-neutral metadata and canonical assets and `@beaver/ui` for the demonstrated shared React surface. The repository root owns pnpm/Turbo orchestration, asset synchronization, workspace tests, and compatibility aliases; each app keeps its own theme and app-specific components.
+**Architecture:** Move the Vite/Tauri app to `apps/desktop`, keep root-owned workspace orchestration, and add `@beaver/brand` plus `@beaver/ui` as small reusable packages. Root `pnpm dev` targets all packages under `apps/*`, so a future mocked website can join by adding an app package with a `dev` script.
 
-**Tech Stack:** pnpm 10.33.0, Turborepo 2.9.16, React 19, TypeScript 5.8, Vite 7, Next.js 16.2.7, Tauri 2, Vitest 4.
+**Tech Stack:** pnpm 10.33.0, Turborepo 2.9.16, React 19, TypeScript 5.8, Vite 7, Tauri 2, Vitest 4.
 
 ---
 
-## Working Tree Note
+## Guardrails
 
-`website/` is currently untracked user work. Preserve its contents exactly when
-moving it to `apps/website`; do not recreate or discard it. The approved design
-spec is:
+- Per `AGENTS.md`, run shell commands with the `rtk` prefix.
+- Do not create `apps/website`.
+- The old untracked `website/` directory was intentionally removed from scope.
+- Keep the desktop app visually and behaviorally unchanged.
+- Keep real `.env.release` credentials untracked and do not move or print them.
+- Commit after each task when verification passes.
 
-`docs/superpowers/specs/2026-06-03-pnpm-monorepo-design.md`
+## Target File Map
 
-## File Structure
+| Path | Action | Responsibility |
+| --- | --- | --- |
+| `package.json` | Replace | Root workspace scripts and dev tooling |
+| `pnpm-workspace.yaml` | Create | pnpm packages and shared dependency catalog |
+| `turbo.json` | Create | Workspace task orchestration |
+| `tests/workspace-config.test.ts` | Create | Root workspace contract tests |
+| `tests/brand-assets.test.ts` | Create | Canonical asset drift tests |
+| `apps/desktop/` | Create by move | Existing Vite/Tauri desktop app |
+| `apps/desktop/package.json` | Create | Desktop package manifest |
+| `apps/desktop/src/tests/release-script.test.ts` | Modify | Root release script tests after move |
+| `scripts/release-macos.sh` | Modify | Root release script with desktop paths |
+| `scripts/gen-dmg-background.py` | Modify | Desktop asset paths after move |
+| `scripts/dmgbuild-settings.py` | Keep | DMG layout settings |
+| `packages/brand/` | Create | Framework-neutral product data and brand assets |
+| `packages/ui/` | Create | `cn` and `BrandMark` shared React utilities |
+| `README.md` | Modify | Monorepo command and layout docs |
 
-| File or directory | Action | Responsibility |
-|---|---|---|
-| `package.json` | Replace | Root Turbo commands, focused aliases, package manager pin |
-| `pnpm-workspace.yaml` | Create | Workspace packages and shared dependency catalog |
-| `turbo.json` | Create | Dependency-aware build, test, typecheck, and dev tasks |
-| `pnpm-lock.yaml` | Regenerate | Single workspace lockfile |
-| `tests/workspace-config.test.ts` | Create | Verify root workspace contract |
-| `scripts/sync-brand-assets.mjs` | Create | Copy canonical shared assets into app public directories |
-| `apps/desktop/` | Create by move | Existing Vite/Tauri desktop application |
-| `apps/website/` | Create by move | Existing Next.js marketing website |
-| `packages/brand/package.json` | Create | Framework-neutral brand package manifest |
-| `packages/brand/tsconfig.json` | Create | Brand package TypeScript configuration |
-| `packages/brand/src/index.ts` | Create | Product metadata, external links, public asset paths |
-| `packages/brand/src/index.test.ts` | Create | Brand metadata contract tests |
-| `packages/brand/src/assets.test.ts` | Create | Canonical asset and committed-copy drift tests |
-| `packages/brand/assets/` | Create | Canonical shared asset files |
-| `packages/ui/package.json` | Create | Shared React package manifest |
-| `packages/ui/tsconfig.json` | Create | Shared UI TypeScript configuration |
-| `packages/ui/vitest.config.ts` | Create | Shared UI jsdom test configuration |
-| `packages/ui/src/index.ts` | Create | Public UI exports |
-| `packages/ui/src/cn.ts` | Create | Shared class-name merge helper |
-| `packages/ui/src/brand-mark.tsx` | Create | Shared normal-`img` brand mark |
-| `packages/ui/src/index.test.tsx` | Create | Shared UI contract tests |
-| `README.md` | Modify | Document monorepo layout and root command pattern |
+---
 
-## Task 1: Move Both Applications Into a pnpm/Turbo Workspace
+### Task 1: Move Desktop Into Workspace
 
 **Files:**
-- Create: `tests/workspace-config.test.ts`
 - Create: `pnpm-workspace.yaml`
 - Create: `turbo.json`
-- Replace: `package.json`
+- Create: `tests/workspace-config.test.ts`
+- Create: `apps/desktop/package.json`
+- Move: `src/` -> `apps/desktop/src/`
+- Move: `src-tauri/` -> `apps/desktop/src-tauri/`
+- Move: `public/` -> `apps/desktop/public/`
+- Move: `index.html` -> `apps/desktop/index.html`
+- Move: `components.json` -> `apps/desktop/components.json`
+- Move: `vite.config.ts` -> `apps/desktop/vite.config.ts`
+- Move: `tsconfig.json` -> `apps/desktop/tsconfig.json`
+- Move: `tsconfig.node.json` -> `apps/desktop/tsconfig.node.json`
+- Modify: `package.json`
 - Modify: `.gitignore`
-- Move: `package.json` → `apps/desktop/package.json`
-- Move: `src/` → `apps/desktop/src/`
-- Move: `src-tauri/` → `apps/desktop/src-tauri/`
-- Move: `public/` → `apps/desktop/public/`
-- Move: `scripts/` → `apps/desktop/scripts/`
-- Move: `index.html` → `apps/desktop/index.html`
-- Move: `vite.config.ts` → `apps/desktop/vite.config.ts`
-- Move: `tsconfig.json` → `apps/desktop/tsconfig.json`
-- Move: `tsconfig.node.json` → `apps/desktop/tsconfig.node.json`
-- Move: `components.json` → `apps/desktop/components.json`
-- Move: `.env.release.example` → `apps/desktop/.env.release.example`
-- Move: `website/` → `apps/website/`
-- Delete: `apps/website/pnpm-lock.yaml`
-- Modify: `apps/desktop/package.json`
-- Modify: `apps/website/package.json`
-- Modify: `apps/desktop/scripts/release-macos.sh`
+- Modify: `scripts/release-macos.sh`
+- Modify: `scripts/gen-dmg-background.py`
 - Modify: `apps/desktop/src/tests/release-script.test.ts`
-- Regenerate: `pnpm-lock.yaml`
 
-- [ ] **Step 1: Write the failing workspace configuration test**
+- [ ] **Step 1: Write the failing workspace config test**
 
 Create `tests/workspace-config.test.ts`:
 
-```typescript
+```ts
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 
-const rootPackage = JSON.parse(readFileSync("package.json", "utf8"));
-const workspace = readFileSync("pnpm-workspace.yaml", "utf8");
-const turbo = JSON.parse(readFileSync("turbo.json", "utf8"));
+function readJson(path: string) {
+  return JSON.parse(readFileSync(path, "utf8"));
+}
 
 describe("workspace layout", () => {
-  it("contains both applications", () => {
+  it("has a desktop app and no website app in this pass", () => {
     expect(existsSync("apps/desktop/package.json")).toBe(true);
-    expect(existsSync("apps/website/package.json")).toBe(true);
+    expect(existsSync("apps/website/package.json")).toBe(false);
   });
 
-  it("registers app and package directories", () => {
-    expect(workspace).toContain("- apps/*");
-    expect(workspace).toContain("- packages/*");
-  });
-});
-
-describe("root command contract", () => {
-  it("uses Turbo for workspace-wide commands", () => {
-    expect(rootPackage.scripts).toMatchObject({
-      dev: "turbo run dev",
-      build: "turbo run build",
-      test: "turbo run test",
-      "test:run": "pnpm test:config && turbo run test:run",
-      typecheck: "turbo run typecheck",
-    });
+  it("keeps root dev on the apps/* pattern", () => {
+    const pkg = readJson("package.json");
+    expect(pkg.scripts.dev).toContain("turbo run dev");
+    expect(pkg.scripts.dev).toContain("./apps/*");
   });
 
-  it("preserves desktop compatibility aliases", () => {
-    expect(rootPackage.scripts).toMatchObject({
-      preview: "pnpm --filter @beaver/desktop run preview --",
-      tauri: "pnpm --filter @beaver/desktop run tauri --",
-      "tauri:onboarding":
-        "pnpm --filter @beaver/desktop run tauri:onboarding --",
-      "release:mac": "pnpm --filter @beaver/desktop run release:mac --",
-    });
-  });
-});
-
-describe("Turbo task contract", () => {
-  it("keeps development and watch tests persistent and uncached", () => {
-    expect(turbo.tasks.dev).toEqual({ cache: false, persistent: true });
-    expect(turbo.tasks.test).toEqual({ cache: false, persistent: true });
+  it("keeps native Tauri dev explicit", () => {
+    const pkg = readJson("package.json");
+    expect(pkg.scripts.tauri).toContain("@beaver/desktop");
+    expect(pkg.scripts["tauri:onboarding"]).toContain("BEAVER_FORCE_ONBOARDING=1");
   });
 
-  it("makes builds, tests, and typechecks dependency-aware", () => {
-    expect(turbo.tasks.build.dependsOn).toEqual(["^build"]);
-    expect(turbo.tasks["test:run"].dependsOn).toEqual(["^test:run"]);
-    expect(turbo.tasks.typecheck.dependsOn).toEqual(["^typecheck"]);
+  it("registers only apps and packages as workspaces", () => {
+    const workspace = readFileSync("pnpm-workspace.yaml", "utf8");
+    expect(workspace).toContain("apps/*");
+    expect(workspace).toContain("packages/*");
   });
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [ ] **Step 2: Run the failing test**
 
 Run:
 
 ```bash
-pnpm exec vitest run tests/workspace-config.test.ts
+rtk pnpm exec vitest run tests/workspace-config.test.ts
 ```
 
-Expected: FAIL because `pnpm-workspace.yaml`, `turbo.json`, and the `apps/`
-directories do not exist.
+Expected: fails because `apps/desktop/package.json` and workspace files do not
+exist yet.
 
-- [ ] **Step 3: Move the existing applications**
+- [ ] **Step 3: Move the desktop files**
 
 Run:
 
 ```bash
-mkdir -p apps
-git mv package.json apps/desktop-package.json
-mkdir -p apps/desktop
-git mv apps/desktop-package.json apps/desktop/package.json
-git mv src src-tauri public scripts index.html vite.config.ts tsconfig.json tsconfig.node.json components.json .env.release.example apps/desktop/
-mv website apps/website
-rm apps/website/pnpm-lock.yaml
+rtk mkdir -p apps/desktop
+rtk git mv src apps/desktop/src
+rtk git mv src-tauri apps/desktop/src-tauri
+rtk git mv public apps/desktop/public
+rtk git mv index.html apps/desktop/index.html
+rtk git mv components.json apps/desktop/components.json
+rtk git mv vite.config.ts apps/desktop/vite.config.ts
+rtk git mv tsconfig.json apps/desktop/tsconfig.json
+rtk git mv tsconfig.node.json apps/desktop/tsconfig.node.json
 ```
 
-Expected: the tracked desktop application is represented as Git moves, the
-untracked website is preserved under `apps/website`, and the root lockfile is
-the only remaining pnpm lockfile.
+Expected: `apps/desktop` contains the current desktop app source. Root
+`scripts/`, `.env.release.example`, `.gitignore`, `README.md`, and docs remain
+at the root.
 
-- [ ] **Step 4: Create the root workspace configuration**
+- [ ] **Step 4: Replace the root package manifest**
 
-Create the root `package.json`:
+Replace `package.json` with:
 
 ```json
 {
-  "name": "@beaver/workspace",
+  "name": "beaver-workspace",
   "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "test": "turbo run test",
-    "test:run": "pnpm test:config && turbo run test:run",
-    "test:config": "vitest run tests",
-    "typecheck": "turbo run typecheck",
-    "preview": "pnpm --filter @beaver/desktop run preview --",
-    "tauri": "pnpm --filter @beaver/desktop run tauri --",
-    "tauri:onboarding": "pnpm --filter @beaver/desktop run tauri:onboarding --",
-    "release:mac": "pnpm --filter @beaver/desktop run release:mac --",
-    "desktop:dev": "pnpm --filter @beaver/desktop run dev",
-    "desktop:build": "pnpm --filter @beaver/desktop run build",
+    "dev": "pnpm sync:assets && turbo run dev --filter='./apps/*' --parallel",
+    "build": "pnpm sync:assets && turbo run build --filter='./packages/*' --filter='./apps/*'",
+    "preview": "pnpm sync:assets && pnpm --filter @beaver/desktop run preview",
+    "test": "vitest --passWithNoTests && turbo run test --filter='./packages/*' --filter='./apps/*'",
+    "test:run": "vitest run tests --passWithNoTests && turbo run test:run --filter='./packages/*' --filter='./apps/*'",
+    "typecheck": "turbo run typecheck --filter='./packages/*' --filter='./apps/*'",
+    "sync:assets": "node scripts/sync-brand-assets.mjs",
+    "desktop:dev": "pnpm sync:assets && pnpm --filter @beaver/desktop run dev",
+    "desktop:build": "pnpm sync:assets && pnpm --filter @beaver/desktop run build",
     "desktop:test": "pnpm --filter @beaver/desktop run test:run",
     "desktop:typecheck": "pnpm --filter @beaver/desktop run typecheck",
-    "website:dev": "pnpm --filter @beaver/website run dev",
-    "website:build": "pnpm --filter @beaver/website run build",
-    "website:test": "pnpm --filter @beaver/website run test:run",
-    "website:typecheck": "pnpm --filter @beaver/website run typecheck"
+    "tauri": "pnpm sync:assets && pnpm --filter @beaver/desktop exec tauri --",
+    "tauri:onboarding": "pnpm sync:assets && BEAVER_FORCE_ONBOARDING=1 pnpm --filter @beaver/desktop exec tauri dev",
+    "release:mac": "pnpm sync:assets && bash scripts/release-macos.sh"
   },
   "devDependencies": {
-    "turbo": "^2.9.16",
+    "turbo": "2.9.16",
+    "typescript": "catalog:",
     "vitest": "catalog:"
-  },
-  "packageManager": "pnpm@10.33.0"
+  }
 }
 ```
+
+- [ ] **Step 5: Create the workspace manifest**
 
 Create `pnpm-workspace.yaml`:
 
 ```yaml
 packages:
-  - apps/*
-  - packages/*
+  - "apps/*"
+  - "packages/*"
 
 catalog:
-  "@fontsource-variable/geist": ^5.2.9
-  "@testing-library/jest-dom": ^6.9.1
-  "@testing-library/react": ^16.3.2
-  "@testing-library/user-event": ^14.6.1
-  "@types/node": ^25.9.1
-  "@types/react": ^19.2.15
-  "@types/react-dom": ^19.2.3
-  class-variance-authority: ^0.7.1
-  clsx: ^2.1.1
-  jsdom: ^29.1.1
-  lucide-react: ^1.17.0
-  react: ^19.2.6
-  react-dom: ^19.2.6
-  tailwind-merge: ^3.6.0
-  tailwindcss: ^4.3.0
-  typescript: ~5.8.3
-  vitest: ^4.1.7
+  "@base-ui/react": "^1.5.0"
+  "@fontsource-variable/geist": "^5.2.9"
+  "@tailwindcss/vite": "^4.3.0"
+  "@tauri-apps/api": "^2.11.0"
+  "@tauri-apps/cli": "^2.11.2"
+  "@tauri-apps/plugin-sql": "^2.4.0"
+  "@testing-library/jest-dom": "^6.9.1"
+  "@testing-library/react": "^16.3.2"
+  "@testing-library/user-event": "^14.6.1"
+  "@types/node": "^25.9.1"
+  "@types/react": "^19.2.15"
+  "@types/react-dom": "^19.2.3"
+  "@vitejs/plugin-react": "^4.7.0"
+  "@vitest/ui": "^4.1.7"
+  "class-variance-authority": "^0.7.1"
+  "clsx": "^2.1.1"
+  "jsdom": "^29.1.1"
+  "lucide-react": "^1.17.0"
+  "react": "^19.2.6"
+  "react-dom": "^19.2.6"
+  "shadcn": "^4.9.0"
+  "tailwind-merge": "^3.6.0"
+  "tailwindcss": "^4.3.0"
+  "tw-animate-css": "^1.4.0"
+  "typescript": "~5.8.3"
+  "vite": "^7.3.3"
+  "vitest": "^4.1.7"
 ```
+
+- [ ] **Step 6: Create the Turbo config**
 
 Create `turbo.json`:
 
@@ -232,40 +214,39 @@ Create `turbo.json`:
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**", "out/**"]
-    },
-    "test": {
-      "cache": false,
-      "persistent": true
-    },
-    "test:run": {
-      "dependsOn": ["^test:run"],
-      "outputs": []
-    },
-    "typecheck": {
-      "dependsOn": ["^typecheck"],
-      "outputs": []
+      "outputs": ["dist/**"]
     },
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "test:run": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
     }
   }
 }
 ```
 
-Append these generated-output entries to `.gitignore`:
+- [ ] **Step 7: Ignore Turbo's local cache**
+
+Append this line to `.gitignore`:
 
 ```gitignore
 .turbo/
-.next/
-out/
-tsconfig.tsbuildinfo
 ```
 
-- [ ] **Step 5: Update both application manifests**
+- [ ] **Step 8: Create the desktop package manifest**
 
-Replace `apps/desktop/package.json` with:
+Create `apps/desktop/package.json`:
 
 ```json
 {
@@ -276,106 +257,74 @@ Replace `apps/desktop/package.json` with:
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri:onboarding": "BEAVER_FORCE_ONBOARDING=1 tauri dev",
     "test": "vitest",
     "test:run": "vitest run --passWithNoTests",
-    "release:mac": "bash scripts/release-macos.sh"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@base-ui/react": "^1.5.0",
+    "@base-ui/react": "catalog:",
     "@fontsource-variable/geist": "catalog:",
-    "@tauri-apps/api": "^2.11.0",
-    "@tauri-apps/plugin-sql": "^2.4.0",
+    "@tauri-apps/api": "catalog:",
+    "@tauri-apps/plugin-sql": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "shadcn": "^4.9.0",
+    "shadcn": "catalog:",
     "tailwind-merge": "catalog:",
-    "tw-animate-css": "^1.4.0"
+    "tw-animate-css": "catalog:"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.0",
-    "@tauri-apps/cli": "^2.11.2",
+    "@tailwindcss/vite": "catalog:",
+    "@tauri-apps/cli": "catalog:",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@vitejs/plugin-react": "^4.7.0",
-    "@vitest/ui": "^4.1.7",
+    "@vitejs/plugin-react": "catalog:",
+    "@vitest/ui": "catalog:",
     "jsdom": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "vite": "^7.3.3",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }
 ```
 
-Replace `apps/website/package.json` with:
+This keeps `clsx` and `tailwind-merge` on the desktop app temporarily because
+`apps/desktop/src/lib/utils.ts` still owns `cn` until Task 3.
 
-```json
-{
-  "name": "@beaver/website",
-  "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@fontsource-variable/geist": "catalog:",
-    "@radix-ui/react-accordion": "^1.2.12",
-    "clsx": "catalog:",
-    "lucide-react": "catalog:",
-    "next": "16.2.7",
-    "react": "catalog:",
-    "react-dom": "catalog:",
-    "tailwind-merge": "catalog:"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.17",
-    "@types/node": "catalog:",
-    "@types/react": "catalog:",
-    "@types/react-dom": "catalog:",
-    "tailwindcss": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
-  }
-}
-```
-
-- [ ] **Step 6: Write the failing release compatibility test**
+- [ ] **Step 9: Update release tests for root paths and deterministic env**
 
 Replace `apps/desktop/src/tests/release-script.test.ts` with:
 
-```typescript
+```ts
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const workspaceRoot = fileURLToPath(new URL("../../../../", import.meta.url));
+const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../..");
+
+function rootPath(path: string): string {
+  return join(workspaceRoot, path);
+}
 
 function printMode(identity: string): string {
-  return execFileSync("bash", ["scripts/release-macos.sh", "--print-mode"], {
+  return execFileSync("bash", [rootPath("scripts/release-macos.sh"), "--print-mode"], {
+    cwd: workspaceRoot,
     encoding: "utf8",
     env: {
       ...process.env,
-      APPLE_SIGNING_IDENTITY: identity,
       BEAVER_RELEASE_ENV_FILE: "/dev/null",
+      APPLE_SIGNING_IDENTITY: identity,
     },
   }).trim();
 }
@@ -386,158 +335,157 @@ describe("release-macos.sh", () => {
   });
 
   it("reports signed when a signing identity is set", () => {
-    expect(
-      printMode("Developer ID Application: DJTL AB (Z7HLVJ93DA)")
-    ).toBe("signed");
+    expect(printMode("Developer ID Application: DJTL AB (Z7HLVJ93DA)")).toBe("signed");
   });
 });
 
 describe("release wiring", () => {
   it("documents credentials in .env.release.example", () => {
-    const example = readFileSync(".env.release.example", "utf8");
-    expect(example).toContain("APPLE_SIGNING_IDENTITY");
-    expect(example).toContain("APPLE_TEAM_ID");
+    const ex = readFileSync(rootPath(".env.release.example"), "utf8");
+    expect(ex).toContain("APPLE_SIGNING_IDENTITY");
+    expect(ex).toContain("APPLE_TEAM_ID");
   });
 
-  it("gitignores the real .env.release at workspace or app level", () => {
-    expect(readFileSync(join(workspaceRoot, ".gitignore"), "utf8")).toContain(
-      ".env.release"
-    );
+  it("gitignores the real .env.release", () => {
+    expect(readFileSync(rootPath(".gitignore"), "utf8")).toContain(".env.release");
   });
 
-  it("loads credentials from the workspace root for migration compatibility", () => {
-    const script = readFileSync("scripts/release-macos.sh", "utf8");
-    expect(script).toContain('"$WORKSPACE_ROOT/.env.release"');
-  });
-
-  it("allows callers to select a release credential file", () => {
-    const script = readFileSync("scripts/release-macos.sh", "utf8");
-    expect(script).toContain("BEAVER_RELEASE_ENV_FILE");
-  });
-
-  it("exposes a release:mac script", () => {
-    const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+  it("exposes a release:mac script at the workspace root", () => {
+    const pkg = JSON.parse(readFileSync(rootPath("package.json"), "utf8"));
     expect(pkg.scripts["release:mac"]).toContain("release-macos.sh");
   });
 
-  it("keeps the example file", () => {
-    expect(existsSync(".env.release.example")).toBe(true);
+  it("keeps the example file at the workspace root", () => {
+    expect(existsSync(rootPath(".env.release.example"))).toBe(true);
   });
 });
 
 describe("headless dmg packaging", () => {
-  it("packages the DMG with dmgbuild without Finder scripting", () => {
-    const script = readFileSync("scripts/release-macos.sh", "utf8");
-    expect(script).toContain("dmgbuild");
-    expect(script).toContain("scripts/dmgbuild-settings.py");
+  it("packages the DMG with dmgbuild (no Finder/AppleScript)", () => {
+    const sh = readFileSync(rootPath("scripts/release-macos.sh"), "utf8");
+    expect(sh).toContain("dmgbuild");
+    expect(sh).toContain("scripts/dmgbuild-settings.py");
   });
 
   it("ships a dmgbuild settings file with the install layout", () => {
-    const settings = readFileSync("scripts/dmgbuild-settings.py", "utf8");
-    expect(settings).toContain("symlinks");
-    expect(settings).toContain("Applications");
-    expect(settings).toContain("icon_locations");
-    expect(settings).toContain("BEAVER_APP");
+    const s = readFileSync(rootPath("scripts/dmgbuild-settings.py"), "utf8");
+    expect(s).toContain("symlinks");
+    expect(s).toContain("Applications");
+    expect(s).toContain("icon_locations");
+    expect(s).toContain("BEAVER_APP");
   });
 });
 ```
 
-Run:
+- [ ] **Step 10: Update `scripts/release-macos.sh` paths**
+
+Edit the top of `scripts/release-macos.sh` so root and desktop paths are
+explicit:
 
 ```bash
-pnpm install
-pnpm --filter @beaver/desktop exec vitest run src/tests/release-script.test.ts
-```
+WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DESKTOP_DIR="$WORKSPACE_ROOT/apps/desktop"
+cd "$WORKSPACE_ROOT"
 
-Expected: FAIL because the moved release script does not yet support
-`WORKSPACE_ROOT` or `BEAVER_RELEASE_ENV_FILE`.
+load_release_env() {
+  if [[ -n "${BEAVER_RELEASE_ENV_FILE:-}" ]]; then
+    if [[ -f "$BEAVER_RELEASE_ENV_FILE" ]]; then
+      set -a
+      # shellcheck disable=SC1090
+      source "$BEAVER_RELEASE_ENV_FILE"
+      set +a
+    fi
+    return
+  fi
 
-- [ ] **Step 7: Preserve release credentials and root release behavior**
-
-Replace the opening root-resolution and credential-loading block in
-`apps/desktop/scripts/release-macos.sh` with:
-
-```bash
-APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORKSPACE_ROOT="$(cd "$APP_ROOT/../.." && pwd)"
-cd "$APP_ROOT"
-
-# Prefer app-local credentials, while continuing to honor the workspace-root
-# file used before the monorepo migration. Callers can select a specific file
-# with BEAVER_RELEASE_ENV_FILE; /dev/null is useful for environment-only runs.
-release_env="${BEAVER_RELEASE_ENV_FILE:-}"
-if [[ -z "$release_env" ]]; then
-  for candidate in "$APP_ROOT/.env.release" "$WORKSPACE_ROOT/.env.release"; do
+  local candidate
+  for candidate in "$WORKSPACE_ROOT/.env.release" "$DESKTOP_DIR/.env.release"; do
     if [[ -f "$candidate" ]]; then
-      release_env="$candidate"
-      break
+      set -a
+      # shellcheck disable=SC1090
+      source "$candidate"
+      set +a
+      return
     fi
   done
-fi
-if [[ -n "$release_env" ]]; then
-  if [[ ! -f "$release_env" ]]; then
-    echo "error: release env file does not exist: $release_env" >&2
-    exit 1
-  fi
-  set -a
-  # shellcheck disable=SC1090
-  source "$release_env"
-  set +a
-fi
+}
+
+load_release_env
 ```
+
+Then update path-sensitive lines:
+
+```bash
+pnpm --filter @beaver/desktop exec tauri build --target "$TARGET"
+
+BUNDLE="$DESKTOP_DIR/src-tauri/target/${TARGET}/release/bundle"
+
+codesign --force --options runtime --timestamp \
+  --entitlements "$DESKTOP_DIR/src-tauri/entitlements.plist" \
+  --sign "$APPLE_SIGNING_IDENTITY" "$APP"
+
+VERSION="$(node -p "require('./apps/desktop/package.json').version")"
+
+tiffutil -cathidpicheck \
+  "$DESKTOP_DIR/src-tauri/dmg/background.png" \
+  "$DESKTOP_DIR/src-tauri/dmg/background@2x.png" \
+  -out "$BG_TIFF" >/dev/null
+
+BEAVER_APP="$APP" \
+BEAVER_DMG_BG="$BG_TIFF" \
+BEAVER_VOLICON="$DESKTOP_DIR/src-tauri/icons/icon.icns" \
+  uv run --no-project --with dmgbuild -- \
+    dmgbuild -s scripts/dmgbuild-settings.py "Beaver" "$DMG"
+```
+
+- [ ] **Step 11: Update the DMG background generator**
+
+Replace `scripts/gen-dmg-background.py` path constants with:
+
+```py
+ROOT = Path(__file__).resolve().parents[1]
+DESKTOP = ROOT / "apps" / "desktop"
+OUT = DESKTOP / "src-tauri" / "dmg"
+HEAD = DESKTOP / "public" / "beaver-head.webp"
+```
+
+- [ ] **Step 12: Install and verify Task 1**
 
 Run:
 
 ```bash
-pnpm --filter @beaver/desktop exec vitest run src/tests/release-script.test.ts
+rtk pnpm install
+rtk pnpm exec vitest run tests/workspace-config.test.ts
+rtk pnpm --filter @beaver/desktop test:run
 ```
 
-Expected: PASS.
+Expected: workspace and desktop tests pass from the moved package location.
 
-- [ ] **Step 8: Install the workspace and verify the move**
+- [ ] **Step 13: Commit Task 1**
 
 Run:
 
 ```bash
-pnpm install
-pnpm test:config
-pnpm --filter @beaver/desktop test:run
-pnpm --filter @beaver/website test:run
-pnpm typecheck
-pnpm build
-pnpm release:mac -- --print-mode
+rtk git add package.json .gitignore pnpm-workspace.yaml turbo.json pnpm-lock.yaml tests/workspace-config.test.ts apps/desktop scripts
+rtk git commit -m "refactor: move desktop app into pnpm workspace"
 ```
 
-Expected:
+---
 
-- One root `pnpm-lock.yaml` contains importers for both apps.
-- The workspace configuration test passes.
-- Existing desktop and website tests pass from their new package directories.
-- Typecheck and build pass through Turbo.
-- The release mode command prints `signed` or `unsigned`, matching available
-  credentials, without building a release.
-
-- [ ] **Step 9: Commit the workspace migration**
-
-```bash
-git add -A apps package.json pnpm-workspace.yaml turbo.json pnpm-lock.yaml tests .gitignore
-git commit -m "refactor: move apps into pnpm workspace"
-```
-
-## Task 2: Add the Framework-Neutral Brand Package
+### Task 2: Add Brand Package And Asset Sync
 
 **Files:**
 - Create: `packages/brand/package.json`
 - Create: `packages/brand/tsconfig.json`
-- Create: `packages/brand/src/index.test.ts`
 - Create: `packages/brand/src/index.ts`
-- Modify: `apps/website/package.json`
-- Modify: `apps/website/next.config.ts`
-- Modify: `apps/website/lib/site-content.ts`
-- Modify: `apps/website/lib/site-content.test.ts`
-- Regenerate: `pnpm-lock.yaml`
+- Create: `packages/brand/src/index.test.ts`
+- Create by copy: `packages/brand/assets/beaver-head.webp`
+- Create by copy: `packages/brand/assets/favicon.ico`
+- Create: `scripts/sync-brand-assets.mjs`
+- Create: `tests/brand-assets.test.ts`
+- Modify: `apps/desktop/index.html`
 
-- [ ] **Step 1: Create the brand package scaffold and failing metadata test**
+- [ ] **Step 1: Create the brand package manifest**
 
 Create `packages/brand/package.json`:
 
@@ -551,6 +499,7 @@ Create `packages/brand/package.json`:
     ".": "./src/index.ts"
   },
   "scripts": {
+    "build": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
     "typecheck": "tsc --noEmit"
@@ -568,457 +517,216 @@ Create `packages/brand/tsconfig.json`:
 ```json
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM"],
     "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "moduleResolution": "bundler",
     "strict": true,
-    "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node", "vitest/globals"]
+    "noEmit": true,
+    "isolatedModules": true,
+    "types": ["vitest/globals", "node"]
   },
   "include": ["src"]
 }
 ```
 
-Create `packages/brand/src/index.test.ts`:
-
-```typescript
-import { describe, expect, it } from "vitest";
-import { brandAssets, externalLinks, product } from "./index";
-
-describe("Beaver brand contract", () => {
-  it("publishes stable product metadata", () => {
-    expect(product).toEqual({
-      name: "Beaver",
-      version: "0.1.0",
-      title: "Beaver - Screenshot in. Markdown out.",
-      description:
-        "Beaver is a private macOS menu-bar utility that turns any screen region into clean Markdown with fully on-device vision.",
-      constraints: "Apple Silicon · macOS 13+ · Free",
-    });
-  });
-
-  it("publishes stable external links", () => {
-    expect(externalLinks).toEqual({
-      download: "https://github.com/thomasindrias/beaver/releases/latest",
-      github: "https://github.com/thomasindrias/beaver",
-      company: "https://djtl.se",
-      linkedin: "https://www.linkedin.com/in/thomas-indrias",
-    });
-  });
-
-  it("publishes stable public asset paths", () => {
-    expect(brandAssets).toEqual({
-      mark: "/beaver-head.webp",
-      favicon: "/favicon.ico",
-    });
-  });
-});
-```
-
-- [ ] **Step 2: Install and run the test to verify it fails**
-
-Run:
-
-```bash
-pnpm install
-pnpm --filter @beaver/brand test:run
-```
-
-Expected: FAIL because `packages/brand/src/index.ts` does not exist.
-
-- [ ] **Step 3: Implement the brand exports**
+- [ ] **Step 2: Add brand exports and tests**
 
 Create `packages/brand/src/index.ts`:
 
-```typescript
-export const product = {
+```ts
+export const beaverProduct = {
   name: "Beaver",
-  version: "0.1.0",
-  title: "Beaver - Screenshot in. Markdown out.",
-  description:
-    "Beaver is a private macOS menu-bar utility that turns any screen region into clean Markdown with fully on-device vision.",
-  constraints: "Apple Silicon · macOS 13+ · Free",
-} as const;
-
-export const externalLinks = {
-  download: "https://github.com/thomasindrias/beaver/releases/latest",
-  github: "https://github.com/thomasindrias/beaver",
-  company: "https://djtl.se",
-  linkedin: "https://www.linkedin.com/in/thomas-indrias",
+  tagline: "Screenshot to structured Markdown, fully on-device.",
+  platform: "macOS",
 } as const;
 
 export const brandAssets = {
-  mark: "/beaver-head.webp",
+  head: "/beaver-head.webp",
   favicon: "/favicon.ico",
 } as const;
+
+export type BrandAssetName = keyof typeof brandAssets;
 ```
 
-- [ ] **Step 4: Make the website consume brand metadata**
+Create `packages/brand/src/index.test.ts`:
 
-Add the workspace dependency to `apps/website/package.json`:
-
-```json
-"@beaver/brand": "workspace:*"
-```
-
-Replace `apps/website/next.config.ts` with:
-
-```typescript
-import type { NextConfig } from "next";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const appRoot = dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = resolve(appRoot, "../..");
-
-const nextConfig: NextConfig = {
-  output: "export",
-  images: {
-    unoptimized: true,
-  },
-  transpilePackages: ["@beaver/brand"],
-  turbopack: {
-    root: workspaceRoot,
-  },
-};
-
-export default nextConfig;
-```
-
-At the top of `apps/website/lib/site-content.ts`, add:
-
-```typescript
-import { brandAssets, externalLinks, product } from "@beaver/brand";
-```
-
-Replace the existing `ctaLinks` and `siteMeta` declarations with:
-
-```typescript
-export const ctaLinks = externalLinks;
-
-export const siteMeta = {
-  ...product,
-  version: `v${product.version}`,
-} as const;
-```
-
-Replace the current mark entry inside `assetSlots` with:
-
-```typescript
-  {
-    path: "/beaver-head.svg",
-    label: "Final beaver-head SVG logo mark",
-    current: brandAssets.mark,
-  },
-```
-
-Replace the favicon entry inside `assetSlots` with:
-
-```typescript
-  {
-    path: brandAssets.favicon,
-    label: "Browser favicon",
-    current: "Existing app icon",
-  },
-```
-
-Add this assertion to the first test in
-`apps/website/lib/site-content.test.ts`:
-
-```typescript
-expect(siteMeta.name).toBe("Beaver");
-```
-
-- [ ] **Step 5: Run brand and website verification**
-
-Run:
-
-```bash
-pnpm install
-pnpm --filter @beaver/brand test:run
-pnpm --filter @beaver/website test:run
-pnpm --filter @beaver/brand typecheck
-pnpm --filter @beaver/website typecheck
-pnpm --filter @beaver/website build
-```
-
-Expected: all commands pass, and Next.js resolves the local TypeScript brand
-package through `transpilePackages`.
-
-- [ ] **Step 6: Commit the brand metadata package**
-
-```bash
-git add packages/brand apps/website/package.json apps/website/next.config.ts apps/website/lib pnpm-lock.yaml
-git commit -m "refactor: add shared brand metadata package"
-```
-
-## Task 3: Make Shared Assets Canonical and Synchronized
-
-**Files:**
-- Create: `packages/brand/src/assets.test.ts`
-- Create: `packages/brand/assets/beaver-head.webp`
-- Create: `packages/brand/assets/favicon.ico`
-- Create: `scripts/sync-brand-assets.mjs`
-- Modify: `package.json`
-- Modify: `tests/workspace-config.test.ts`
-- Modify: `apps/desktop/index.html`
-- Modify: `apps/website/app/layout.tsx`
-- Create by sync: `apps/desktop/public/favicon.ico`
-- Verify by sync: `apps/desktop/public/beaver-head.webp`
-- Verify by sync: `apps/website/public/favicon.ico`
-- Verify by sync: `apps/website/public/beaver-head.webp`
-- Delete: `apps/website/public/beaver-animations/beaver-wave.webp`
-- Delete: `apps/desktop/public/vite.svg`
-- Delete: `apps/desktop/public/tauri.svg`
-- Delete: `apps/desktop/src/assets/react.svg`
-
-- [ ] **Step 1: Write the failing asset drift test**
-
-Create `packages/brand/src/assets.test.ts`:
-
-```typescript
+```ts
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 
-const workspaceRoot = fileURLToPath(new URL("../../../", import.meta.url));
-const sharedAssets = [
-  "beaver-head.webp",
-  "favicon.ico",
-] as const;
-const appPublicDirs = [
-  "apps/desktop/public",
-  "apps/website/public",
-] as const;
+import { beaverProduct, brandAssets } from ".";
 
-describe("shared brand assets", () => {
-  for (const asset of sharedAssets) {
-    const source = join(workspaceRoot, "packages/brand/assets", asset);
+describe("@beaver/brand", () => {
+  it("exports stable product metadata", () => {
+    expect(beaverProduct.name).toBe("Beaver");
+    expect(beaverProduct.platform).toBe("macOS");
+  });
 
-    for (const publicDir of appPublicDirs) {
-      const destination = join(workspaceRoot, publicDir, asset);
-
-      it(`${destination} matches ${source}`, () => {
-        const canonical = readFileSync(source);
-        const committedCopy = readFileSync(destination);
-        expect(
-          committedCopy.equals(canonical),
-          `${destination} differs from ${source}`
-        ).toBe(true);
-      });
-    }
-  }
+  it("exports public asset paths", () => {
+    expect(brandAssets.head).toBe("/beaver-head.webp");
+    expect(brandAssets.favicon).toBe("/favicon.ico");
+  });
 });
 ```
 
-Update the root command assertions in `tests/workspace-config.test.ts` to:
-
-```typescript
-expect(rootPackage.scripts).toMatchObject({
-  dev: "pnpm sync:assets && turbo run dev",
-  build: "pnpm sync:assets && turbo run build",
-  test: "turbo run test",
-  "test:run": "pnpm test:config && turbo run test:run",
-  typecheck: "turbo run typecheck",
-  "sync:assets": "node scripts/sync-brand-assets.mjs",
-});
-```
-
-Update the desktop compatibility alias assertions to:
-
-```typescript
-expect(rootPackage.scripts).toMatchObject({
-  preview: "pnpm --filter @beaver/desktop run preview --",
-  tauri: "pnpm sync:assets && pnpm --filter @beaver/desktop run tauri --",
-  "tauri:onboarding":
-    "pnpm sync:assets && pnpm --filter @beaver/desktop run tauri:onboarding --",
-  "release:mac":
-    "pnpm sync:assets && pnpm --filter @beaver/desktop run release:mac --",
-});
-```
-
-- [ ] **Step 2: Run the tests to verify they fail**
+- [ ] **Step 3: Copy canonical assets**
 
 Run:
 
 ```bash
-pnpm test:config
-pnpm --filter @beaver/brand test:run
+rtk mkdir -p packages/brand/assets
+rtk cp apps/desktop/public/beaver-head.webp packages/brand/assets/beaver-head.webp
+rtk cp apps/desktop/src-tauri/icons/icon.ico packages/brand/assets/favicon.ico
 ```
 
-Expected:
-
-- The root config test fails because `sync:assets` is not wired.
-- The brand asset test fails because `packages/brand/assets/` does not exist.
-
-- [ ] **Step 3: Create the asset synchronization script**
+- [ ] **Step 4: Add the asset sync script**
 
 Create `scripts/sync-brand-assets.mjs`:
 
-```javascript
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+```js
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const canonicalDir = join(workspaceRoot, "packages/brand/assets");
-const appPublicDirs = [
-  join(workspaceRoot, "apps/desktop/public"),
-  join(workspaceRoot, "apps/website/public"),
-];
-const sharedAssets = [
-  "beaver-head.webp",
-  "favicon.ico",
+
+const assets = [
+  {
+    name: "beaver-head.webp",
+    source: "packages/brand/assets/beaver-head.webp",
+    targets: ["apps/desktop/public/beaver-head.webp"],
+  },
+  {
+    name: "favicon.ico",
+    source: "packages/brand/assets/favicon.ico",
+    targets: ["apps/desktop/public/favicon.ico"],
+  },
 ];
 
-for (const asset of sharedAssets) {
-  const source = join(canonicalDir, asset);
-  if (!existsSync(source)) {
-    throw new Error(`missing canonical asset: ${source}`);
-  }
+const check = process.argv.includes("--check");
+let drifted = false;
 
-  for (const publicDir of appPublicDirs) {
-    const destination = join(publicDir, asset);
-    mkdirSync(dirname(destination), { recursive: true });
-    copyFileSync(source, destination);
-    console.log(`synced ${asset} -> ${destination}`);
+for (const asset of assets) {
+  const sourcePath = join(workspaceRoot, asset.source);
+  const source = readFileSync(sourcePath);
+
+  for (const target of asset.targets) {
+    const targetPath = join(workspaceRoot, target);
+
+    if (check) {
+      let current;
+      try {
+        current = readFileSync(targetPath);
+      } catch {
+        console.error(`missing synced asset: ${target}`);
+        drifted = true;
+        continue;
+      }
+
+      if (!source.equals(current)) {
+        console.error(`asset drift: ${asset.source} != ${target}`);
+        drifted = true;
+      }
+      continue;
+    }
+
+    mkdirSync(dirname(targetPath), { recursive: true });
+    writeFileSync(targetPath, source);
   }
+}
+
+if (drifted) {
+  process.exitCode = 1;
 }
 ```
 
-- [ ] **Step 4: Seed canonical assets and sync committed copies**
+- [ ] **Step 5: Add workspace asset drift tests**
 
-Run:
+Create `tests/brand-assets.test.ts`:
 
-```bash
-mkdir -p packages/brand/assets
-cp apps/desktop/public/beaver-head.webp packages/brand/assets/beaver-head.webp
-cp apps/website/public/favicon.ico packages/brand/assets/favicon.ico
-node scripts/sync-brand-assets.mjs
-```
+```ts
+import { describe, expect, it } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
 
-Expected: the script copies both canonical files into both app public
-directories, including a new desktop `favicon.ico`.
-
-- [ ] **Step 5: Wire asset synchronization into root commands**
-
-Replace the root `package.json` scripts object with:
-
-```json
-{
-  "dev": "pnpm sync:assets && turbo run dev",
-  "build": "pnpm sync:assets && turbo run build",
-  "test": "turbo run test",
-  "test:run": "pnpm test:config && turbo run test:run",
-  "test:config": "vitest run tests",
-  "typecheck": "turbo run typecheck",
-  "sync:assets": "node scripts/sync-brand-assets.mjs",
-  "preview": "pnpm --filter @beaver/desktop run preview --",
-  "tauri": "pnpm sync:assets && pnpm --filter @beaver/desktop run tauri --",
-  "tauri:onboarding": "pnpm sync:assets && pnpm --filter @beaver/desktop run tauri:onboarding --",
-  "release:mac": "pnpm sync:assets && pnpm --filter @beaver/desktop run release:mac --",
-  "desktop:dev": "pnpm sync:assets && pnpm --filter @beaver/desktop run dev",
-  "desktop:build": "pnpm sync:assets && pnpm --filter @beaver/desktop run build",
-  "desktop:test": "pnpm --filter @beaver/desktop run test:run",
-  "desktop:typecheck": "pnpm --filter @beaver/desktop run typecheck",
-  "website:dev": "pnpm sync:assets && pnpm --filter @beaver/website run dev",
-  "website:build": "pnpm sync:assets && pnpm --filter @beaver/website run build",
-  "website:test": "pnpm --filter @beaver/website run test:run",
-  "website:typecheck": "pnpm --filter @beaver/website run typecheck"
+function sameBytes(left: string, right: string) {
+  expect(readFileSync(left), `${left} should match ${right}`).toEqual(readFileSync(right));
 }
+
+describe("brand asset sync", () => {
+  it("keeps desktop public copies in sync with canonical brand assets", () => {
+    sameBytes("packages/brand/assets/beaver-head.webp", "apps/desktop/public/beaver-head.webp");
+    sameBytes("packages/brand/assets/favicon.ico", "apps/desktop/public/favicon.ico");
+  });
+
+  it("removes starter template assets from the desktop app", () => {
+    expect(existsSync("apps/desktop/public/vite.svg")).toBe(false);
+    expect(existsSync("apps/desktop/public/tauri.svg")).toBe(false);
+    expect(existsSync("apps/desktop/src/assets/react.svg")).toBe(false);
+  });
+});
 ```
 
-- [ ] **Step 6: Make both apps reference the shared asset contract**
+- [ ] **Step 6: Update desktop HTML**
 
-Replace `apps/desktop/index.html` with:
+Replace the `<head>` in `apps/desktop/index.html` with:
 
 ```html
-<!doctype html>
-<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Beaver</title>
   </head>
-
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
 ```
 
-Add `brandAssets` to the imports in `apps/website/app/layout.tsx`:
-
-```typescript
-import { brandAssets } from "@beaver/brand";
-```
-
-Replace the website metadata icon declaration with:
-
-```typescript
-  icons: {
-    icon: brandAssets.favicon,
-  },
-```
-
-Remove unused starter assets:
+Then remove starter assets:
 
 ```bash
-git rm apps/desktop/public/vite.svg apps/desktop/public/tauri.svg apps/desktop/src/assets/react.svg apps/website/public/beaver-animations/beaver-wave.webp
+rtk git rm apps/desktop/public/vite.svg apps/desktop/public/tauri.svg apps/desktop/src/assets/react.svg
+rtk pnpm sync:assets
 ```
 
-- [ ] **Step 7: Run asset and workspace verification**
+- [ ] **Step 7: Verify Task 2**
 
 Run:
 
 ```bash
-pnpm sync:assets
-pnpm test:config
-pnpm --filter @beaver/brand test:run
-pnpm test:run
-pnpm typecheck
-pnpm build
+rtk pnpm install
+rtk pnpm --filter @beaver/brand test:run
+rtk pnpm sync:assets --check
+rtk pnpm exec vitest run tests/brand-assets.test.ts
 ```
 
-Expected: all commands pass, and the brand asset test proves every committed
-copy is byte-for-byte equal to its canonical source.
+Expected: all commands pass.
 
-- [ ] **Step 8: Commit canonical shared assets**
+- [ ] **Step 8: Commit Task 2**
+
+Run:
 
 ```bash
-git add package.json tests/workspace-config.test.ts scripts packages/brand apps/desktop apps/website
-git commit -m "refactor: centralize shared brand assets"
+rtk git add package.json pnpm-lock.yaml packages/brand scripts/sync-brand-assets.mjs tests/brand-assets.test.ts apps/desktop
+rtk git commit -m "feat: add shared brand package and asset sync"
 ```
 
-## Task 4: Add the Shared React UI Package
+---
+
+### Task 3: Add Shared UI Package
 
 **Files:**
 - Create: `packages/ui/package.json`
 - Create: `packages/ui/tsconfig.json`
-- Create: `packages/ui/vitest.config.ts`
-- Create: `packages/ui/src/test-setup.ts`
-- Create: `packages/ui/src/index.test.tsx`
-- Create: `packages/ui/src/cn.ts`
-- Create: `packages/ui/src/brand-mark.tsx`
 - Create: `packages/ui/src/index.ts`
+- Create: `packages/ui/src/cn.ts`
+- Create: `packages/ui/src/BrandMark.tsx`
+- Create: `packages/ui/src/BrandMark.test.tsx`
 - Modify: `apps/desktop/package.json`
-- Modify: `apps/website/package.json`
-- Modify: `apps/website/next.config.ts`
-- Modify: `apps/desktop/components.json`
-- Modify: `apps/desktop/src/index.css`
-- Modify: `apps/website/app/globals.css`
 - Modify: `apps/desktop/src/components/Logo.tsx`
-- Modify: `apps/website/components/ui/logo.tsx`
-- Modify: all current `@/lib/utils` consumers under both apps
+- Modify: `apps/desktop/src/index.css`
+- Modify: all current `@/lib/utils` import sites under `apps/desktop/src`
 - Delete: `apps/desktop/src/lib/utils.ts`
-- Delete: `apps/website/lib/utils.ts`
-- Regenerate: `pnpm-lock.yaml`
 
-- [ ] **Step 1: Create the shared UI scaffold and failing tests**
+- [ ] **Step 1: Create the UI package manifest**
 
 Create `packages/ui/package.json`:
 
@@ -1032,26 +740,23 @@ Create `packages/ui/package.json`:
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest",
-    "test:run": "vitest run",
+    "build": "tsc --noEmit",
+    "test": "vitest --environment jsdom",
+    "test:run": "vitest run --environment jsdom",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@beaver/brand": "workspace:*",
     "clsx": "catalog:",
+    "react": "catalog:",
     "tailwind-merge": "catalog:"
   },
-  "peerDependencies": {
-    "react": "catalog:"
-  },
   "devDependencies": {
-    "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "jsdom": "catalog:",
-    "react": "catalog:",
-    "react-dom": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
@@ -1063,91 +768,27 @@ Create `packages/ui/tsconfig.json`:
 ```json
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "jsx": "react-jsx",
+    "moduleResolution": "bundler",
     "strict": true,
-    "noEmit": true,
     "skipLibCheck": true,
-    "types": ["vitest/globals"]
+    "noEmit": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "types": ["vitest/globals", "node"]
   },
   "include": ["src"]
 }
 ```
 
-Create `packages/ui/vitest.config.ts`:
-
-```typescript
-import { defineConfig } from "vitest/config";
-
-export default defineConfig({
-  test: {
-    environment: "jsdom",
-    setupFiles: ["./src/test-setup.ts"],
-  },
-});
-```
-
-Create `packages/ui/src/test-setup.ts`:
-
-```typescript
-import "@testing-library/jest-dom";
-```
-
-Create `packages/ui/src/index.test.tsx`:
-
-```typescript
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { brandAssets } from "@beaver/brand";
-import { BrandMark, cn } from "./index";
-
-describe("cn", () => {
-  it("merges conflicting Tailwind utility classes", () => {
-    expect(cn("px-2", "px-4")).toBe("px-4");
-  });
-});
-
-describe("BrandMark", () => {
-  it("renders the shared mark path with an accessible label", () => {
-    render(<BrandMark alt="Beaver mascot head" size={24} className="custom" />);
-
-    const mark = screen.getByRole("img", { name: "Beaver mascot head" });
-    expect(mark).toHaveAttribute("src", brandAssets.mark);
-    expect(mark).toHaveAttribute("width", "24");
-    expect(mark).toHaveAttribute("height", "24");
-    expect(mark).toHaveClass("custom");
-  });
-
-  it("is decorative by default", () => {
-    const { container } = render(<BrandMark />);
-    expect(container.querySelector("img")).toHaveAttribute(
-      "aria-hidden",
-      "true"
-    );
-  });
-});
-```
-
-- [ ] **Step 2: Install and run the test to verify it fails**
-
-Run:
-
-```bash
-pnpm install
-pnpm --filter @beaver/ui test:run
-```
-
-Expected: FAIL because `packages/ui/src/index.ts` does not exist.
-
-- [ ] **Step 3: Implement `cn` and `BrandMark`**
+- [ ] **Step 2: Add `cn`, `BrandMark`, and tests**
 
 Create `packages/ui/src/cn.ts`:
 
-```typescript
-import { clsx, type ClassValue } from "clsx";
+```ts
+import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -1155,29 +796,30 @@ export function cn(...inputs: ClassValue[]) {
 }
 ```
 
-Create `packages/ui/src/brand-mark.tsx`:
+Create `packages/ui/src/BrandMark.tsx`:
 
-```typescript
+```tsx
 import { brandAssets } from "@beaver/brand";
+
 import { cn } from "./cn";
 
-export type BrandMarkProps = {
-  alt?: string;
-  className?: string;
+export interface BrandMarkProps {
   size?: number;
-};
+  className?: string;
+  alt?: string;
+  decorative?: boolean;
+}
 
 export function BrandMark({
-  alt = "",
-  className,
   size = 40,
+  className,
+  alt = "Beaver",
+  decorative = false,
 }: BrandMarkProps) {
-  const decorative = alt === "";
-
   return (
     <img
-      src={brandAssets.mark}
-      alt={alt}
+      src={brandAssets.head}
+      alt={decorative ? "" : alt}
       aria-hidden={decorative || undefined}
       width={size}
       height={size}
@@ -1190,65 +832,60 @@ export function BrandMark({
 
 Create `packages/ui/src/index.ts`:
 
-```typescript
-export { BrandMark, type BrandMarkProps } from "./brand-mark";
+```ts
+export { BrandMark, type BrandMarkProps } from "./BrandMark";
 export { cn } from "./cn";
 ```
 
-- [ ] **Step 4: Run the shared UI tests**
+Create `packages/ui/src/BrandMark.test.tsx`:
 
-Run:
+```tsx
+import { describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
 
-```bash
-pnpm --filter @beaver/ui test:run
-pnpm --filter @beaver/ui typecheck
+import { BrandMark } from ".";
+
+describe("BrandMark", () => {
+  it("renders the shared beaver mark", () => {
+    render(<BrandMark alt="Beaver logo" />);
+    expect(screen.getByAltText("Beaver logo").getAttribute("src")).toBe("/beaver-head.webp");
+  });
+
+  it("can render decoratively", () => {
+    const { container } = render(<BrandMark decorative />);
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("alt")).toBe("");
+    expect(img?.getAttribute("aria-hidden")).toBe("true");
+  });
+});
 ```
 
-Expected: PASS.
+- [ ] **Step 3: Point desktop imports to shared UI**
 
-- [ ] **Step 5: Make both applications consume `@beaver/ui`**
-
-Add this dependency to both `apps/desktop/package.json` and
-`apps/website/package.json`:
+In `apps/desktop/package.json`, add the shared UI dependency:
 
 ```json
 "@beaver/ui": "workspace:*"
 ```
 
-Remove these direct dependencies from both app manifests:
+Then remove these direct desktop dependencies because `cn` now lives in
+`@beaver/ui`:
 
 ```json
 "clsx": "catalog:",
 "tailwind-merge": "catalog:"
 ```
 
-Replace `apps/website/next.config.ts` with:
+Replace every desktop import of `@/lib/utils`:
 
-```typescript
-import type { NextConfig } from "next";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const appRoot = dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = resolve(appRoot, "../..");
-
-const nextConfig: NextConfig = {
-  output: "export",
-  images: {
-    unoptimized: true,
-  },
-  transpilePackages: ["@beaver/brand", "@beaver/ui"],
-  turbopack: {
-    root: workspaceRoot,
-  },
-};
-
-export default nextConfig;
+```bash
+rtk proxy sh -c 'rg -l "from \"@/lib/utils\"" apps/desktop/src | xargs perl -pi -e "s/from \"@\\/lib\\/utils\"/from \"@beaver\\/ui\"/g"'
+rtk git rm apps/desktop/src/lib/utils.ts
 ```
 
 Replace `apps/desktop/src/components/Logo.tsx` with:
 
-```typescript
+```tsx
 import { BrandMark, cn } from "@beaver/ui";
 
 interface Props {
@@ -1259,176 +896,69 @@ interface Props {
 }
 
 /**
- * Beaver mark used across desktop application surfaces.
+ * Beaver mark — the app's mascot head, used everywhere the brand shows up.
  */
 export function Logo({ size = 40, className, live = false }: Props) {
   return (
     <BrandMark
       size={size}
+      decorative
       className={cn(live && "animate-beaver-pulse", className)}
     />
   );
 }
 ```
 
-Replace `apps/website/components/ui/logo.tsx` with:
+- [ ] **Step 4: Add Tailwind source coverage for shared UI**
 
-```typescript
-import { BrandMark, cn } from "@beaver/ui";
-
-type LogoProps = {
-  className?: string;
-  markClassName?: string;
-};
-
-export function Logo({ className, markClassName }: LogoProps) {
-  return (
-    <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <BrandMark
-        alt="Beaver mascot head"
-        size={40}
-        className={cn("size-9", markClassName)}
-      />
-      <span className="text-base font-semibold text-stone-50">Beaver</span>
-    </span>
-  );
-}
-```
-
-Change the shadcn utils alias in `apps/desktop/components.json` to:
-
-```json
-"utils": "@beaver/ui"
-```
-
-Add this Tailwind v4 source directive immediately after the import lines in
-both `apps/desktop/src/index.css` and `apps/website/app/globals.css`:
+Add this line immediately after the imports in `apps/desktop/src/index.css`:
 
 ```css
 @source "../../../packages/ui/src";
 ```
 
-Mechanically replace every remaining local utils import:
-
-```bash
-rg -l 'from "@/lib/utils"' apps/desktop/src apps/website | xargs perl -pi -e 's/from "@\/lib\/utils"/from "@beaver\/ui"/g'
-git rm apps/desktop/src/lib/utils.ts apps/website/lib/utils.ts
-```
-
-- [ ] **Step 6: Install and verify both application consumers**
+- [ ] **Step 5: Verify Task 3**
 
 Run:
 
 ```bash
-pnpm install
-pnpm --filter @beaver/ui test:run
-pnpm --filter @beaver/desktop test:run
-pnpm --filter @beaver/website test:run
-pnpm typecheck
-pnpm build
+rtk pnpm install
+rtk pnpm --filter @beaver/ui test:run
+rtk pnpm --filter @beaver/desktop test:run
+rtk pnpm --filter @beaver/desktop typecheck
 ```
 
-Expected: all commands pass. The existing desktop `Logo` tests verify its local
-wrapper behavior, and the website build verifies Next.js transpiles both shared
-source packages.
+Expected: UI tests pass, desktop tests still pass with the local `Logo`
+wrapper, and TypeScript resolves both workspace packages.
 
-- [ ] **Step 7: Commit the shared UI package**
+- [ ] **Step 6: Commit Task 3**
+
+Run:
 
 ```bash
-git add packages/ui apps/desktop apps/website pnpm-lock.yaml
-git commit -m "refactor: add shared brand mark and utility package"
+rtk git add package.json pnpm-lock.yaml packages/ui apps/desktop
+rtk git commit -m "feat: share brand mark and class utilities"
 ```
 
-## Task 5: Document the Monorepo Command Pattern and Remove Stale Paths
+---
+
+### Task 4: Update README And Run Full Verification
 
 **Files:**
 - Modify: `README.md`
-- Modify: `apps/website/components/sections/demo-video.tsx`
 
-- [ ] **Step 1: Update the website-owned public path references**
+- [ ] **Step 1: Update development commands**
 
-In `apps/website/components/sections/demo-video.tsx`, replace every textual
-reference to:
+In `README.md`, replace the Development, Testing, Build, and Project layout
+sections so they describe the workspace:
 
-```text
-website/public
-```
-
-with:
-
-```text
-apps/website/public
-```
-
-- [ ] **Step 2: Replace the README development and layout documentation**
-
-Replace `README.md` with:
-
-````markdown
-# Beaver
-
-A macOS menu-bar utility that turns a screenshot into structured data. Press a
-shortcut, drag a box around anything on screen, and Beaver extracts what's
-inside it as clean Markdown. Tables stay tables, lists stay lists, and code
-stays code. Vision runs fully on-device after a one-time model download, so
-captures never leave your machine.
-
-> Apple Silicon only. The vision model runs on Apple's MLX framework, which
-> requires an M-series Mac.
-
-## Install (macOS, Apple Silicon)
-
-1. Download `Beaver_<version>_aarch64.dmg`.
-2. Open the DMG and drag **Beaver** into **Applications**.
-3. Launch Beaver from Applications. Grant Screen Recording permission when asked.
-
-> Unsigned builds: the first launch needs right-click → **Open** once to get
-> past Gatekeeper. Signed and notarized builds open normally.
-
-## How it works
-
-1. `Cmd+Shift+D` opens a full-screen capture overlay.
-2. You drag a bounding box around the region of interest.
-3. The cropped image is sent to a local FastAPI server running
-   `Qwen2.5-VL-3B-Instruct-4bit` via MLX.
-4. The extracted Markdown is returned, stored in local SQLite history, and
-   copied to your clipboard.
-
-On first launch Beaver downloads the vision model and prepares an on-device
-Python environment. A progress bar tracks the download; everything after setup
-runs offline.
-
-## Stack
-
-- **Desktop shell:** Tauri 2 with a Rust core
-- **Desktop frontend:** React 19, TypeScript, Vite 7, Tailwind CSS v4, shadcn
-- **Website:** Next.js 16 static export
-- **Vision backend:** Python FastAPI + MLX (`mlx-vlm`)
-- **Storage:** SQLite via `tauri-plugin-sql`
-- **Workspace:** pnpm + Turborepo
-
-## Prerequisites
-
-- macOS on Apple Silicon
-- [Rust](https://rustup.rs) stable
-- [Node.js](https://nodejs.org) + [pnpm](https://pnpm.io)
-- [uv](https://github.com/astral-sh/uv)
-
+````md
 ## Development
 
 ```bash
 pnpm install
-pnpm dev          # desktop Vite frontend + Next.js website
-pnpm tauri dev    # native desktop application
-```
-
-Focused commands follow a consistent app prefix:
-
-```bash
-pnpm desktop:dev
-pnpm website:dev
-pnpm desktop:test
-pnpm website:test
+pnpm dev          # run all app dev servers; currently the desktop Vite frontend
+pnpm tauri dev    # run the native macOS app
 ```
 
 ## Testing
@@ -1436,160 +966,91 @@ pnpm website:test
 ```bash
 pnpm test:run
 pnpm typecheck
-cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
-cd apps/desktop/src-tauri/resources && \
-  uv run --no-project --with fastapi --with uvicorn --with pydantic --with tqdm \
-  python test_mlx_server.py
+cd apps/desktop/src-tauri && cargo test
 ```
 
 ## Build
 
 ```bash
-pnpm build          # all workspace build tasks
-pnpm desktop:build
-pnpm website:build
-pnpm tauri build    # native desktop bundle
+pnpm build
+pnpm tauri build
 ```
-
-## Building a macOS release
-
-Requires Apple Silicon, Rust, pnpm, and the release prerequisites documented in
-`apps/desktop/.env.release.example`.
-
-```bash
-pnpm release:mac
-```
-
-Without credentials this produces an unsigned DMG for local testing. With a
-Developer ID identity and notarization credentials in either the workspace-root
-`.env.release` or `apps/desktop/.env.release`, the script signs, notarizes, and
-verifies the artifact.
 
 ## Project layout
 
 ```text
 apps/
-  desktop/
-    src/                    React desktop frontend
-    src-tauri/              Rust core and MLX server resources
-    scripts/                macOS release and asset-generation tooling
-    public/                 Desktop public assets
-  website/
-    app/                    Next.js app router pages and global styles
-    components/             Marketing sections and website UI
-    public/                 Website public assets
+  desktop/                 React frontend and Tauri shell
 packages/
-  brand/                    Product metadata and canonical shared assets
-  ui/                       Shared BrandMark and cn helper
-scripts/
-  sync-brand-assets.mjs     Sync canonical assets into both apps
-tests/
-  workspace-config.test.ts  Root workspace contract
+  brand/                   Product metadata and canonical brand assets
+  ui/                      Shared React primitives
+scripts/                   Workspace automation and release scripts
+tests/                     Workspace contract tests
 ```
 ````
 
-- [ ] **Step 3: Search for stale top-level application path references**
+- [ ] **Step 2: Search for stale paths**
 
 Run:
 
 ```bash
-rg -n '(^|[^/])website/public|cd src-tauri|src-tauri/|public/beaver-head' README.md apps scripts tests --glob '!apps/desktop/src-tauri/target/**'
+rtk rg -n '(^|[^/])src-tauri/|(^|[^/])src/|website|apps/website|public/beaver-head|Tauri \\+ React' README.md package.json pnpm-workspace.yaml turbo.json scripts tests apps packages --glob '!apps/desktop/src-tauri/target/**'
 ```
 
-Expected:
+Expected: no output. Exit code 1 from `rg` is acceptable here because it means
+there were no matches.
 
-- No top-level `website/public` references remain.
-- Desktop-local `src-tauri` references remain only where they are correct
-  inside `apps/desktop`.
-- Root documentation uses `apps/desktop/src-tauri`.
-
-- [ ] **Step 4: Run documentation-adjacent verification**
+- [ ] **Step 3: Run full verification**
 
 Run:
 
 ```bash
-pnpm test:run
-pnpm typecheck
-pnpm build
+rtk pnpm install
+rtk pnpm sync:assets --check
+rtk pnpm test:run
+rtk pnpm typecheck
+rtk pnpm build
 ```
 
-Expected: PASS.
-
-- [ ] **Step 5: Commit documentation and stale-path cleanup**
+Then run Rust tests:
 
 ```bash
-git add README.md apps/website/components/sections/demo-video.tsx
-git commit -m "docs: document monorepo development workflow"
+cd apps/desktop/src-tauri && rtk cargo test
 ```
 
-## Task 6: Run End-to-End Workspace Verification
+Expected: all commands pass.
 
-**Files:**
-- Verify only; no planned file changes
-
-- [ ] **Step 1: Verify a clean install uses the single workspace lockfile**
+- [ ] **Step 4: Smoke-test root dev script pattern**
 
 Run:
 
 ```bash
-pnpm install --frozen-lockfile
-rg --files -uu -g 'pnpm-lock.yaml' -g '!**/node_modules/**'
+rtk pnpm dev
 ```
 
-Expected: install succeeds and the only printed lockfile is
-`./pnpm-lock.yaml`.
+Expected: Turbo starts `@beaver/desktop#dev` on Vite port `1420`. Stop it with
+`Ctrl-C` after the server is up.
 
-- [ ] **Step 2: Run all automated workspace verification**
+- [ ] **Step 5: Commit Task 4**
 
 Run:
 
 ```bash
-pnpm test:run
-pnpm typecheck
-pnpm build
-cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
-pnpm release:mac -- --print-mode
+rtk git add README.md package.json pnpm-lock.yaml apps packages scripts tests turbo.json pnpm-workspace.yaml
+rtk git commit -m "docs: update monorepo usage"
 ```
 
-Expected:
+---
 
-- Root config, brand, shared UI, desktop, and website tests pass.
-- All TypeScript packages and apps typecheck.
-- Desktop and website builds pass through Turbo.
-- Rust tests pass.
-- Release mode prints `signed` or `unsigned` without building a DMG.
+## Completion Checklist
 
-- [ ] **Step 3: Verify `pnpm dev` starts both frontend applications**
-
-Run:
-
-```bash
-pnpm dev
-```
-
-Expected: Turbo starts `@beaver/desktop#dev` with Vite on port `1420` and
-`@beaver/website#dev` with Next.js on port `3000`. Stop the command with
-`Ctrl-C` after both servers report ready.
-
-- [ ] **Step 4: Verify the native desktop alias**
-
-Run:
-
-```bash
-pnpm tauri dev
-```
-
-Expected: the Tauri desktop application starts and resolves the Vite frontend
-from `apps/desktop`. Stop the command after confirming the app launches.
-
-- [ ] **Step 5: Confirm the final working tree contains only intended changes**
-
-Run:
-
-```bash
-git status --short
-git log --oneline -n 6
-```
-
-Expected: the working tree is clean, and the recent commits correspond to the
-workspace move, brand metadata, canonical assets, shared UI, and documentation.
+- [ ] `apps/desktop` exists.
+- [ ] `apps/website` does not exist.
+- [ ] Root `pnpm dev` uses the `apps/*` pattern.
+- [ ] Root `pnpm tauri dev` runs the native desktop app explicitly.
+- [ ] `@beaver/brand` has no React dependency.
+- [ ] `@beaver/ui` only exports `BrandMark` and `cn`.
+- [ ] Brand assets sync byte-for-byte into `apps/desktop/public`.
+- [ ] No Vite/Tauri starter assets remain.
+- [ ] Release tests ignore local signing credentials by default.
+- [ ] All full verification commands pass.

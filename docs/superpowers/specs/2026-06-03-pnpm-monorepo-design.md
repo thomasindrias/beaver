@@ -1,254 +1,183 @@
-# pnpm Monorepo Refactor Design
-
-**Date:** 2026-06-03
-**Status:** Approved
+# Beaver pnpm Monorepo Design
 
 ## Goal
 
-Refactor Beaver into a clean pnpm/Turborepo monorepo that keeps the desktop app
-and marketing website independently understandable, removes demonstrated
-duplication, and preserves the existing desktop development and release
-workflows.
+Convert Beaver into a clean pnpm/Turbo monorepo centered on the existing
+desktop app. Remove the current untracked website from scope; a real website
+will be designed later after mockups.
 
-## Locked Decisions
+## Decisions
 
-| Decision | Choice |
-|----------|--------|
-| Repository layout | Move both apps under `apps/` |
-| Workspace manager | pnpm workspace with one root lockfile |
-| Task orchestration | Turborepo for local task orchestration and caching |
-| Shared package split | Focused `@beaver/brand` and `@beaver/ui` packages |
-| Shared code scope | Brand data, shared assets, `BrandMark`, and `cn` |
-| Visual themes | Desktop and website themes remain distinct |
-| Asset delivery | Canonical assets in `packages/brand`, synced to app `public/` directories |
-| Synced asset copies | Committed and verified against the canonical source |
-| Root `pnpm dev` | Start the Vite desktop frontend and Next.js website |
-| Native desktop development | Preserve `pnpm tauri dev` as an explicit root alias |
-| Desktop release | Preserve `pnpm release:mac` as an explicit root alias |
+| Topic | Decision |
+| --- | --- |
+| Website | Remove the current `website/`; do not create `apps/website` in this pass |
+| Desktop app | Move the existing Vite/Tauri app to `apps/desktop` |
+| Root dev pattern | `pnpm dev` runs every app under `apps/*` that has a `dev` task |
+| Native app dev | `pnpm tauri dev` remains the explicit Tauri/native workflow |
+| Shared packages | Add `@beaver/brand` and `@beaver/ui` only |
+| Assets | Keep canonical shared brand assets in `packages/brand/assets` and sync public copies |
+| Animations | Keep mood animations desktop-owned under `apps/desktop/public/beaver-animations` |
+| Themes | Keep the desktop visual system unchanged |
 
-## Architecture
-
-The repository becomes a pnpm workspace with two applications and two focused
-shared packages:
+## Target Layout
 
 ```text
 apps/
-  desktop/                  Vite React frontend, Tauri Rust shell, release tooling
-  website/                  Next.js marketing site
+  desktop/                  Existing Vite React frontend and Tauri shell
 packages/
-  brand/                    Framework-neutral brand metadata and canonical assets
-  ui/                       Small React primitives shared by both apps
+  brand/                    Framework-neutral product metadata and brand assets
+  ui/                       Small shared React primitives
+scripts/                    Workspace scripts, including release and asset sync
+tests/                      Workspace-level configuration and asset tests
+docs/                       Existing planning/spec documents
 ```
 
-The repository root owns workspace orchestration only: the root
-`package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `turbo.json`, shared
-dependency version policy, and documentation. Product code lives in an app or
-package.
+There is intentionally no website app in the target tree. A future website can
+be added as `apps/website` with its own `package.json` and `dev` script; the
+root `pnpm dev` pattern will pick it up without redesigning the workspace.
 
-`@beaver/brand` has no React dependency. It exports stable product metadata,
-external links, and public asset paths. `@beaver/ui` depends on
-`@beaver/brand` and initially exports only the demonstrated shared React
-surface: `BrandMark` and `cn`.
+## Workspace
 
-The desktop and website apps remain separate products with different runtime
-constraints:
+The repository root owns:
 
-- The desktop app continues to use Vite, Tauri, desktop-specific Tailwind
-  tokens, native IPC, and local release tooling.
-- The website continues to use Next.js, static export, website-specific
-  Tailwind tokens, and marketing components.
-- App-specific components stay local even when they have similar names. The
-  shared packages do not become a second design system.
+- `pnpm-workspace.yaml`
+- `turbo.json`
+- one root `pnpm-lock.yaml`
+- dependency catalog versions
+- root scripts and compatibility aliases
+- workspace-level tests
 
-## Workspace Layout
+Root scripts follow this contract:
 
-### Root
+```text
+pnpm dev          Sync brand assets, then run dev tasks for all apps in apps/*
+pnpm build        Sync assets, build shared packages, then build apps
+pnpm test:run     Run workspace tests and package tests once
+pnpm typecheck    Type-check packages and apps
+pnpm tauri dev    Run the desktop app through Tauri
+pnpm release:mac  Build the macOS release from the root
+```
 
-The root `package.json` is private and contains Turbo scripts, desktop
-compatibility aliases, focused app aliases, the `turbo` development dependency,
-and the pinned pnpm package manager version. It does not carry the Beaver
-desktop product version.
+The first workspace contains one app, so `pnpm dev` starts the desktop Vite
+frontend only. That is deliberate: Tauri/native dev stays opt-in through
+`pnpm tauri dev`.
 
-`pnpm-workspace.yaml` includes `apps/*` and `packages/*`. It also defines a
-small catalog for dependency versions that must remain aligned across the
-workspace, including React, React DOM, TypeScript, Vitest, Tailwind CSS, and
-the shared utility dependencies.
+## Desktop App
 
-`turbo.json` defines:
+The current root app moves to `apps/desktop` with the least behavior change
+possible:
 
-- `dev` as persistent and uncached.
-- `build` as dependency-aware with app/package output globs.
-- `test:run` and `typecheck` as dependency-aware verification tasks.
+- React/Vite source remains under `apps/desktop/src`.
+- Tauri Rust source remains under `apps/desktop/src-tauri`.
+- Desktop public assets remain under `apps/desktop/public`.
+- Desktop tests remain close to the desktop source under
+  `apps/desktop/src/tests`.
+- The desktop package is named `@beaver/desktop`.
 
-Root development, build, native desktop, and release aliases synchronize
-canonical assets before invoking their underlying task. Workspace tests verify
-that committed public copies have not drifted.
+Tauri config keeps its existing relative model: `src-tauri/tauri.conf.json`
+still uses `../dist` for `frontendDist`, because the config remains one level
+below the desktop app root.
 
-Remote caching and deployment configuration are out of scope.
+## Release Script
 
-### `apps/desktop`
+The macOS release script stays a root-owned workflow at
+`scripts/release-macos.sh`. It is updated to address the moved desktop paths:
 
-The current repository-root desktop app moves into `apps/desktop`, including:
+- build through `pnpm --filter @beaver/desktop exec tauri build`
+- read the app version from `apps/desktop/package.json`
+- use `apps/desktop/src-tauri/...` for bundle, entitlement, DMG, and icon paths
+- keep `scripts/dmgbuild-settings.py` at the root
 
-- `src/`, `public/`, `index.html`, Vite and TypeScript configuration.
-- `src-tauri/` and its Rust, Python, resource, icon, and DMG files.
-- `scripts/`, `.env.release.example`, `components.json`, and desktop tests.
-- The current desktop package metadata and version.
+Release credentials remain compatible with existing local state:
 
-Tauri configuration remains beside its frontend. Its `beforeDevCommand`,
-`beforeBuildCommand`, and `frontendDist` paths continue to resolve within the
-desktop app directory. The macOS release script resolves its own app root
-instead of assuming the repository root.
+1. `BEAVER_RELEASE_ENV_FILE=/path/to/file` loads that exact file when set.
+2. Otherwise root `.env.release` is used when present.
+3. Otherwise `apps/desktop/.env.release` is accepted for app-local workflows.
 
-### `apps/website`
+Tests set `BEAVER_RELEASE_ENV_FILE=/dev/null` so checked-in tests are
+deterministic even when a developer has real signing credentials at the root.
 
-The existing untracked `website/` app moves into `apps/website` without a
-visual redesign. Its Next.js configuration transpiles `@beaver/brand` and
-`@beaver/ui`, and points Turbopack at the monorepo root so local workspace
-packages resolve consistently.
+## Brand Package
 
-Website-only media such as demo recordings, the poster image, and Open Graph
-image stay owned by the website.
+`@beaver/brand` is framework-neutral and has no React dependency. It exports:
 
-### `packages/brand`
+- product metadata such as `beaverProduct.name`
+- public asset paths such as `brandAssets.head`
+- shared external or support links when they become stable
 
-`@beaver/brand` is the framework-neutral source of truth for:
-
-- Product name and stable descriptive metadata.
-- GitHub repository and release download URLs.
-- Shared public asset paths.
-- Canonical shared asset files.
-
-Only assets used by both applications belong here:
+Canonical files live under `packages/brand/assets`:
 
 - `beaver-head.webp`
-- `favicon.ico`
+- `favicon.ico` copied from the existing Tauri icon source
 
-Desktop-only mood animations, including the wave animation, stay in
-`apps/desktop/public`. The website's currently unused wave copy is removed.
-Website-only media stays in `apps/website/public`.
+The sync script copies those assets into app public directories. In this pass
+the only app target is `apps/desktop/public`.
 
-### `packages/ui`
+## UI Package
 
-`@beaver/ui` is a small source package consumed directly by Vite and transpiled
-by Next.js. It exports:
+`@beaver/ui` starts intentionally small:
 
-- `BrandMark`, rendered as a normal `<img>` using the shared brand asset path.
-- `cn`, the existing `clsx` plus `tailwind-merge` helper.
+- `cn`, the existing `clsx` + `tailwind-merge` helper
+- `BrandMark`, a plain React `<img>` wrapper for the shared mascot mark
 
-Both app stylesheets explicitly register `packages/ui/src` as a Tailwind v4
-source so shared component utility classes are included in production CSS.
+The desktop app keeps its local `Logo` component, but it delegates the mark to
+`BrandMark` so app-specific animation and accessibility choices stay local.
 
-Each app keeps a local `Logo` wrapper:
+Desktop Tailwind CSS includes the package source explicitly:
 
-- Desktop retains its size, live pulse animation, and decorative semantics.
-- Website retains its wordmark, Next.js layout behavior, and theme-specific
-  classes.
-
-Buttons, headings, Tailwind tokens, and other app-specific UI are not shared in
-this refactor.
-
-## Asset Synchronization
-
-Canonical shared files live under `packages/brand/assets/`. A root-owned sync
-script copies them into the matching paths under each app's `public/`
-directory.
-
-The copied files remain committed for three reasons:
-
-1. Fresh checkouts can run either app without a preparatory generation step.
-2. Next.js static export and Tauri builds keep ordinary public URLs.
-3. Reviewers can see asset changes in the application artifact paths.
-
-A verification script or test compares the canonical files to every committed
-copy and fails when they drift. Build and verification tasks run asset
-synchronization or verification explicitly so local development and CI cannot
-silently ship stale copies.
-
-## Commands
-
-The root command pattern is:
-
-```text
-pnpm dev          Start the desktop Vite frontend and Next.js website
-pnpm build        Build all buildable workspace packages and apps
-pnpm test:run     Run all workspace tests once
-pnpm typecheck    Type-check all TypeScript packages and apps
-pnpm tauri dev    Start the native Tauri desktop app
-pnpm release:mac  Run the desktop macOS release workflow
+```css
+@source "../../../packages/ui/src";
 ```
 
-Focused aliases are also available for one-app work, using a consistent
-`desktop:*` and `website:*` pattern, such as:
+That keeps Tailwind v4 aware of classes used by shared UI components.
+
+## Asset Sync
+
+The repository keeps checked-in public copies for predictable Vite and Tauri
+behavior. A root script enforces the copy contract:
 
 ```text
-pnpm desktop:dev
-pnpm desktop:test
-pnpm website:dev
-pnpm website:test
+pnpm sync:assets          Copy canonical brand assets into app public dirs
+pnpm sync:assets --check  Fail if any public copy has drifted
 ```
 
-The compatibility aliases use pnpm filters instead of relying on the current
-working directory. Arguments after `--` continue to pass through, including
-`pnpm release:mac -- --print-mode`.
+The script is wired before root `dev`, `build`, `preview`, `tauri`, and release
+commands. Workspace tests also check byte-for-byte equality.
 
-## Migration Requirements
+Starter assets from the Vite/Tauri template are removed:
 
-The move must update every path-sensitive integration rather than relying on
-the old repository-root layout:
+- `apps/desktop/public/vite.svg`
+- `apps/desktop/public/tauri.svg`
+- `apps/desktop/src/assets/react.svg`
 
-- Tauri `frontendDist` and build command assumptions.
-- macOS release script package version, bundle paths, and workspace-root
-  `.env.release` compatibility.
-- DMG background generator input and output paths.
-- Desktop tests that read `package.json`, `src-tauri`, scripts, or assets.
-- README development, testing, build, release, and project-layout commands.
-- Website comments and tests that refer to the old `website/public` path.
-- Root and app `.gitignore` coverage.
+Desktop mood animations remain where the app uses them.
 
-The migration produces one root `pnpm-lock.yaml`. The current root lockfile and
-website lockfile are replaced by the workspace lockfile generated from all
-workspace package manifests.
+## Documentation
+
+The README is updated to show the monorepo layout and current commands. It
+should not mention the removed website or top-level `src-tauri` paths except
+when describing the old location in historical docs.
 
 ## Verification
 
-Automated verification must demonstrate:
+The implementation is complete when these pass:
 
-- One root `pnpm install` installs all workspace dependencies and produces one
-  lockfile.
-- Workspace configuration includes both apps and both shared packages.
-- `@beaver/brand` exports the expected metadata and asset paths.
-- `@beaver/ui` renders `BrandMark` and provides `cn`.
-- Committed public asset copies match the canonical files.
-- Existing desktop frontend tests pass after their move.
-- Existing website tests pass after their move.
-- Desktop Tauri configuration and release script tests pass with their new
-  paths.
-- `pnpm build`, `pnpm test:run`, and `pnpm typecheck` pass through Turbo.
-- `pnpm release:mac -- --print-mode` continues to report signed or unsigned
-  mode without building a release.
+```text
+pnpm install
+pnpm sync:assets --check
+pnpm test:run
+pnpm typecheck
+pnpm build
+cd apps/desktop/src-tauri && cargo test
+```
 
-Manual verification must demonstrate:
+`pnpm dev` must start the desktop frontend through the workspace pattern, and
+`pnpm tauri dev` must remain the explicit native app command.
 
-- `pnpm dev` starts both the Vite desktop frontend and the Next.js website.
-- `pnpm tauri dev` still starts the native desktop application.
+## Out Of Scope
 
-## Error Handling
-
-Workspace scripts fail fast when a package task fails. Asset synchronization
-reports the source and destination path for missing or mismatched files.
-Compatibility aliases return the underlying desktop command exit status so
-release and native build failures remain visible.
-
-No task should mutate unrelated application assets or hide a missing canonical
-asset by leaving an old committed copy in place.
-
-## Non-Goals
-
-- Splitting or refactoring the Rust `src-tauri/src/lib.rs` entrypoint.
-- Refactoring the Python MLX server.
-- Unifying desktop and website visual themes.
-- Building a broad shared component library.
-- Sharing app-specific Tailwind tokens or layout components.
-- Adding remote Turbo caching, CI/CD, deployment, or release automation.
-- Changing Beaver runtime behavior or the marketing website design.
+- Creating or preserving the old website
+- Adding `apps/website`
+- Redesigning the desktop UI
+- Refactoring Rust or Python internals
+- Changing Beaver capture, onboarding, model, database, or release behavior
