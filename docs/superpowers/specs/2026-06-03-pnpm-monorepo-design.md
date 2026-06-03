@@ -79,8 +79,10 @@ the shared utility dependencies.
 - `dev` as persistent and uncached.
 - `build` as dependency-aware with app/package output globs.
 - `test:run` and `typecheck` as dependency-aware verification tasks.
-- Asset synchronization as an explicit dependency where an app requires
-  committed public copies.
+
+Root development, build, native desktop, and release aliases synchronize
+canonical assets before invoking their underlying task. Workspace tests verify
+that committed public copies have not drifted.
 
 Remote caching and deployment configuration are out of scope.
 
@@ -101,9 +103,9 @@ instead of assuming the repository root.
 ### `apps/website`
 
 The existing untracked `website/` app moves into `apps/website` without a
-visual redesign. Its Next.js configuration transpiles `@beaver/ui` and points
-Turbopack at the monorepo root so local workspace packages resolve
-consistently.
+visual redesign. Its Next.js configuration transpiles `@beaver/brand` and
+`@beaver/ui`, and points Turbopack at the monorepo root so local workspace
+packages resolve consistently.
 
 Website-only media such as demo recordings, the poster image, and Open Graph
 image stay owned by the website.
@@ -120,11 +122,11 @@ image stay owned by the website.
 Only assets used by both applications belong here:
 
 - `beaver-head.webp`
-- `beaver-animations/beaver-wave.webp`
 - `favicon.ico`
 
-Desktop-only mood animations stay in `apps/desktop/public`. Website-only media
-stays in `apps/website/public`.
+Desktop-only mood animations, including the wave animation, stay in
+`apps/desktop/public`. The website's currently unused wave copy is removed.
+Website-only media stays in `apps/website/public`.
 
 ### `packages/ui`
 
@@ -133,6 +135,9 @@ by Next.js. It exports:
 
 - `BrandMark`, rendered as a normal `<img>` using the shared brand asset path.
 - `cn`, the existing `clsx` plus `tailwind-merge` helper.
+
+Both app stylesheets explicitly register `packages/ui/src` as a Tailwind v4
+source so shared component utility classes are included in production CSS.
 
 Each app keeps a local `Logo` wrapper:
 
@@ -193,7 +198,8 @@ The move must update every path-sensitive integration rather than relying on
 the old repository-root layout:
 
 - Tauri `frontendDist` and build command assumptions.
-- macOS release script package version and bundle paths.
+- macOS release script package version, bundle paths, and workspace-root
+  `.env.release` compatibility.
 - DMG background generator input and output paths.
 - Desktop tests that read `package.json`, `src-tauri`, scripts, or assets.
 - README development, testing, build, release, and project-layout commands.
