@@ -1,0 +1,45 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+
+:root {
+  --color-page-background: #eff0f6;
+  --color-ink: #211c16;
+  --color-ink-muted: #6b635a;
+  --color-accent: #dd6b27;
+  --color-accent-hover: #c85a1c;
+}
+
+@theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, -apple-system,
+    BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--color-page-background);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+}
+
+@keyframes beaver-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: beaver-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
