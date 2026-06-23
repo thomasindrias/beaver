@@ -13,7 +13,15 @@ const assets = [
   {
     name: "favicon.ico",
     source: "packages/brand/assets/favicon.ico",
-    targets: ["apps/desktop/public/favicon.ico"],
+    targets: [
+      "apps/desktop/public/favicon.ico",
+      "apps/website/public/favicon.ico",
+    ],
+  },
+  {
+    name: "beaver-wave.mp4",
+    source: "packages/brand/assets/beaver-wave.mp4",
+    targets: ["apps/website/public/beaver-wave.mp4"],
   },
 ];
 

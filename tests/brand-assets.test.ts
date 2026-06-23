@@ -19,6 +19,17 @@ describe("brand asset sync", () => {
     );
   });
 
+  it("keeps website public copies in sync with canonical brand assets", () => {
+    sameBytes(
+      "packages/brand/assets/beaver-wave.mp4",
+      "apps/website/public/beaver-wave.mp4",
+    );
+    sameBytes(
+      "packages/brand/assets/favicon.ico",
+      "apps/website/public/favicon.ico",
+    );
+  });
+
   it("removes starter template assets from the desktop app", () => {
     expect(existsSync("apps/desktop/public/vite.svg")).toBe(false);
     expect(existsSync("apps/desktop/public/tauri.svg")).toBe(false);
