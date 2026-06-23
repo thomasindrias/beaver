@@ -7,6 +7,7 @@ export const beaverProduct = {
 export const brandAssets = {
   head: "/beaver-head.webp",
   favicon: "/favicon.ico",
+  wave: "/beaver-wave.mp4",
 } as const;
 
 export type BrandAssetName = keyof typeof brandAssets;

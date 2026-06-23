@@ -11,5 +11,6 @@ describe("@beaver/brand", () => {
   it("exports public asset paths", () => {
     expect(brandAssets.head).toBe("/beaver-head.webp");
     expect(brandAssets.favicon).toBe("/favicon.ico");
+    expect(brandAssets.wave).toBe("/beaver-wave.mp4");
   });
 });
