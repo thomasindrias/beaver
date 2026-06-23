@@ -32,3 +32,6 @@ __pycache__/
 
 # Workspace tool caches
 .turbo/
+
+# Isolated worktrees for agent-driven development
+.worktrees/
