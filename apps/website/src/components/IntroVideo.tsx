@@ -9,6 +9,10 @@ interface IntroVideoProps {
 export function IntroVideo({ isSettled, onSettle }: IntroVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // onSettle must be a referentially stable callback (e.g. wrapped in
+  // useCallback by the caller) — this effect re-fires play() whenever it
+  // changes, which would restart playback after the video has already
+  // ended or been skipped.
   useEffect(() => {
     videoRef.current?.play().catch(onSettle);
   }, [onSettle]);
