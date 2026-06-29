@@ -21,6 +21,10 @@ describe("brand asset sync", () => {
 
   it("keeps website public copies in sync with canonical brand assets", () => {
     sameBytes(
+      "packages/brand/assets/beaver-head.webp",
+      "apps/website/public/beaver-head.webp",
+    );
+    sameBytes(
       "packages/brand/assets/beaver-wave.mp4",
       "apps/website/public/beaver-wave.mp4",
     );

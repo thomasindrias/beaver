@@ -8,7 +8,10 @@ const assets = [
   {
     name: "beaver-head.webp",
     source: "packages/brand/assets/beaver-head.webp",
-    targets: ["apps/desktop/public/beaver-head.webp"],
+    targets: [
+      "apps/desktop/public/beaver-head.webp",
+      "apps/website/public/beaver-head.webp",
+    ],
   },
   {
     name: "favicon.ico",
