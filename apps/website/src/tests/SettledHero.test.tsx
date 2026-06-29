@@ -34,4 +34,10 @@ describe("SettledHero", () => {
     const video = document.querySelector("video");
     expect(video).not.toHaveAttribute("autoplay");
   });
+
+  it("renders the looping video without an edge mask", () => {
+    render(<SettledHero autoPlayVideo />);
+    const video = document.querySelector("video");
+    expect(video?.className).not.toContain("mask-image");
+  });
 });

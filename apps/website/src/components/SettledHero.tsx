@@ -9,7 +9,7 @@ export function SettledHero({ autoPlayVideo }: SettledHeroProps) {
   return (
     <div className="flex flex-col items-center gap-6 px-6 text-center">
       <video
-        className="h-auto w-64 [-webkit-mask-image:radial-gradient(closest-side,black_75%,transparent_100%)] [mask-image:radial-gradient(closest-side,black_75%,transparent_100%)] sm:w-80"
+        className="h-auto w-64 sm:w-80"
         src={brandAssets.wave}
         autoPlay={autoPlayVideo}
         muted

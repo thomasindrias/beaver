@@ -19,6 +19,7 @@ describe("Hero", () => {
   let playSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    window.sessionStorage.clear();
     playSpy = vi
       .spyOn(window.HTMLMediaElement.prototype, "play")
       .mockResolvedValue(undefined);
@@ -26,6 +27,7 @@ describe("Hero", () => {
 
   afterEach(() => {
     playSpy.mockRestore();
+    window.sessionStorage.clear();
     vi.unstubAllGlobals();
   });
 
@@ -65,5 +67,21 @@ describe("Hero", () => {
     render(<Hero />);
     fireEvent.click(screen.getByTestId("intro-video"));
     expect(screen.getByText(heroCopy.headline)).toBeInTheDocument();
+  });
+
+  it("plays the intro only once per browser session", () => {
+    stubMatchMedia(false);
+    const { unmount } = render(<Hero />);
+    const video = document.querySelector("video") as HTMLVideoElement;
+    fireEvent.ended(video);
+
+    expect(window.sessionStorage.getItem("beaver:intro-seen")).toBe("true");
+
+    unmount();
+    render(<Hero />);
+
+    expect(screen.getByText(heroCopy.headline)).toBeInTheDocument();
+    expect(screen.queryByTestId("intro-video")).not.toBeInTheDocument();
+    expect(playSpy).toHaveBeenCalledTimes(1);
   });
 });
