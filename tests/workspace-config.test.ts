@@ -6,9 +6,9 @@ function readJson(path: string) {
 }
 
 describe("workspace layout", () => {
-  it("has a desktop app and no website app in this pass", () => {
+  it("has both a desktop app and a website app", () => {
     expect(existsSync("apps/desktop/package.json")).toBe(true);
-    expect(existsSync("apps/website/package.json")).toBe(false);
+    expect(existsSync("apps/website/package.json")).toBe(true);
   });
 
   it("keeps root dev on the apps/* pattern", () => {
