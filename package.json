@@ -9,9 +9,13 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:onboarding": "BEAVER_FORCE_ONBOARDING=1 tauri dev",
-    "test": "vitest",
-    "test:run": "vitest run --passWithNoTests",
-    "release:mac": "bash scripts/release-macos.sh"
+    "test": "vitest --exclude 'apps/**'",
+    "test:run": "vitest run --exclude 'apps/**' --passWithNoTests",
+    "release:mac": "bash scripts/release-macos.sh",
+    "website:dev": "pnpm --filter @beaver/website dev",
+    "website:build": "pnpm --filter @beaver/website build",
+    "website:test": "pnpm --filter @beaver/website test:run",
+    "website:typecheck": "pnpm --filter @beaver/website typecheck"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
