@@ -67,9 +67,9 @@ pub fn run() {
             let tray_menu = MenuBuilder::new(app).text("quit", "Quit Beaver").build()?;
 
             let _tray = TrayIconBuilder::new()
-                // Dedicated menu-bar glyph (the beaver head, white circle masked
-                // off) rather than the full app-icon squircle. Colored, so it's
-                // not rendered as a monochrome template.
+                // Dedicated menu-bar glyph generated from the same beaver head
+                // mark used by the React Logo and browser favicon. Colored, so
+                // it's not rendered as a monochrome template.
                 .icon(tauri::include_image!("icons/tray.png"))
                 .icon_as_template(false)
                 .tooltip("Beaver")
