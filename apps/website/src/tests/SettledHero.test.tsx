@@ -23,10 +23,16 @@ describe("SettledHero", () => {
     expect(cta).toHaveAttribute("rel", "noopener noreferrer");
   });
 
-  it("marks the looping video as decorative", () => {
+  it("marks the video as decorative", () => {
     render(<SettledHero autoPlayVideo />);
     const video = document.querySelector("video");
     expect(video).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("does not loop the video so it stops on its final frame", () => {
+    render(<SettledHero autoPlayVideo />);
+    const video = document.querySelector("video");
+    expect(video).not.toHaveAttribute("loop");
   });
 
   it("does not autoplay the video when autoPlayVideo is false", () => {
@@ -35,7 +41,7 @@ describe("SettledHero", () => {
     expect(video).not.toHaveAttribute("autoplay");
   });
 
-  it("renders the looping video without an edge mask", () => {
+  it("renders the video without an edge mask", () => {
     render(<SettledHero autoPlayVideo />);
     const video = document.querySelector("video");
     expect(video?.className).not.toContain("mask-image");

@@ -13,7 +13,6 @@ export function SettledHero({ autoPlayVideo }: SettledHeroProps) {
         src={brandAssets.wave}
         autoPlay={autoPlayVideo}
         muted
-        loop
         playsInline
         aria-hidden="true"
       />
