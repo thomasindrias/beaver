@@ -8,8 +8,8 @@
   },
   "scripts": {
     "build": "tsc --noEmit",
-    "test": "vitest --environment jsdom",
-    "test:run": "vitest run --environment jsdom",
+    "test": "vitest --environment jsdom --config /dev/null",
+    "test:run": "vitest run --environment jsdom --config /dev/null",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
