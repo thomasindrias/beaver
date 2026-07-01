@@ -2,6 +2,16 @@
   "name": "beaver",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
+  "packageManager": "pnpm@11.7.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thomasindrias/beaver.git"
+  },
+  "bugs": {
+    "url": "https://github.com/thomasindrias/beaver/issues"
+  },
+  "homepage": "https://github.com/thomasindrias/beaver#readme",
   "type": "module",
   "scripts": {
     "dev": "vite",

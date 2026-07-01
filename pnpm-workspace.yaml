@@ -1,2 +1,6 @@
 packages:
   - apps/website
+
+allowBuilds:
+  esbuild: true
+  msw: true

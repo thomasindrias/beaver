@@ -10,6 +10,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+.turbo/
+.worktrees/
+target/
 *.local
 
 # Python (MLX vision server bytecode)

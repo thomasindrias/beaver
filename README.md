@@ -60,6 +60,8 @@ UI-only work.
 ```bash
 pnpm test               # frontend (vitest, watch mode)
 pnpm test:run           # frontend, single run
+pnpm website:typecheck  # website TypeScript
+pnpm website:test       # website vitest, single run
 cargo test              # Rust (run inside src-tauri/)
 # Python vision server:
 cd src-tauri/resources && \
@@ -71,6 +73,7 @@ cd src-tauri/resources && \
 
 ```bash
 pnpm build              # type-check + bundle the frontend
+pnpm website:build      # build the landing page
 pnpm tauri build        # produce the signed .app / .dmg
 ```
 
@@ -86,6 +89,27 @@ Without credentials this produces an **unsigned** DMG for local testing. To sign
 and notarize, copy `.env.release.example` to `.env.release`, fill in your Developer
 ID identity and notarization credentials, and re-run. The script verifies the
 signature, Gatekeeper acceptance, and notarization staple before finishing.
+
+GitHub Actions includes:
+
+- `CI` for frontend tests, website checks, Rust tests, and the Python server unit
+  test.
+- `Deploy Website` for publishing `apps/website` to GitHub Pages.
+- `Release macOS` for manually building a DMG and optionally creating a draft
+  GitHub release. It builds unsigned unless signing and notarization secrets are
+  configured.
+
+## Security and Contributing
+
+- See [SECURITY.md](SECURITY.md) for vulnerability reporting and the app security
+  model.
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and pull request
+  expectations.
+- Beaver is released under the [MIT License](LICENSE).
+
+The macOS app requires screen capture and a bundled Python/MLX runtime. Keep
+changes to Tauri permissions, hardened-runtime entitlements, and network
+behavior narrow and documented.
 
 ## Project layout
 
@@ -105,5 +129,5 @@ src-tauri/                 Rust core
   resources/
     mlx_server.py          FastAPI vision server (Qwen2.5-VL via MLX)
 public/
-  beaver-animations/       per-mood beaver animations (PNG frames + WebP)
+  beaver-animations/       per-mood beaver animations (WebP)
 ```
