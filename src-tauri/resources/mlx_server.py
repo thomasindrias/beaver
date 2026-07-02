@@ -17,6 +17,7 @@ import os
 import queue
 import tempfile
 import threading
+import time
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -87,6 +88,19 @@ def _resolve_model(snapshot_download):
         STATE["progress"] = 0.0
         _ProgressTqdm.reset()
         return snapshot_download(MODEL_REPO, tqdm_class=_ProgressTqdm)
+
+
+def _parent_alive(parent_pid: int) -> bool:
+    """True while our parent is still the process that spawned us. When Beaver
+    dies (crash, force-quit), macOS reparents us and getppid() changes."""
+    return os.getppid() == parent_pid
+
+
+def _watch_parent(parent_pid: int, poll_seconds: float = 2.0):
+    while True:
+        if not _parent_alive(parent_pid):
+            os._exit(0)
+        time.sleep(poll_seconds)
 
 
 # Inference jobs: (prompt, image_path, result_holder, done_event). The single
@@ -176,7 +190,12 @@ def _worker():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, required=True)
+    parser.add_argument("--parent-pid", type=int, default=None)
     args = parser.parse_args()
 
+    if args.parent_pid is not None:
+        threading.Thread(
+            target=_watch_parent, args=(args.parent_pid,), daemon=True
+        ).start()
     threading.Thread(target=_worker, daemon=True).start()
     uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")

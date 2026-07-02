@@ -161,6 +161,17 @@ pub fn build_env(app: &tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Argument vector for the MLX server process. Extracted for testability.
+pub fn server_args(script: &std::path::Path, port: u16, parent_pid: u32) -> Vec<String> {
+    vec![
+        script.to_string_lossy().into_owned(),
+        "--port".into(),
+        port.to_string(),
+        "--parent-pid".into(),
+        parent_pid.to_string(),
+    ]
+}
+
 /// Spawn the MLX server using the venv's Python, with HF_HOME pinned to the
 /// app-data cache and stdout/stderr appended to mlx-server.log so first-run
 /// failures are diagnosable in the field. Returns the child handle.
@@ -168,9 +179,7 @@ pub fn spawn_server(app: &tauri::AppHandle, port: u16) -> Result<Child, String> 
     let python = venv_python(app);
     let script = resolve_resource(app, "mlx_server.py");
     let mut cmd = Command::new(python);
-    cmd.arg(script)
-        .arg("--port")
-        .arg(port.to_string())
+    cmd.args(server_args(&script, port, std::process::id()))
         .env("HF_HOME", hf_home(app));
 
     // Best-effort log capture: a failure to open the log file must not block
@@ -212,5 +221,20 @@ mod tests {
         let a = free_port().unwrap();
         let b = free_port().unwrap();
         assert!(a > 0 && b > 0);
+    }
+
+    #[test]
+    fn server_args_include_port_and_parent_pid() {
+        let args = server_args(std::path::Path::new("/x/mlx_server.py"), 11500, 4242);
+        assert_eq!(
+            args,
+            vec![
+                "/x/mlx_server.py".to_string(),
+                "--port".to_string(),
+                "11500".to_string(),
+                "--parent-pid".to_string(),
+                "4242".to_string(),
+            ]
+        );
     }
 }
