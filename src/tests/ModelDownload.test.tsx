@@ -71,11 +71,14 @@ describe("ModelDownload failure", () => {
 
     const btn = await screen.findByRole("button", { name: /try again/i });
     invokeMock.mockImplementation(async (cmd: string) =>
-      cmd === "mlx_status" ? { phase: "preparing", progress: null, detail: null } : undefined
+      cmd === "mlx_status" ? { phase: "downloading", progress: 0.3, detail: null } : undefined
     );
     fireEvent.click(btn);
 
     await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("retry_setup"));
-    expect(await screen.findByText(/preparing environment/i)).toBeInTheDocument();
+    // Only a re-armed poll loop can fetch and render this status — the
+    // optimistic local reset shows "Preparing environment…", not this.
+    expect(await screen.findByText(/downloading model/i)).toBeInTheDocument();
+    expect((await screen.findByRole("progressbar")).getAttribute("aria-valuenow")).toBe("30");
   });
 });
