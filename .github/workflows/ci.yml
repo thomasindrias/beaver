@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run desktop frontend tests
+        run: pnpm test:run
+
+      - name: Run website typecheck
+        run: pnpm website:typecheck
+
+      - name: Run website tests
+        run: pnpm website:test
+
+      - name: Build desktop frontend
+        run: pnpm build
+
+      - name: Build website
+        run: pnpm website:build
+
+      - name: Run Rust tests
+        working-directory: src-tauri
+        run: cargo test
+
+      - name: Run MLX server unit tests
+        working-directory: src-tauri/resources
+        run: uv run --no-project --with fastapi --with uvicorn --with pydantic --with tqdm python test_mlx_server.py

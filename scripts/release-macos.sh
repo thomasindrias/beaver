@@ -4,8 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-# Load gitignored release credentials if present.
-if [[ -f .env.release ]]; then
+# Load gitignored release credentials if present. Tests can disable this to keep
+# release mode assertions independent from a developer's local signing setup.
+if [[ "${BEAVER_SKIP_RELEASE_ENV:-}" != "1" && -f .env.release ]]; then
   set -a
   # shellcheck disable=SC1091
   source .env.release

@@ -5,7 +5,11 @@ import { existsSync, readFileSync } from "node:fs";
 function printMode(identity: string): string {
   return execFileSync("bash", ["scripts/release-macos.sh", "--print-mode"], {
     encoding: "utf8",
-    env: { ...process.env, APPLE_SIGNING_IDENTITY: identity },
+    env: {
+      ...process.env,
+      APPLE_SIGNING_IDENTITY: identity,
+      BEAVER_SKIP_RELEASE_ENV: "1",
+    },
   }).trim();
 }
 
@@ -15,7 +19,7 @@ describe("release-macos.sh", () => {
   });
 
   it("reports signed when a signing identity is set", () => {
-    expect(printMode("Developer ID Application: DJTL AB (Z7HLVJ93DA)")).toBe("signed");
+    expect(printMode("Developer ID Application: Example Developer (TEAMID1234)")).toBe("signed");
   });
 });
 
