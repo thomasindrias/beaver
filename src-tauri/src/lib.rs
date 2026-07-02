@@ -220,12 +220,25 @@ fn spawn_setup(handle: tauri::AppHandle) {
     }
 
     std::thread::spawn(move || {
+        // Clear the running flag on every exit path, including panics —
+        // otherwise a single panicked setup pass would permanently disable
+        // retry_setup for the rest of the process's life.
+        struct ClearRunningOnExit(tauri::AppHandle);
+        impl Drop for ClearRunningOnExit {
+            fn drop(&mut self) {
+                let state = self.0.state::<server::MlxServer>();
+                state
+                    .setup_running
+                    .store(false, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+        let _clear_running = ClearRunningOnExit(handle.clone());
+
         let state = handle.state::<server::MlxServer>();
 
         if !server::env_is_ready(&handle) {
             if let Err(msg) = server::preflight_disk(&handle) {
                 state.fail(msg);
-                state.setup_running.store(false, std::sync::atomic::Ordering::SeqCst);
                 return;
             }
             if let Err(e) = server::build_env(&handle) {
@@ -233,7 +246,6 @@ fn spawn_setup(handle: tauri::AppHandle) {
                     "Couldn't prepare the on-device Python environment. Check your \
                      internet connection and try again. ({e})"
                 ));
-                state.setup_running.store(false, std::sync::atomic::Ordering::SeqCst);
                 return;
             }
         }
@@ -245,7 +257,6 @@ fn spawn_setup(handle: tauri::AppHandle) {
             }
             Err(e) => {
                 state.fail(format!("Couldn't start the on-device model server. ({e})"));
-                state.setup_running.store(false, std::sync::atomic::Ordering::SeqCst);
                 return;
             }
         }
@@ -294,7 +305,6 @@ fn spawn_setup(handle: tauri::AppHandle) {
             }
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
-        state.setup_running.store(false, std::sync::atomic::Ordering::SeqCst);
     });
 }
 
