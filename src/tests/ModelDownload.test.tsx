@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
@@ -40,5 +40,42 @@ describe("ModelDownload progress", () => {
     render(<ModelDownload onComplete={onComplete} />);
 
     await waitFor(() => expect(onComplete).toHaveBeenCalled());
+  });
+});
+
+describe("ModelDownload failure", () => {
+  beforeEach(() => invokeMock.mockReset());
+
+  it("shows the failure detail from the backend", async () => {
+    invokeMock.mockResolvedValue({
+      phase: "error",
+      progress: null,
+      detail: "Beaver needs about 8 GB free to set up its on-device model. Free up space and try again.",
+    });
+    render(<ModelDownload onComplete={() => {}} />);
+
+    expect(await screen.findByText(/8 GB free/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /continue anyway/i })).not.toBeInTheDocument();
+  });
+
+  it("falls back to generic copy when there is no detail", async () => {
+    invokeMock.mockResolvedValue({ phase: "error", progress: null, detail: null });
+    render(<ModelDownload onComplete={() => {}} />);
+
+    expect(await screen.findByText(/couldn't finish setting up/i)).toBeInTheDocument();
+  });
+
+  it("Try again invokes retry_setup and resumes polling", async () => {
+    invokeMock.mockResolvedValue({ phase: "error", progress: null, detail: null });
+    render(<ModelDownload onComplete={() => {}} />);
+
+    const btn = await screen.findByRole("button", { name: /try again/i });
+    invokeMock.mockImplementation(async (cmd: string) =>
+      cmd === "mlx_status" ? { phase: "preparing", progress: null, detail: null } : undefined
+    );
+    fireEvent.click(btn);
+
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("retry_setup"));
+    expect(await screen.findByText(/preparing environment/i)).toBeInTheDocument();
   });
 });
