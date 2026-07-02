@@ -226,9 +226,29 @@ pub fn spawn_server(app: &tauri::AppHandle, port: u16) -> Result<Child, String> 
     cmd.spawn().map_err(|e| format!("failed to spawn MLX server: {e}"))
 }
 
-/// Placeholder until the disk preflight lands (next task).
-pub fn preflight_disk(_app: &tauri::AppHandle) -> Result<(), String> {
-    Ok(())
+/// First-run setup needs venv (~2 GB) + model (~3 GB) + headroom.
+pub const SETUP_DISK_NEEDED_BYTES: u64 = 8 * 1024 * 1024 * 1024;
+
+pub fn disk_has_room(available: u64) -> bool {
+    available >= SETUP_DISK_NEEDED_BYTES
+}
+
+pub fn insufficient_disk_message() -> String {
+    "Beaver needs about 8 GB free to set up its on-device model. \
+     Free up space and try again."
+        .to_string()
+}
+
+/// Fail fast (with a clear reason) when the disk can't hold the first-run
+/// setup, instead of dying mid-download. A failure to *measure* free space is
+/// not fatal — setup proceeds and any real ENOSPC surfaces later.
+pub fn preflight_disk(app: &tauri::AppHandle) -> Result<(), String> {
+    let data = app_data(app);
+    std::fs::create_dir_all(&data).map_err(|e| format!("create app data dir: {e}"))?;
+    match fs4::available_space(&data) {
+        Ok(avail) if !disk_has_room(avail) => Err(insufficient_disk_message()),
+        _ => Ok(()),
+    }
 }
 
 #[cfg(test)]
@@ -281,5 +301,16 @@ mod tests {
         s.fail("network burped".to_string());
         assert_eq!(*s.phase.lock().unwrap(), SetupPhase::Failed);
         assert_eq!(s.failure.lock().unwrap().as_deref(), Some("network burped"));
+    }
+
+    #[test]
+    fn disk_has_room_boundary() {
+        assert!(disk_has_room(SETUP_DISK_NEEDED_BYTES));
+        assert!(!disk_has_room(SETUP_DISK_NEEDED_BYTES - 1));
+    }
+
+    #[test]
+    fn insufficient_disk_message_names_the_size() {
+        assert!(insufficient_disk_message().contains("8 GB"));
     }
 }

@@ -32,4 +32,5 @@ base64 = "0.22.1"
 window-vibrancy = "0.7.1"
 tauri-plugin-log = "2"
 log = "0.4"
+fs4 = "0.13"
 
