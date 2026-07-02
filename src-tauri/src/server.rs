@@ -1,6 +1,7 @@
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::{Child, Command};
+use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 
 use tauri::Manager;
@@ -28,6 +29,29 @@ pub struct MlxServer {
     pub port: u16,
     pub child: Mutex<Option<Child>>,
     pub phase: Mutex<SetupPhase>,
+    /// Short user-readable reason when phase == Failed.
+    pub failure: Mutex<Option<String>>,
+    /// Guards against stacked setup threads on rapid retries.
+    pub setup_running: AtomicBool,
+}
+
+impl MlxServer {
+    pub fn new(port: u16) -> Self {
+        Self {
+            port,
+            child: Mutex::new(None),
+            phase: Mutex::new(SetupPhase::BuildingEnv),
+            failure: Mutex::new(None),
+            setup_running: AtomicBool::new(false),
+        }
+    }
+
+    /// Record a setup failure with a reason the UI can show.
+    pub fn fail(&self, msg: String) {
+        log::error!("setup failed: {msg}");
+        *self.failure.lock().unwrap() = Some(msg);
+        *self.phase.lock().unwrap() = SetupPhase::Failed;
+    }
 }
 
 /// Bind to port 0 to let the OS pick a free port, then drop the listener so the
@@ -202,6 +226,11 @@ pub fn spawn_server(app: &tauri::AppHandle, port: u16) -> Result<Child, String> 
     cmd.spawn().map_err(|e| format!("failed to spawn MLX server: {e}"))
 }
 
+/// Placeholder until the disk preflight lands (next task).
+pub fn preflight_disk(_app: &tauri::AppHandle) -> Result<(), String> {
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,5 +265,21 @@ mod tests {
                 "4242".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn new_mlx_server_starts_in_building_env_with_no_failure() {
+        let s = MlxServer::new(11500);
+        assert_eq!(*s.phase.lock().unwrap(), SetupPhase::BuildingEnv);
+        assert!(s.failure.lock().unwrap().is_none());
+        assert!(!s.setup_running.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
+    #[test]
+    fn fail_sets_phase_and_stores_reason() {
+        let s = MlxServer::new(11500);
+        s.fail("network burped".to_string());
+        assert_eq!(*s.phase.lock().unwrap(), SetupPhase::Failed);
+        assert_eq!(s.failure.lock().unwrap().as_deref(), Some("network burped"));
     }
 }

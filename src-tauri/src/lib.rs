@@ -127,113 +127,41 @@ pub fn run() {
             // Pick a free localhost port and register server state up front so
             // commands can read it immediately.
             let port = server::free_port().unwrap_or(11500);
-            app.manage(server::MlxServer {
-                port,
-                child: Mutex::new(None),
-                phase: Mutex::new(server::SetupPhase::BuildingEnv),
-            });
+            app.manage(server::MlxServer::new(port));
+
+            // Show onboarding immediately when the model isn't cached yet, so the
+            // user watches setup progress instead of a blank app. Created here
+            // (on the main thread, since `.setup` already runs there) rather than
+            // inside the setup worker, so onboarding shows up exactly once per
+            // launch regardless of how many times setup itself is retried.
+            let first_launch = !server::setup_is_complete(app.handle()) || force_onboarding_enabled();
+            if first_launch {
+                let h = app.handle().clone();
+                let mut builder = tauri::WebviewWindowBuilder::new(
+                    &h,
+                    "onboarding",
+                    tauri::WebviewUrl::App("/".into()),
+                )
+                .title("Welcome to Beaver")
+                .inner_size(480.0, 640.0)
+                .center();
+                // Borderless chrome: let the dark UI fill to the top edge with the
+                // traffic lights floating over it, instead of a white system title
+                // bar.
+                #[cfg(target_os = "macos")]
+                {
+                    builder = builder
+                        .hidden_title(true)
+                        .title_bar_style(tauri::TitleBarStyle::Overlay);
+                }
+                if let Err(e) = builder.build() {
+                    log::error!("failed to create onboarding window: {e}");
+                }
+            }
 
             // Build the venv (first run only), spawn the server, and poll it to
             // readiness — all off the main thread so the tray is usable at once.
-            // Show onboarding immediately when the model isn't cached yet, so the
-            // user watches setup progress instead of a blank app.
-            let handle = app.handle().clone();
-            std::thread::spawn(move || {
-                let state = handle.state::<server::MlxServer>();
-                let first_launch = !server::setup_is_complete(&handle) || force_onboarding_enabled();
-
-                if first_launch {
-                    let h = handle.clone();
-                    let _ = handle.run_on_main_thread(move || {
-                        let mut builder = tauri::WebviewWindowBuilder::new(
-                            &h,
-                            "onboarding",
-                            tauri::WebviewUrl::App("/".into()),
-                        )
-                        .title("Welcome to Beaver")
-                        .inner_size(480.0, 640.0)
-                        .center();
-                        // Borderless chrome: let the dark UI fill to the top edge
-                        // with the traffic lights floating over it, instead of a
-                        // white system title bar.
-                        #[cfg(target_os = "macos")]
-                        {
-                            builder = builder
-                                .hidden_title(true)
-                                .title_bar_style(tauri::TitleBarStyle::Overlay);
-                        }
-                        let result = builder.build();
-                        if let Err(e) = result {
-                            log::error!("failed to create onboarding window: {e}");
-                        }
-                    });
-                }
-
-                if !server::env_is_ready(&handle) {
-                    *state.phase.lock().unwrap() = server::SetupPhase::BuildingEnv;
-                    if let Err(e) = server::build_env(&handle) {
-                        log::error!("MLX env build failed: {e}");
-                        *state.phase.lock().unwrap() = server::SetupPhase::Failed;
-                        return;
-                    }
-                }
-
-                *state.phase.lock().unwrap() = server::SetupPhase::StartingServer;
-                match server::spawn_server(&handle, state.port) {
-                    Ok(child) => {
-                        *state.child.lock().unwrap() = Some(child);
-                    }
-                    Err(e) => {
-                        log::error!("failed to spawn MLX server: {e}");
-                        *state.phase.lock().unwrap() = server::SetupPhase::Failed;
-                        return;
-                    }
-                }
-
-                // Poll to readiness. Do NOT impose a wall-clock deadline while the
-                // server is reachable and reports progress — the first run can
-                // download a few hundred MB of deps plus a ~3 GB model on a slow
-                // link. Only fail if the server stays UNREACHABLE for a sustained
-                // window (the process likely died), with a generous absolute cap
-                // as a final backstop.
-                let started = std::time::Instant::now();
-                let mut last_reachable = std::time::Instant::now();
-                let unreachable_grace = std::time::Duration::from_secs(60);
-                let absolute_cap = std::time::Duration::from_secs(3600);
-                loop {
-                    match tauri::async_runtime::block_on(mlx::health(state.port)) {
-                        Ok(h) => {
-                            last_reachable = std::time::Instant::now();
-                            match h.status {
-                                mlx::ServerStatus::Ready => {
-                                    *state.phase.lock().unwrap() = server::SetupPhase::ServerUp;
-                                    server::mark_setup_complete(&handle);
-                                    break;
-                                }
-                                mlx::ServerStatus::Error => {
-                                    *state.phase.lock().unwrap() = server::SetupPhase::Failed;
-                                    break;
-                                }
-                                // downloading / loading — keep waiting.
-                                _ => {}
-                            }
-                        }
-                        Err(_) => {
-                            if last_reachable.elapsed() > unreachable_grace {
-                                log::error!("MLX server unreachable — giving up");
-                                *state.phase.lock().unwrap() = server::SetupPhase::Failed;
-                                break;
-                            }
-                        }
-                    }
-                    if started.elapsed() > absolute_cap {
-                        log::error!("MLX server setup exceeded the time cap");
-                        *state.phase.lock().unwrap() = server::SetupPhase::Failed;
-                        break;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-                }
-            });
+            spawn_setup(app.handle().clone());
 
             Ok(())
         })
@@ -241,7 +169,8 @@ pub fn run() {
             capture_and_extract,
             mlx_status,
             write_to_clipboard,
-            finish_onboarding
+            finish_onboarding,
+            retry_setup
         ])
         .build(tauri::generate_context!())
         .expect("error while building Beaver")
@@ -268,17 +197,126 @@ pub fn run() {
         });
 }
 
+/// Build the env (first run), spawn the MLX server, and poll it to readiness —
+/// all off the main thread. Re-runnable: `retry_setup` calls this again after a
+/// failure. The `setup_running` flag makes concurrent calls a no-op.
+fn spawn_setup(handle: tauri::AppHandle) {
+    {
+        let state = handle.state::<server::MlxServer>();
+        if state
+            .setup_running
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            return; // a setup pass is already in flight
+        }
+        *state.failure.lock().unwrap() = None;
+        *state.phase.lock().unwrap() = server::SetupPhase::BuildingEnv;
+        // A retry after a spawn-then-crash leaves a stale child; reap it.
+        if let Ok(mut guard) = state.child.lock() {
+            if let Some(mut child) = guard.take() {
+                let _ = child.kill();
+            }
+        };
+    }
+
+    std::thread::spawn(move || {
+        let state = handle.state::<server::MlxServer>();
+
+        if !server::env_is_ready(&handle) {
+            if let Err(msg) = server::preflight_disk(&handle) {
+                state.fail(msg);
+                state.setup_running.store(false, std::sync::atomic::Ordering::SeqCst);
+                return;
+            }
+            if let Err(e) = server::build_env(&handle) {
+                state.fail(format!(
+                    "Couldn't prepare the on-device Python environment. Check your \
+                     internet connection and try again. ({e})"
+                ));
+                state.setup_running.store(false, std::sync::atomic::Ordering::SeqCst);
+                return;
+            }
+        }
+
+        *state.phase.lock().unwrap() = server::SetupPhase::StartingServer;
+        match server::spawn_server(&handle, state.port) {
+            Ok(child) => {
+                *state.child.lock().unwrap() = Some(child);
+            }
+            Err(e) => {
+                state.fail(format!("Couldn't start the on-device model server. ({e})"));
+                state.setup_running.store(false, std::sync::atomic::Ordering::SeqCst);
+                return;
+            }
+        }
+
+        // Poll to readiness (same policy as before: no wall-clock deadline while
+        // reachable; fail on sustained unreachability, with an absolute cap).
+        let started = std::time::Instant::now();
+        let mut last_reachable = std::time::Instant::now();
+        let unreachable_grace = std::time::Duration::from_secs(60);
+        let absolute_cap = std::time::Duration::from_secs(3600);
+        loop {
+            match tauri::async_runtime::block_on(mlx::health(state.port)) {
+                Ok(h) => {
+                    last_reachable = std::time::Instant::now();
+                    match h.status {
+                        mlx::ServerStatus::Ready => {
+                            *state.phase.lock().unwrap() = server::SetupPhase::ServerUp;
+                            server::mark_setup_complete(&handle);
+                            break;
+                        }
+                        mlx::ServerStatus::Error => {
+                            state.fail(
+                                "The on-device model failed to load. Try again — the \
+                                 log file has details."
+                                    .to_string(),
+                            );
+                            break;
+                        }
+                        _ => {} // downloading / loading — keep waiting
+                    }
+                }
+                Err(_) => {
+                    if last_reachable.elapsed() > unreachable_grace {
+                        state.fail(
+                            "Lost contact with the on-device model server. Check your \
+                             internet connection and try again."
+                                .to_string(),
+                        );
+                        break;
+                    }
+                }
+            }
+            if started.elapsed() > absolute_cap {
+                state.fail("Setup took too long and was stopped. Try again.".to_string());
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+        state.setup_running.store(false, std::sync::atomic::Ordering::SeqCst);
+    });
+}
+
+#[tauri::command]
+fn retry_setup(app: tauri::AppHandle) {
+    spawn_setup(app);
+}
+
 #[derive(serde::Serialize)]
 struct MlxStatus {
     phase: String,
     /// Download progress 0.0–1.0 during the downloading phase; `None` otherwise.
     progress: Option<f64>,
+    /// User-readable failure reason when phase == "error"; `None` otherwise.
+    detail: Option<String>,
 }
 
 #[tauri::command]
 async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<MlxStatus, ()> {
     // Copy the cheap bits out before any await so we never hold the lock across it.
     let phase = *state.phase.lock().unwrap();
+    let detail = state.failure.lock().unwrap().clone();
     let port = state.port;
 
     let (label, progress) = match phase {
@@ -301,8 +339,9 @@ async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<MlxSta
         }
     };
     Ok(MlxStatus {
-        phase: label,
+        phase: label.clone(),
         progress,
+        detail: if label == "error" { detail } else { None },
     })
 }
 
@@ -327,11 +366,13 @@ async fn write_to_clipboard(app: tauri::AppHandle, text: String) -> Result<(), S
 }
 
 // End onboarding once setup is ready: surface the menu-bar popover so the user
-// discovers where Beaver lives, then close the onboarding window. Writing the
-// setup marker here is what keeps onboarding from reappearing on later launches.
+// discovers where Beaver lives, then close the onboarding window. The
+// setup-complete marker is written by the setup readiness poll (`spawn_setup`),
+// not here — this command only runs once the UI has already observed "ready",
+// so writing it again here would be redundant and, on a retry raced against a
+// still-failed setup, would wrongly mark an incomplete setup as done.
 #[tauri::command]
 fn finish_onboarding(app: tauri::AppHandle) {
-    server::mark_setup_complete(&app);
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         if let Some(w) = handle.get_webview_window("onboarding") {
