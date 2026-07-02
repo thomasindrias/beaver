@@ -109,6 +109,30 @@ pub fn mark_setup_complete(app: &tauri::AppHandle) {
     }
 }
 
+/// Marker asking the next launch to open the popover once — written just
+/// before the post-permission relaunch so the user isn't dropped into a
+/// silent menu-bar app.
+fn permission_relaunch_marker(app: &tauri::AppHandle) -> PathBuf {
+    app_data(app).join(".post-permission-relaunch")
+}
+
+pub fn mark_permission_relaunch(app: &tauri::AppHandle) {
+    if let Err(e) = std::fs::write(permission_relaunch_marker(app), b"1") {
+        log::error!("failed to write relaunch marker: {e}");
+    }
+}
+
+/// Consume the marker: true exactly once after a permission relaunch.
+pub fn take_permission_relaunch(app: &tauri::AppHandle) -> bool {
+    let p = permission_relaunch_marker(app);
+    if p.exists() {
+        let _ = std::fs::remove_file(&p);
+        true
+    } else {
+        false
+    }
+}
+
 /// Resolve a bundled resource. In debug builds resources aren't copied to a
 /// bundle, so read them from the crate's `resources/` dir; in release read from
 /// the app's resource dir.

@@ -1,6 +1,7 @@
 mod capture;
 mod db;
 mod mlx;
+mod permission;
 mod server;
 mod shortcut;
 
@@ -163,6 +164,12 @@ pub fn run() {
             // readiness — all off the main thread so the tray is usable at once.
             spawn_setup(app.handle().clone());
 
+            // After the permission relaunch, surface the popover once so the
+            // user lands somewhere instead of a silent menu-bar app.
+            if server::take_permission_relaunch(app.handle()) {
+                open_popover_at_menubar(app.handle());
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -170,7 +177,11 @@ pub fn run() {
             mlx_status,
             write_to_clipboard,
             finish_onboarding,
-            retry_setup
+            retry_setup,
+            screen_permission_granted,
+            request_screen_permission,
+            open_screen_recording_settings,
+            relaunch_app
         ])
         .build(tauri::generate_context!())
         .expect("error while building Beaver")
@@ -313,6 +324,32 @@ fn retry_setup(app: tauri::AppHandle) {
     spawn_setup(app);
 }
 
+#[tauri::command]
+fn screen_permission_granted() -> bool {
+    permission::screen_capture_granted()
+}
+
+#[tauri::command]
+fn request_screen_permission() -> bool {
+    permission::request_screen_capture()
+}
+
+#[tauri::command]
+fn open_screen_recording_settings() {
+    if let Err(e) = std::process::Command::new("open")
+        .arg(permission::SETTINGS_URL)
+        .spawn()
+    {
+        log::error!("failed to open System Settings: {e}");
+    }
+}
+
+#[tauri::command]
+fn relaunch_app(app: tauri::AppHandle) {
+    server::mark_permission_relaunch(&app);
+    app.restart();
+}
+
 #[derive(serde::Serialize)]
 struct MlxStatus {
     phase: String,
@@ -363,6 +400,9 @@ async fn capture_and_extract(
     region: capture::CaptureRegion,
     state: tauri::State<'_, server::MlxServer>,
 ) -> Result<String, String> {
+    if !permission::screen_capture_granted() {
+        return Err(permission::PERMISSION_ERROR.to_string());
+    }
     let port = state.port;
     let bytes = capture::capture_region(&region).map_err(|e| e.to_string())?;
     let image_base64 = STANDARD.encode(&bytes);
