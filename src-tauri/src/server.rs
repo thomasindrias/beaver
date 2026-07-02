@@ -81,7 +81,7 @@ pub fn setup_is_complete(app: &tauri::AppHandle) -> bool {
 
 pub fn mark_setup_complete(app: &tauri::AppHandle) {
     if let Err(e) = std::fs::write(setup_marker(app), b"1") {
-        eprintln!("Beaver: failed to write setup marker: {e}");
+        log::error!("failed to write setup marker: {e}");
     }
 }
 
@@ -162,17 +162,35 @@ pub fn build_env(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 /// Spawn the MLX server using the venv's Python, with HF_HOME pinned to the
-/// app-data cache. Returns the child handle to be held in managed state.
+/// app-data cache and stdout/stderr appended to mlx-server.log so first-run
+/// failures are diagnosable in the field. Returns the child handle.
 pub fn spawn_server(app: &tauri::AppHandle, port: u16) -> Result<Child, String> {
     let python = venv_python(app);
     let script = resolve_resource(app, "mlx_server.py");
-    Command::new(python)
-        .arg(script)
+    let mut cmd = Command::new(python);
+    cmd.arg(script)
         .arg("--port")
         .arg(port.to_string())
-        .env("HF_HOME", hf_home(app))
-        .spawn()
-        .map_err(|e| format!("failed to spawn MLX server: {e}"))
+        .env("HF_HOME", hf_home(app));
+
+    // Best-effort log capture: a failure to open the log file must not block
+    // the server itself.
+    if let Ok(log_dir) = app.path().app_log_dir() {
+        if std::fs::create_dir_all(&log_dir).is_ok() {
+            if let Ok(file) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(log_dir.join("mlx-server.log"))
+            {
+                if let Ok(err_file) = file.try_clone() {
+                    cmd.stdout(std::process::Stdio::from(file))
+                        .stderr(std::process::Stdio::from(err_file));
+                }
+            }
+        }
+    }
+
+    cmd.spawn().map_err(|e| format!("failed to spawn MLX server: {e}"))
 }
 
 #[cfg(test)]

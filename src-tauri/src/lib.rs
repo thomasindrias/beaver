@@ -26,7 +26,7 @@ fn apply_popover_vibrancy(window: &tauri::WebviewWindow) {
         Some(NSVisualEffectState::Active),
         Some(18.0),
     ) {
-        eprintln!("Beaver: failed to apply vibrancy: {e}");
+        log::warn!("failed to apply vibrancy: {e}");
     }
 }
 
@@ -47,6 +47,19 @@ fn force_onboarding_enabled() -> bool {
 pub fn run() {
     tauri::Builder::default()
         .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                        file_name: Some("beaver".into()),
+                    }),
+                ])
+                .level(log::LevelFilter::Info)
+                .max_file_size(5_000_000)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
+                .build(),
+        )
+        .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:beaver.db", db::migrations())
                 .build(),
@@ -54,6 +67,12 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
+            log::info!(
+                "Beaver v{} starting; logs in {:?}",
+                app.package_info().version,
+                app.path().app_log_dir().ok()
+            );
+
             #[cfg(target_os = "macos")]
             let _ = app.handle().set_activation_policy(tauri::ActivationPolicy::Accessory);
 
@@ -145,7 +164,7 @@ pub fn run() {
                         }
                         let result = builder.build();
                         if let Err(e) = result {
-                            eprintln!("Beaver: failed to create onboarding window: {e}");
+                            log::error!("failed to create onboarding window: {e}");
                         }
                     });
                 }
@@ -153,7 +172,7 @@ pub fn run() {
                 if !server::env_is_ready(&handle) {
                     *state.phase.lock().unwrap() = server::SetupPhase::BuildingEnv;
                     if let Err(e) = server::build_env(&handle) {
-                        eprintln!("Beaver: MLX env build failed: {e}");
+                        log::error!("MLX env build failed: {e}");
                         *state.phase.lock().unwrap() = server::SetupPhase::Failed;
                         return;
                     }
@@ -165,7 +184,7 @@ pub fn run() {
                         *state.child.lock().unwrap() = Some(child);
                     }
                     Err(e) => {
-                        eprintln!("Beaver: failed to spawn MLX server: {e}");
+                        log::error!("failed to spawn MLX server: {e}");
                         *state.phase.lock().unwrap() = server::SetupPhase::Failed;
                         return;
                     }
@@ -201,14 +220,14 @@ pub fn run() {
                         }
                         Err(_) => {
                             if last_reachable.elapsed() > unreachable_grace {
-                                eprintln!("Beaver: MLX server unreachable — giving up");
+                                log::error!("MLX server unreachable — giving up");
                                 *state.phase.lock().unwrap() = server::SetupPhase::Failed;
                                 break;
                             }
                         }
                     }
                     if started.elapsed() > absolute_cap {
-                        eprintln!("Beaver: MLX server setup exceeded the time cap");
+                        log::error!("MLX server setup exceeded the time cap");
                         *state.phase.lock().unwrap() = server::SetupPhase::Failed;
                         break;
                     }
@@ -381,7 +400,7 @@ fn popover_position_menubar(app: &tauri::AppHandle) -> tauri::LogicalPosition<f6
 fn toggle_popover(app: &tauri::AppHandle, icon_rect: Option<tauri::Rect>) {
     if let Some(w) = app.get_webview_window("popover") {
         if w.is_visible().unwrap_or(false) {
-            if let Err(e) = w.hide() { eprintln!("Beaver: failed to hide popover: {e}"); }
+            if let Err(e) = w.hide() { log::error!("failed to hide popover: {e}"); }
         } else {
             // If the window was just auto-hidden on focus loss (because this
             // very tray click stole focus), treat the click as a dismiss and
@@ -398,11 +417,11 @@ fn toggle_popover(app: &tauri::AppHandle, icon_rect: Option<tauri::Rect>) {
             }
             if let Some(rect) = icon_rect {
                 if let Err(e) = w.set_position(popover_position(app, rect)) {
-                    eprintln!("Beaver: failed to reposition popover: {e}");
+                    log::error!("failed to reposition popover: {e}");
                 }
             }
-            if let Err(e) = w.show() { eprintln!("Beaver: failed to show popover: {e}"); }
-            if let Err(e) = w.set_focus() { eprintln!("Beaver: failed to focus popover: {e}"); }
+            if let Err(e) = w.show() { log::error!("failed to show popover: {e}"); }
+            if let Err(e) = w.set_focus() { log::error!("failed to focus popover: {e}"); }
         }
         return;
     }
@@ -453,7 +472,7 @@ fn build_popover(app: &tauri::AppHandle, pos: Option<tauri::LogicalPosition<f64>
 
             let _ = window.set_focus();
         }
-        Err(e) => eprintln!("Beaver: failed to create popover window: {e}"),
+        Err(e) => log::error!("failed to create popover window: {e}"),
     }
 }
 
@@ -472,8 +491,8 @@ fn open_popover_at_menubar(app: &tauri::AppHandle) {
 
 fn show_capture_overlay(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("capture-overlay") {
-        if let Err(e) = w.show() { eprintln!("Beaver: failed to show capture overlay: {e}"); }
-        if let Err(e) = w.set_focus() { eprintln!("Beaver: failed to focus capture overlay: {e}"); }
+        if let Err(e) = w.show() { log::error!("failed to show capture overlay: {e}"); }
+        if let Err(e) = w.set_focus() { log::error!("failed to focus capture overlay: {e}"); }
         return;
     }
 
@@ -505,7 +524,7 @@ fn show_capture_overlay(app: &tauri::AppHandle) {
     .build();
 
     if let Err(e) = result {
-        eprintln!("Beaver: failed to create capture overlay: {e}");
+        log::error!("failed to create capture overlay: {e}");
     }
 }
 

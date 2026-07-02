@@ -30,4 +30,6 @@ tokio = { version = "1.52.3", features = ["full"] }
 reqwest = { version = "0.12", features = ["json"] }
 base64 = "0.22.1"
 window-vibrancy = "0.7.1"
+tauri-plugin-log = "2"
+log = "0.4"
 
