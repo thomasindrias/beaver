@@ -65,11 +65,12 @@ interface Point {
 interface Props {
   state: AppState;
   origin: Point;
+  errorKind?: "generic" | "permission";
 }
 
 // A small bubble that rides the cursor while a capture is processed. It stays
 // purely informational (pointer-events-none) so it never intercepts clicks.
-export function CursorToast({ state, origin }: Props) {
+export function CursorToast({ state, origin, errorKind = "generic" }: Props) {
   const [pos, setPos] = useState<Point>(origin);
   const [msgIndex, setMsgIndex] = useState(
     () => Math.floor(Math.random() * LOADING_MESSAGES.length)
@@ -94,7 +95,7 @@ export function CursorToast({ state, origin }: Props) {
 
   if (state === "idle") return null;
 
-  const { icon, message } = render(state, msgIndex);
+  const { icon, message } = render(state, msgIndex, errorKind);
 
   return (
     <div
@@ -112,7 +113,7 @@ export function CursorToast({ state, origin }: Props) {
   );
 }
 
-function render(state: AppState, msgIndex: number): { icon: ReactElement; message: string } {
+function render(state: AppState, msgIndex: number, errorKind: "generic" | "permission"): { icon: ReactElement; message: string } {
   if (state === "success") {
     return {
       icon: <Check className="size-4 text-primary" strokeWidth={3} />,
@@ -122,7 +123,10 @@ function render(state: AppState, msgIndex: number): { icon: ReactElement; messag
   if (state === "error") {
     return {
       icon: <TriangleAlert className="size-4 text-amber-400" />,
-      message: "Dam — couldn't read that. Try again.",
+      message:
+        errorKind === "permission"
+          ? "Beaver needs Screen Recording access — check System Settings."
+          : "Dam — couldn't read that. Try again.",
     };
   }
   return {

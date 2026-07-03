@@ -9,12 +9,16 @@ interface CaptureRegion { x: number; y: number; width: number; height: number }
 // briefly blocks the screen.
 export const SUCCESS_DWELL_MS = 1500;
 export const ERROR_DWELL_MS = 2500;
+export const PERMISSION_ERROR_DWELL_MS = 4000;
+
+export type CaptureErrorKind = "generic" | "permission";
 
 export function useBeaver(
   onSave?: (capture: Omit<Capture, "id" | "created_at">) => Promise<void>,
   onComplete?: () => void,
 ) {
   const [state, setState] = useState<AppState>("idle");
+  const [errorKind, setErrorKind] = useState<CaptureErrorKind>("generic");
 
   const runCapture = useCallback(async (region: CaptureRegion) => {
     setState("processing");
@@ -38,16 +42,20 @@ export function useBeaver(
         setState("idle");
         onComplete?.();
       }, SUCCESS_DWELL_MS);
-    } catch {
+    } catch (e) {
+      const kind: CaptureErrorKind = String(e).includes("screen-permission-missing")
+        ? "permission"
+        : "generic";
+      setErrorKind(kind);
       setState("error");
       setTimeout(() => {
         setState("idle");
         onComplete?.();
-      }, ERROR_DWELL_MS);
+      }, kind === "permission" ? PERMISSION_ERROR_DWELL_MS : ERROR_DWELL_MS);
     }
   }, [onSave, onComplete]);
 
-  return { state, runCapture };
+  return { state, errorKind, runCapture };
 }
 
 function detectContentType(md: string): Capture["content_type"] {

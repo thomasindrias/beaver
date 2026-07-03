@@ -60,4 +60,23 @@ describe("useBeaver", () => {
     expect(result.current.state).toBe("idle");
     vi.useRealTimers();
   });
+
+  it("flags a permission error so the toast can explain it", async () => {
+    invokeMock.mockRejectedValue("screen-permission-missing");
+    const { result } = renderHook(() => useBeaver());
+    await act(async () => {
+      await result.current.runCapture({ x: 0, y: 0, width: 10, height: 10 });
+    });
+    expect(result.current.state).toBe("error");
+    expect(result.current.errorKind).toBe("permission");
+  });
+
+  it("keeps generic errors generic", async () => {
+    invokeMock.mockRejectedValue("MLX request failed: boom");
+    const { result } = renderHook(() => useBeaver());
+    await act(async () => {
+      await result.current.runCapture({ x: 0, y: 0, width: 10, height: 10 });
+    });
+    expect(result.current.errorKind).toBe("generic");
+  });
 });
