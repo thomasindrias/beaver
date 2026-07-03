@@ -29,3 +29,8 @@ machine during normal use.
 The macOS build uses hardened-runtime entitlements needed for screen capture and
 the bundled Python/MLX runtime. Keep entitlement changes narrow and document the
 reason for any new permission.
+
+- Update visibility: Beaver asks `api.github.com` for the latest release tag at
+  most once per day, only when the popover opens. The request carries no
+  capture data or identifiers beyond a generic user agent, and
+  `BEAVER_DISABLE_UPDATE_CHECK=1` disables it entirely.
