@@ -346,7 +346,9 @@ async fn check_for_update(app: tauri::AppHandle) -> Option<update::UpdateInfo> {
     let cache = match cached {
         Some(c) if update::cache_is_fresh(c.checked_at, now) => c,
         _ => {
-            let (latest_tag, url) = update::fetch_latest().await?;
+            let (latest_tag, url) = update::fetch_latest().await.unwrap_or_default();
+            // Cache even a failed attempt (empty tag) so an offline machine
+            // retries at most once per interval instead of on every call.
             let c = update::CheckCache { checked_at: now, latest_tag, url };
             if let Ok(json) = serde_json::to_string(&c) {
                 let _ = std::fs::write(&cache_path, json);

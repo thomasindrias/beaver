@@ -50,9 +50,13 @@ pub fn cache_is_fresh(checked_at: u64, now: u64) -> bool {
     now.saturating_sub(checked_at) < CHECK_INTERVAL_SECS
 }
 
-/// Only ever open our own GitHub pages from the update pill.
+/// Only ever open our own GitHub pages from the update pill. The prefix must
+/// end at a path boundary so sibling repos (beaver-foo) don't slip through.
 pub fn allowed_external_url(url: &str) -> bool {
-    url.starts_with(ALLOWED_URL_PREFIX)
+    match url.strip_prefix(ALLOWED_URL_PREFIX) {
+        Some(rest) => rest.is_empty() || rest.starts_with('/'),
+        None => false,
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -104,6 +108,11 @@ mod tests {
     }
 
     #[test]
+    fn empty_latest_tag_is_never_newer() {
+        assert!(!is_newer("0.1.0", ""));
+    }
+
+    #[test]
     fn cache_freshness_boundary() {
         assert!(cache_is_fresh(1000, 1000 + CHECK_INTERVAL_SECS - 1));
         assert!(!cache_is_fresh(1000, 1000 + CHECK_INTERVAL_SECS));
@@ -114,6 +123,8 @@ mod tests {
         assert!(allowed_external_url(
             "https://github.com/thomasindrias/beaver/releases/tag/v0.2.0"
         ));
+        assert!(allowed_external_url(ALLOWED_URL_PREFIX));
+        assert!(!allowed_external_url("https://github.com/thomasindrias/beaver-evil"));
         assert!(!allowed_external_url("https://evil.example.com/"));
         assert!(!allowed_external_url("file:///etc/passwd"));
     }
