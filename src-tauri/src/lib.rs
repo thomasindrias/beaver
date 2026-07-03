@@ -343,13 +343,16 @@ async fn check_for_update(app: tauri::AppHandle) -> Option<update::UpdateInfo> {
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok());
 
-    let cache = match cached {
-        Some(c) if update::cache_is_fresh(c.checked_at, now) => c,
+    let cache = match &cached {
+        Some(c) if update::cache_is_fresh(c.checked_at, now) => c.clone(),
         _ => {
-            let (latest_tag, url) = update::fetch_latest().await.unwrap_or_default();
-            // Cache even a failed attempt (empty tag) so an offline machine
-            // retries at most once per interval instead of on every call.
-            let c = update::CheckCache { checked_at: now, latest_tag, url };
+            let fetched = update::fetch_latest().await;
+            // A failed fetch (`None`) keeps whatever was previously cached —
+            // see `merge_cache` — so one transient network blip doesn't hide
+            // an already-known newer version for up to 24h. Either way the
+            // cache is rewritten so an offline machine retries at most once
+            // per interval instead of on every call.
+            let c = update::merge_cache(cached.as_ref(), now, fetched);
             if let Ok(json) = serde_json::to_string(&c) {
                 let _ = std::fs::write(&cache_path, json);
             }

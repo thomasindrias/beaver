@@ -15,11 +15,32 @@ pub struct UpdateInfo {
     pub url: String,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Default)]
+#[derive(serde::Serialize, serde::Deserialize, Default, Clone)]
 pub struct CheckCache {
     pub checked_at: u64,
     pub latest_tag: String,
     pub url: String,
+}
+
+/// Fold a fetch attempt into the cache that gets written back to disk. A
+/// successful fetch replaces the tag/url outright; a failed one (`None`)
+/// keeps whatever was previously cached so a single transient network blip
+/// doesn't hide an already-known newer version for up to 24h — only
+/// `checked_at` advances, which is what keeps the throttle working.
+pub fn merge_cache(
+    previous: Option<&CheckCache>,
+    now: u64,
+    fetched: Option<(String, String)>,
+) -> CheckCache {
+    match fetched {
+        Some((latest_tag, url)) => CheckCache { checked_at: now, latest_tag, url },
+        None => {
+            let (latest_tag, url) = previous
+                .map(|c| (c.latest_tag.clone(), c.url.clone()))
+                .unwrap_or_default();
+            CheckCache { checked_at: now, latest_tag, url }
+        }
+    }
 }
 
 /// Parse "v1.2.3" / "1.2.3" / "1.2" into a comparable triple. Pre-release
@@ -51,8 +72,14 @@ pub fn cache_is_fresh(checked_at: u64, now: u64) -> bool {
 }
 
 /// Only ever open our own GitHub pages from the update pill. The prefix must
-/// end at a path boundary so sibling repos (beaver-foo) don't slip through.
+/// end at a path boundary so sibling repos (beaver-foo) don't slip through,
+/// and a `..` path segment anywhere is rejected outright so the boundary
+/// check can't be satisfied and then normalized away to an arbitrary
+/// github.com URL (e.g. `.../beaver/../evil`).
 pub fn allowed_external_url(url: &str) -> bool {
+    if url.split('/').any(|segment| segment == "..") {
+        return false;
+    }
     match url.strip_prefix(ALLOWED_URL_PREFIX) {
         Some(rest) => rest.is_empty() || rest.starts_with('/'),
         None => false,
@@ -127,5 +154,64 @@ mod tests {
         assert!(!allowed_external_url("https://github.com/thomasindrias/beaver-evil"));
         assert!(!allowed_external_url("https://evil.example.com/"));
         assert!(!allowed_external_url("file:///etc/passwd"));
+    }
+
+    #[test]
+    fn rejects_path_traversal_out_of_our_repo() {
+        assert!(!allowed_external_url(
+            "https://github.com/thomasindrias/beaver/../evil"
+        ));
+        assert!(allowed_external_url(
+            "https://github.com/thomasindrias/beaver/releases/tag/v0.1.0"
+        ));
+    }
+
+    #[test]
+    fn merge_cache_uses_fresh_fetch_when_it_succeeds() {
+        let previous = CheckCache {
+            checked_at: 1_000,
+            latest_tag: "v0.1.0".to_string(),
+            url: "https://github.com/thomasindrias/beaver/releases/tag/v0.1.0".to_string(),
+        };
+        let merged = merge_cache(
+            Some(&previous),
+            2_000,
+            Some((
+                "v0.2.0".to_string(),
+                "https://github.com/thomasindrias/beaver/releases/tag/v0.2.0".to_string(),
+            )),
+        );
+        assert_eq!(merged.checked_at, 2_000);
+        assert_eq!(merged.latest_tag, "v0.2.0");
+        assert_eq!(
+            merged.url,
+            "https://github.com/thomasindrias/beaver/releases/tag/v0.2.0"
+        );
+    }
+
+    #[test]
+    fn merge_cache_keeps_previous_tag_and_url_on_failed_fetch() {
+        let previous = CheckCache {
+            checked_at: 1_000,
+            latest_tag: "v0.2.0".to_string(),
+            url: "https://github.com/thomasindrias/beaver/releases/tag/v0.2.0".to_string(),
+        };
+        // A transient failure must not clobber the last-known newer version —
+        // only the throttle timestamp advances.
+        let merged = merge_cache(Some(&previous), 2_000, None);
+        assert_eq!(merged.checked_at, 2_000);
+        assert_eq!(merged.latest_tag, "v0.2.0");
+        assert_eq!(
+            merged.url,
+            "https://github.com/thomasindrias/beaver/releases/tag/v0.2.0"
+        );
+    }
+
+    #[test]
+    fn merge_cache_defaults_to_empty_on_failed_fetch_with_no_prior_cache() {
+        let merged = merge_cache(None, 2_000, None);
+        assert_eq!(merged.checked_at, 2_000);
+        assert_eq!(merged.latest_tag, "");
+        assert_eq!(merged.url, "");
     }
 }

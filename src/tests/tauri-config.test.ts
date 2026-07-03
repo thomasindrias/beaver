@@ -22,7 +22,8 @@ describe("tauri bundle config", () => {
 
   it("sets a strict CSP", () => {
     const csp = conf.app.security.csp;
-    expect(csp).toBeTruthy();
-    expect(csp).toContain("default-src 'self'");
+    expect(csp).toBe(
+      "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src ipc: http://ipc.localhost"
+    );
   });
 });
