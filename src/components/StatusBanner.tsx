@@ -31,7 +31,7 @@ export function StatusBanner() {
       } catch {
         // backend hiccup — keep polling
       }
-      timer = setTimeout(poll, 2000);
+      if (active) timer = setTimeout(poll, 2000);
     };
     poll();
     return () => {

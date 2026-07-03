@@ -44,4 +44,13 @@ describe("StatusBanner", () => {
     fireEvent.click(screen.getByRole("button", { name: /retry/i }));
     await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("retry_setup"));
   });
+
+  it("prioritizes the permission banner over a setup error", async () => {
+    mockBackend({ granted: false, phase: "error", detail: "Setup failed." });
+    render(<StatusBanner />);
+
+    expect(await screen.findByText(/screen recording is off/i)).toBeInTheDocument();
+    expect(screen.queryByText(/setup failed/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
+  });
 });
