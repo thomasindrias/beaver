@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface UpdateInfo {
   version: string;
@@ -12,9 +13,24 @@ export function UpdatePill() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
 
   useEffect(() => {
-    invoke<UpdateInfo | null>("check_for_update")
-      .then(setUpdate)
-      .catch(() => {});
+    const check = () => {
+      invoke<UpdateInfo | null>("check_for_update")
+        .then(setUpdate)
+        .catch(() => {});
+    };
+
+    check();
+
+    // The popover window is hidden/shown for the app's whole lifetime rather
+    // than recreated, so a mount-only check would never fire again. Re-check
+    // on every focus; the 24h cache on the Rust side keeps the network call
+    // itself throttled.
+    const unlisten = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (focused) check();
+    });
+    return () => {
+      unlisten.then(f => f());
+    };
   }, []);
 
   if (!update) return null;

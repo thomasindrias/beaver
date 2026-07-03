@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AlertCircle, MonitorUp } from "lucide-react";
 
 interface StatusReport {
@@ -18,6 +19,12 @@ export function StatusBanner() {
   useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
+    // True once the loop has gone quiet because everything looked healthy.
+    // The popover window lives for the app's whole lifetime, so without a
+    // way to resume, a permission revoked or model crash after that point
+    // would never be surfaced again — only a focus event restarts it.
+    let stopped = false;
+
     const poll = async () => {
       try {
         const [ok, s] = await Promise.all([
@@ -27,16 +34,28 @@ export function StatusBanner() {
         if (!active) return;
         setGranted(ok);
         setStatus(s);
-        if (ok && s.phase === "ready") return; // healthy — stop polling
+        if (ok && s.phase === "ready") {
+          stopped = true;
+          return; // healthy — stop polling until focus resumes it
+        }
       } catch {
         // backend hiccup — keep polling
       }
       if (active) timer = setTimeout(poll, 2000);
     };
     poll();
+
+    const unlisten = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (focused && active && stopped) {
+        stopped = false;
+        poll();
+      }
+    });
+
     return () => {
       active = false;
       clearTimeout(timer);
+      unlisten.then(f => f());
     };
   }, []);
 
