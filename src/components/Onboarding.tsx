@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { BeaverAnimation } from "./BeaverAnimation";
 import { Kbd } from "./Kbd";
 import { ModelDownload } from "./ModelDownload";
+import { PermissionStep } from "./PermissionStep";
 
-type Step = "welcome" | "download" | "ready";
+type Step = "welcome" | "download" | "permission" | "ready";
 
 // Time the "You're all set" screen stays up before we close onboarding and pop
 // open the menu-bar window, so the user sees where Beaver now lives.
@@ -20,7 +21,12 @@ const FEATURES = [
 
 export function Onboarding() {
   const [step, setStep] = useState<Step>("welcome");
-  const handleDownloadComplete = useCallback(() => setStep("ready"), []);
+  const handleDownloadComplete = useCallback(async () => {
+    // If Screen Recording is already granted (or the check fails), skip the
+    // permission detour — the guard at capture time is the safety net.
+    const granted = await invoke<boolean>("screen_permission_granted").catch(() => true);
+    setStep(granted ? "ready" : "permission");
+  }, []);
 
   // Closes the onboarding window and opens the popover at the menu bar.
   const finish = useCallback(() => {
@@ -90,6 +96,12 @@ export function Onboarding() {
       {step === "download" && (
         <div key="download" className="animate-rise flex flex-1 flex-col items-center justify-center text-center">
           <ModelDownload onComplete={handleDownloadComplete} />
+        </div>
+      )}
+
+      {step === "permission" && (
+        <div key="permission" className="animate-rise flex flex-1 flex-col items-center justify-center text-center">
+          <PermissionStep />
         </div>
       )}
 

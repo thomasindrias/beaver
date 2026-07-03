@@ -1,6 +1,7 @@
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::{Child, Command};
+use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 
 use tauri::Manager;
@@ -28,6 +29,29 @@ pub struct MlxServer {
     pub port: u16,
     pub child: Mutex<Option<Child>>,
     pub phase: Mutex<SetupPhase>,
+    /// Short user-readable reason when phase == Failed.
+    pub failure: Mutex<Option<String>>,
+    /// Guards against stacked setup threads on rapid retries.
+    pub setup_running: AtomicBool,
+}
+
+impl MlxServer {
+    pub fn new(port: u16) -> Self {
+        Self {
+            port,
+            child: Mutex::new(None),
+            phase: Mutex::new(SetupPhase::BuildingEnv),
+            failure: Mutex::new(None),
+            setup_running: AtomicBool::new(false),
+        }
+    }
+
+    /// Record a setup failure with a reason the UI can show.
+    pub fn fail(&self, msg: String) {
+        log::error!("setup failed: {msg}");
+        *self.failure.lock().unwrap() = Some(msg);
+        *self.phase.lock().unwrap() = SetupPhase::Failed;
+    }
 }
 
 /// Bind to port 0 to let the OS pick a free port, then drop the listener so the
@@ -43,6 +67,10 @@ fn app_data(app: &tauri::AppHandle) -> PathBuf {
     app.path()
         .app_data_dir()
         .expect("app data dir must resolve")
+}
+
+pub fn update_cache_path(app: &tauri::AppHandle) -> PathBuf {
+    app_data(app).join("update-check.json")
 }
 
 pub fn venv_python(app: &tauri::AppHandle) -> PathBuf {
@@ -81,7 +109,31 @@ pub fn setup_is_complete(app: &tauri::AppHandle) -> bool {
 
 pub fn mark_setup_complete(app: &tauri::AppHandle) {
     if let Err(e) = std::fs::write(setup_marker(app), b"1") {
-        eprintln!("Beaver: failed to write setup marker: {e}");
+        log::error!("failed to write setup marker: {e}");
+    }
+}
+
+/// Marker asking the next launch to open the popover once — written just
+/// before the post-permission relaunch so the user isn't dropped into a
+/// silent menu-bar app.
+fn permission_relaunch_marker(app: &tauri::AppHandle) -> PathBuf {
+    app_data(app).join(".post-permission-relaunch")
+}
+
+pub fn mark_permission_relaunch(app: &tauri::AppHandle) {
+    if let Err(e) = std::fs::write(permission_relaunch_marker(app), b"1") {
+        log::error!("failed to write relaunch marker: {e}");
+    }
+}
+
+/// Consume the marker: true exactly once after a permission relaunch.
+pub fn take_permission_relaunch(app: &tauri::AppHandle) -> bool {
+    let p = permission_relaunch_marker(app);
+    if p.exists() {
+        let _ = std::fs::remove_file(&p);
+        true
+    } else {
+        false
     }
 }
 
@@ -142,7 +194,7 @@ pub fn build_env(app: &tauri::AppHandle) -> Result<(), String> {
         ));
     }
 
-    let req = resolve_resource(app, "requirements.txt");
+    let req = resolve_resource(app, "requirements.lock");
     let install = uv_command(app)
         .args(["pip", "install", "--python"])
         .arg(venv_python(app))
@@ -161,18 +213,70 @@ pub fn build_env(app: &tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Argument vector for the MLX server process. Extracted for testability.
+pub fn server_args(script: &std::path::Path, port: u16, parent_pid: u32) -> Vec<String> {
+    vec![
+        script.to_string_lossy().into_owned(),
+        "--port".into(),
+        port.to_string(),
+        "--parent-pid".into(),
+        parent_pid.to_string(),
+    ]
+}
+
 /// Spawn the MLX server using the venv's Python, with HF_HOME pinned to the
-/// app-data cache. Returns the child handle to be held in managed state.
+/// app-data cache and stdout/stderr appended to mlx-server.log so first-run
+/// failures are diagnosable in the field. Returns the child handle.
 pub fn spawn_server(app: &tauri::AppHandle, port: u16) -> Result<Child, String> {
     let python = venv_python(app);
     let script = resolve_resource(app, "mlx_server.py");
-    Command::new(python)
-        .arg(script)
-        .arg("--port")
-        .arg(port.to_string())
-        .env("HF_HOME", hf_home(app))
-        .spawn()
-        .map_err(|e| format!("failed to spawn MLX server: {e}"))
+    let mut cmd = Command::new(python);
+    cmd.args(server_args(&script, port, std::process::id()))
+        .env("HF_HOME", hf_home(app));
+
+    // Best-effort log capture: a failure to open the log file must not block
+    // the server itself.
+    if let Ok(log_dir) = app.path().app_log_dir() {
+        if std::fs::create_dir_all(&log_dir).is_ok() {
+            if let Ok(file) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(log_dir.join("mlx-server.log"))
+            {
+                if let Ok(err_file) = file.try_clone() {
+                    cmd.stdout(std::process::Stdio::from(file))
+                        .stderr(std::process::Stdio::from(err_file));
+                }
+            }
+        }
+    }
+
+    cmd.spawn().map_err(|e| format!("failed to spawn MLX server: {e}"))
+}
+
+/// First-run setup needs venv (~2 GB) + model (~3 GB) + headroom.
+pub const SETUP_DISK_NEEDED_BYTES: u64 = 8 * 1024 * 1024 * 1024;
+
+pub fn disk_has_room(available: u64) -> bool {
+    available >= SETUP_DISK_NEEDED_BYTES
+}
+
+pub fn insufficient_disk_message() -> String {
+    "Beaver needs about 8 GB free to set up its on-device model. \
+     Free up space and try again."
+        .to_string()
+}
+
+/// Fail fast (with a clear reason) when the disk can't hold the first-run
+/// setup, instead of dying mid-download. A failure to *measure* free space is
+/// not fatal — setup proceeds and any real ENOSPC surfaces later.
+pub fn preflight_disk(app: &tauri::AppHandle) -> Result<(), String> {
+    let data = app_data(app);
+    std::fs::create_dir_all(&data).map_err(|e| format!("create app data dir: {e}"))?;
+    match fs4::available_space(&data) {
+        Ok(avail) if !disk_has_room(avail) => Err(insufficient_disk_message()),
+        _ => Ok(()),
+    }
 }
 
 #[cfg(test)]
@@ -194,5 +298,47 @@ mod tests {
         let a = free_port().unwrap();
         let b = free_port().unwrap();
         assert!(a > 0 && b > 0);
+    }
+
+    #[test]
+    fn server_args_include_port_and_parent_pid() {
+        let args = server_args(std::path::Path::new("/x/mlx_server.py"), 11500, 4242);
+        assert_eq!(
+            args,
+            vec![
+                "/x/mlx_server.py".to_string(),
+                "--port".to_string(),
+                "11500".to_string(),
+                "--parent-pid".to_string(),
+                "4242".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn new_mlx_server_starts_in_building_env_with_no_failure() {
+        let s = MlxServer::new(11500);
+        assert_eq!(*s.phase.lock().unwrap(), SetupPhase::BuildingEnv);
+        assert!(s.failure.lock().unwrap().is_none());
+        assert!(!s.setup_running.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
+    #[test]
+    fn fail_sets_phase_and_stores_reason() {
+        let s = MlxServer::new(11500);
+        s.fail("network burped".to_string());
+        assert_eq!(*s.phase.lock().unwrap(), SetupPhase::Failed);
+        assert_eq!(s.failure.lock().unwrap().as_deref(), Some("network burped"));
+    }
+
+    #[test]
+    fn disk_has_room_boundary() {
+        assert!(disk_has_room(SETUP_DISK_NEEDED_BYTES));
+        assert!(!disk_has_room(SETUP_DISK_NEEDED_BYTES - 1));
+    }
+
+    #[test]
+    fn insufficient_disk_message_names_the_size() {
+        assert!(insufficient_disk_message().contains("8 GB"));
     }
 }

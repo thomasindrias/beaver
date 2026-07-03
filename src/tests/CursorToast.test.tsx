@@ -64,6 +64,11 @@ describe("CursorToast", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("explains the fix when the error is a missing permission", () => {
+    render(<CursorToast state="error" errorKind="permission" origin={{ x: 0, y: 0 }} />);
+    expect(screen.getByText(/screen recording access/i)).toBeInTheDocument();
+  });
+
   it("anchors near the origin point", () => {
     const { container } = render(
       <CursorToast state="processing" origin={{ x: 120, y: 80 }} />

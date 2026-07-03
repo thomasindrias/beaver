@@ -1,8 +1,10 @@
 mod capture;
 mod db;
 mod mlx;
+mod permission;
 mod server;
 mod shortcut;
+mod update;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::sync::Mutex;
@@ -26,7 +28,7 @@ fn apply_popover_vibrancy(window: &tauri::WebviewWindow) {
         Some(NSVisualEffectState::Active),
         Some(18.0),
     ) {
-        eprintln!("Beaver: failed to apply vibrancy: {e}");
+        log::warn!("failed to apply vibrancy: {e}");
     }
 }
 
@@ -47,6 +49,19 @@ fn force_onboarding_enabled() -> bool {
 pub fn run() {
     tauri::Builder::default()
         .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                        file_name: Some("beaver".into()),
+                    }),
+                ])
+                .level(log::LevelFilter::Info)
+                .max_file_size(5_000_000)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
+                .build(),
+        )
+        .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:beaver.db", db::migrations())
                 .build(),
@@ -54,6 +69,12 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
+            log::info!(
+                "Beaver v{} starting; logs in {:?}",
+                app.package_info().version,
+                app.path().app_log_dir().ok()
+            );
+
             #[cfg(target_os = "macos")]
             let _ = app.handle().set_activation_policy(tauri::ActivationPolicy::Accessory);
 
@@ -108,113 +129,47 @@ pub fn run() {
             // Pick a free localhost port and register server state up front so
             // commands can read it immediately.
             let port = server::free_port().unwrap_or(11500);
-            app.manage(server::MlxServer {
-                port,
-                child: Mutex::new(None),
-                phase: Mutex::new(server::SetupPhase::BuildingEnv),
-            });
+            app.manage(server::MlxServer::new(port));
+
+            // Show onboarding immediately when the model isn't cached yet, so the
+            // user watches setup progress instead of a blank app. Created here
+            // (on the main thread, since `.setup` already runs there) rather than
+            // inside the setup worker, so onboarding shows up exactly once per
+            // launch regardless of how many times setup itself is retried.
+            let first_launch = !server::setup_is_complete(app.handle()) || force_onboarding_enabled();
+            if first_launch {
+                let h = app.handle().clone();
+                let mut builder = tauri::WebviewWindowBuilder::new(
+                    &h,
+                    "onboarding",
+                    tauri::WebviewUrl::App("/".into()),
+                )
+                .title("Welcome to Beaver")
+                .inner_size(480.0, 640.0)
+                .center();
+                // Borderless chrome: let the dark UI fill to the top edge with the
+                // traffic lights floating over it, instead of a white system title
+                // bar.
+                #[cfg(target_os = "macos")]
+                {
+                    builder = builder
+                        .hidden_title(true)
+                        .title_bar_style(tauri::TitleBarStyle::Overlay);
+                }
+                if let Err(e) = builder.build() {
+                    log::error!("failed to create onboarding window: {e}");
+                }
+            }
 
             // Build the venv (first run only), spawn the server, and poll it to
             // readiness — all off the main thread so the tray is usable at once.
-            // Show onboarding immediately when the model isn't cached yet, so the
-            // user watches setup progress instead of a blank app.
-            let handle = app.handle().clone();
-            std::thread::spawn(move || {
-                let state = handle.state::<server::MlxServer>();
-                let first_launch = !server::setup_is_complete(&handle) || force_onboarding_enabled();
+            spawn_setup(app.handle().clone());
 
-                if first_launch {
-                    let h = handle.clone();
-                    let _ = handle.run_on_main_thread(move || {
-                        let mut builder = tauri::WebviewWindowBuilder::new(
-                            &h,
-                            "onboarding",
-                            tauri::WebviewUrl::App("/".into()),
-                        )
-                        .title("Welcome to Beaver")
-                        .inner_size(480.0, 640.0)
-                        .center();
-                        // Borderless chrome: let the dark UI fill to the top edge
-                        // with the traffic lights floating over it, instead of a
-                        // white system title bar.
-                        #[cfg(target_os = "macos")]
-                        {
-                            builder = builder
-                                .hidden_title(true)
-                                .title_bar_style(tauri::TitleBarStyle::Overlay);
-                        }
-                        let result = builder.build();
-                        if let Err(e) = result {
-                            eprintln!("Beaver: failed to create onboarding window: {e}");
-                        }
-                    });
-                }
-
-                if !server::env_is_ready(&handle) {
-                    *state.phase.lock().unwrap() = server::SetupPhase::BuildingEnv;
-                    if let Err(e) = server::build_env(&handle) {
-                        eprintln!("Beaver: MLX env build failed: {e}");
-                        *state.phase.lock().unwrap() = server::SetupPhase::Failed;
-                        return;
-                    }
-                }
-
-                *state.phase.lock().unwrap() = server::SetupPhase::StartingServer;
-                match server::spawn_server(&handle, state.port) {
-                    Ok(child) => {
-                        *state.child.lock().unwrap() = Some(child);
-                    }
-                    Err(e) => {
-                        eprintln!("Beaver: failed to spawn MLX server: {e}");
-                        *state.phase.lock().unwrap() = server::SetupPhase::Failed;
-                        return;
-                    }
-                }
-
-                // Poll to readiness. Do NOT impose a wall-clock deadline while the
-                // server is reachable and reports progress — the first run can
-                // download a few hundred MB of deps plus a ~3 GB model on a slow
-                // link. Only fail if the server stays UNREACHABLE for a sustained
-                // window (the process likely died), with a generous absolute cap
-                // as a final backstop.
-                let started = std::time::Instant::now();
-                let mut last_reachable = std::time::Instant::now();
-                let unreachable_grace = std::time::Duration::from_secs(60);
-                let absolute_cap = std::time::Duration::from_secs(3600);
-                loop {
-                    match tauri::async_runtime::block_on(mlx::health(state.port)) {
-                        Ok(h) => {
-                            last_reachable = std::time::Instant::now();
-                            match h.status {
-                                mlx::ServerStatus::Ready => {
-                                    *state.phase.lock().unwrap() = server::SetupPhase::ServerUp;
-                                    server::mark_setup_complete(&handle);
-                                    break;
-                                }
-                                mlx::ServerStatus::Error => {
-                                    *state.phase.lock().unwrap() = server::SetupPhase::Failed;
-                                    break;
-                                }
-                                // downloading / loading — keep waiting.
-                                _ => {}
-                            }
-                        }
-                        Err(_) => {
-                            if last_reachable.elapsed() > unreachable_grace {
-                                eprintln!("Beaver: MLX server unreachable — giving up");
-                                *state.phase.lock().unwrap() = server::SetupPhase::Failed;
-                                break;
-                            }
-                        }
-                    }
-                    if started.elapsed() > absolute_cap {
-                        eprintln!("Beaver: MLX server setup exceeded the time cap");
-                        *state.phase.lock().unwrap() = server::SetupPhase::Failed;
-                        break;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-                }
-            });
+            // After the permission relaunch, surface the popover once so the
+            // user lands somewhere instead of a silent menu-bar app.
+            if server::take_permission_relaunch(app.handle()) {
+                open_popover_at_menubar(app.handle());
+            }
 
             Ok(())
         })
@@ -222,7 +177,14 @@ pub fn run() {
             capture_and_extract,
             mlx_status,
             write_to_clipboard,
-            finish_onboarding
+            finish_onboarding,
+            retry_setup,
+            screen_permission_granted,
+            request_screen_permission,
+            open_screen_recording_settings,
+            relaunch_app,
+            check_for_update,
+            open_external
         ])
         .build(tauri::generate_context!())
         .expect("error while building Beaver")
@@ -249,17 +211,217 @@ pub fn run() {
         });
 }
 
+/// Build the env (first run), spawn the MLX server, and poll it to readiness —
+/// all off the main thread. Re-runnable: `retry_setup` calls this again after a
+/// failure. The `setup_running` flag makes concurrent calls a no-op.
+fn spawn_setup(handle: tauri::AppHandle) {
+    {
+        let state = handle.state::<server::MlxServer>();
+        if state
+            .setup_running
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            return; // a setup pass is already in flight
+        }
+        *state.failure.lock().unwrap() = None;
+        *state.phase.lock().unwrap() = server::SetupPhase::BuildingEnv;
+        // A retry after a spawn-then-crash leaves a stale child; reap it.
+        if let Ok(mut guard) = state.child.lock() {
+            if let Some(mut child) = guard.take() {
+                let _ = child.kill();
+            }
+        };
+    }
+
+    std::thread::spawn(move || {
+        // Clear the running flag on every exit path, including panics —
+        // otherwise a single panicked setup pass would permanently disable
+        // retry_setup for the rest of the process's life.
+        struct ClearRunningOnExit(tauri::AppHandle);
+        impl Drop for ClearRunningOnExit {
+            fn drop(&mut self) {
+                let state = self.0.state::<server::MlxServer>();
+                state
+                    .setup_running
+                    .store(false, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+        let _clear_running = ClearRunningOnExit(handle.clone());
+
+        let state = handle.state::<server::MlxServer>();
+
+        if !server::env_is_ready(&handle) {
+            if let Err(msg) = server::preflight_disk(&handle) {
+                state.fail(msg);
+                return;
+            }
+            if let Err(e) = server::build_env(&handle) {
+                state.fail(format!(
+                    "Couldn't prepare the on-device Python environment. Check your \
+                     internet connection and try again. ({e})"
+                ));
+                return;
+            }
+        }
+
+        *state.phase.lock().unwrap() = server::SetupPhase::StartingServer;
+        match server::spawn_server(&handle, state.port) {
+            Ok(child) => {
+                *state.child.lock().unwrap() = Some(child);
+            }
+            Err(e) => {
+                state.fail(format!("Couldn't start the on-device model server. ({e})"));
+                return;
+            }
+        }
+
+        // Poll to readiness (same policy as before: no wall-clock deadline while
+        // reachable; fail on sustained unreachability, with an absolute cap).
+        let started = std::time::Instant::now();
+        let mut last_reachable = std::time::Instant::now();
+        let unreachable_grace = std::time::Duration::from_secs(60);
+        let absolute_cap = std::time::Duration::from_secs(3600);
+        loop {
+            match tauri::async_runtime::block_on(mlx::health(state.port)) {
+                Ok(h) => {
+                    last_reachable = std::time::Instant::now();
+                    match h.status {
+                        mlx::ServerStatus::Ready => {
+                            *state.phase.lock().unwrap() = server::SetupPhase::ServerUp;
+                            server::mark_setup_complete(&handle);
+                            break;
+                        }
+                        mlx::ServerStatus::Error => {
+                            state.fail(
+                                "The on-device model failed to load. Try again — the \
+                                 log file has details."
+                                    .to_string(),
+                            );
+                            break;
+                        }
+                        _ => {} // downloading / loading — keep waiting
+                    }
+                }
+                Err(_) => {
+                    if last_reachable.elapsed() > unreachable_grace {
+                        state.fail(
+                            "Lost contact with the on-device model server. Check your \
+                             internet connection and try again."
+                                .to_string(),
+                        );
+                        break;
+                    }
+                }
+            }
+            if started.elapsed() > absolute_cap {
+                state.fail("Setup took too long and was stopped. Try again.".to_string());
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+    });
+}
+
+#[tauri::command]
+fn retry_setup(app: tauri::AppHandle) {
+    spawn_setup(app);
+}
+
+#[tauri::command]
+async fn check_for_update(app: tauri::AppHandle) -> Option<update::UpdateInfo> {
+    if is_truthy(std::env::var("BEAVER_DISABLE_UPDATE_CHECK").ok()) {
+        return None;
+    }
+    let current = app.package_info().version.to_string();
+    let cache_path = server::update_cache_path(&app);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs();
+
+    let cached: Option<update::CheckCache> = std::fs::read_to_string(&cache_path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok());
+
+    let cache = match &cached {
+        Some(c) if update::cache_is_fresh(c.checked_at, now) => c.clone(),
+        _ => {
+            let fetched = update::fetch_latest().await;
+            // A failed fetch (`None`) keeps whatever was previously cached —
+            // see `merge_cache` — so one transient network blip doesn't hide
+            // an already-known newer version for up to 24h. Either way the
+            // cache is rewritten so an offline machine retries at most once
+            // per interval instead of on every call.
+            let c = update::merge_cache(cached.as_ref(), now, fetched);
+            if let Ok(json) = serde_json::to_string(&c) {
+                let _ = std::fs::write(&cache_path, json);
+            }
+            c
+        }
+    };
+
+    if update::is_newer(&current, &cache.latest_tag) {
+        Some(update::UpdateInfo {
+            version: cache.latest_tag.trim_start_matches('v').to_string(),
+            url: cache.url,
+        })
+    } else {
+        None
+    }
+}
+
+#[tauri::command]
+fn open_external(url: String) -> Result<(), String> {
+    if !update::allowed_external_url(&url) {
+        return Err("blocked url".to_string());
+    }
+    std::process::Command::new("open")
+        .arg(url)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn screen_permission_granted() -> bool {
+    permission::screen_capture_granted()
+}
+
+#[tauri::command]
+fn request_screen_permission() -> bool {
+    permission::request_screen_capture()
+}
+
+#[tauri::command]
+fn open_screen_recording_settings() {
+    if let Err(e) = std::process::Command::new("open")
+        .arg(permission::SETTINGS_URL)
+        .spawn()
+    {
+        log::error!("failed to open System Settings: {e}");
+    }
+}
+
+#[tauri::command]
+fn relaunch_app(app: tauri::AppHandle) {
+    server::mark_permission_relaunch(&app);
+    app.restart();
+}
+
 #[derive(serde::Serialize)]
 struct MlxStatus {
     phase: String,
     /// Download progress 0.0–1.0 during the downloading phase; `None` otherwise.
     progress: Option<f64>,
+    /// User-readable failure reason when phase == "error"; `None` otherwise.
+    detail: Option<String>,
 }
 
 #[tauri::command]
 async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<MlxStatus, ()> {
     // Copy the cheap bits out before any await so we never hold the lock across it.
     let phase = *state.phase.lock().unwrap();
+    let detail = state.failure.lock().unwrap().clone();
     let port = state.port;
 
     let (label, progress) = match phase {
@@ -282,8 +444,9 @@ async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<MlxSta
         }
     };
     Ok(MlxStatus {
-        phase: label,
+        phase: label.clone(),
         progress,
+        detail: if label == "error" { detail } else { None },
     })
 }
 
@@ -295,6 +458,9 @@ async fn capture_and_extract(
     region: capture::CaptureRegion,
     state: tauri::State<'_, server::MlxServer>,
 ) -> Result<String, String> {
+    if !permission::screen_capture_granted() {
+        return Err(permission::PERMISSION_ERROR.to_string());
+    }
     let port = state.port;
     let bytes = capture::capture_region(&region).map_err(|e| e.to_string())?;
     let image_base64 = STANDARD.encode(&bytes);
@@ -308,11 +474,13 @@ async fn write_to_clipboard(app: tauri::AppHandle, text: String) -> Result<(), S
 }
 
 // End onboarding once setup is ready: surface the menu-bar popover so the user
-// discovers where Beaver lives, then close the onboarding window. Writing the
-// setup marker here is what keeps onboarding from reappearing on later launches.
+// discovers where Beaver lives, then close the onboarding window. The
+// setup-complete marker is written by the setup readiness poll (`spawn_setup`),
+// not here — this command only runs once the UI has already observed "ready",
+// so writing it again here would be redundant and, on a retry raced against a
+// still-failed setup, would wrongly mark an incomplete setup as done.
 #[tauri::command]
 fn finish_onboarding(app: tauri::AppHandle) {
-    server::mark_setup_complete(&app);
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         if let Some(w) = handle.get_webview_window("onboarding") {
@@ -381,7 +549,7 @@ fn popover_position_menubar(app: &tauri::AppHandle) -> tauri::LogicalPosition<f6
 fn toggle_popover(app: &tauri::AppHandle, icon_rect: Option<tauri::Rect>) {
     if let Some(w) = app.get_webview_window("popover") {
         if w.is_visible().unwrap_or(false) {
-            if let Err(e) = w.hide() { eprintln!("Beaver: failed to hide popover: {e}"); }
+            if let Err(e) = w.hide() { log::error!("failed to hide popover: {e}"); }
         } else {
             // If the window was just auto-hidden on focus loss (because this
             // very tray click stole focus), treat the click as a dismiss and
@@ -398,11 +566,11 @@ fn toggle_popover(app: &tauri::AppHandle, icon_rect: Option<tauri::Rect>) {
             }
             if let Some(rect) = icon_rect {
                 if let Err(e) = w.set_position(popover_position(app, rect)) {
-                    eprintln!("Beaver: failed to reposition popover: {e}");
+                    log::error!("failed to reposition popover: {e}");
                 }
             }
-            if let Err(e) = w.show() { eprintln!("Beaver: failed to show popover: {e}"); }
-            if let Err(e) = w.set_focus() { eprintln!("Beaver: failed to focus popover: {e}"); }
+            if let Err(e) = w.show() { log::error!("failed to show popover: {e}"); }
+            if let Err(e) = w.set_focus() { log::error!("failed to focus popover: {e}"); }
         }
         return;
     }
@@ -453,7 +621,7 @@ fn build_popover(app: &tauri::AppHandle, pos: Option<tauri::LogicalPosition<f64>
 
             let _ = window.set_focus();
         }
-        Err(e) => eprintln!("Beaver: failed to create popover window: {e}"),
+        Err(e) => log::error!("failed to create popover window: {e}"),
     }
 }
 
@@ -472,8 +640,8 @@ fn open_popover_at_menubar(app: &tauri::AppHandle) {
 
 fn show_capture_overlay(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("capture-overlay") {
-        if let Err(e) = w.show() { eprintln!("Beaver: failed to show capture overlay: {e}"); }
-        if let Err(e) = w.set_focus() { eprintln!("Beaver: failed to focus capture overlay: {e}"); }
+        if let Err(e) = w.show() { log::error!("failed to show capture overlay: {e}"); }
+        if let Err(e) = w.set_focus() { log::error!("failed to focus capture overlay: {e}"); }
         return;
     }
 
@@ -505,7 +673,7 @@ fn show_capture_overlay(app: &tauri::AppHandle) {
     .build();
 
     if let Err(e) = result {
-        eprintln!("Beaver: failed to create capture overlay: {e}");
+        log::error!("failed to create capture overlay: {e}");
     }
 }
 

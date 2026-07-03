@@ -62,3 +62,9 @@ jobs:
       - name: Run MLX server unit tests
         working-directory: src-tauri/resources
         run: uv run --no-project --with fastapi --with uvicorn --with pydantic --with tqdm python test_mlx_server.py
+
+      - name: Check Python lockfile resolves
+        working-directory: src-tauri/resources
+        run: |
+          uv venv /tmp/beaver-lock-check --python 3.12
+          uv pip install --python /tmp/beaver-lock-check/bin/python --dry-run -r requirements.lock

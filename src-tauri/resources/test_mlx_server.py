@@ -80,6 +80,15 @@ def test_resolve_model_downloads_when_not_cached():
     assert "tqdm_class" in calls[1]
 
 
+def test_parent_alive_true_for_current_ppid():
+    import os
+    assert m._parent_alive(os.getppid()) is True
+
+
+def test_parent_alive_false_for_other_pid():
+    assert m._parent_alive(1) is False
+
+
 if __name__ == "__main__":
     test_health_reflects_state()
     test_progress_aggregates_byte_bars()
@@ -88,4 +97,6 @@ if __name__ == "__main__":
     test_extract_raises_503_when_not_ready()
     test_resolve_model_skips_download_when_cached()
     test_resolve_model_downloads_when_not_cached()
+    test_parent_alive_true_for_current_ppid()
+    test_parent_alive_false_for_other_pid()
     print("OK")

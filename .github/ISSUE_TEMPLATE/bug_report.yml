@@ -1,0 +1,33 @@
+name: Bug report
+description: Something broke or behaved unexpectedly
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Beaver version
+      placeholder: "0.1.0 (menu-bar popover header, or the DMG filename)"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and chip
+      placeholder: "macOS 15.5, M2 Pro"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        Attach `beaver.log` and `mlx-server.log` from
+        `~/Library/Logs/se.djtl.beaver/` if you can — they contain no capture
+        content, only setup/runtime diagnostics.

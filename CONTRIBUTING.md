@@ -77,3 +77,22 @@ signed/notarized releases:
 Beaver is designed for local inference. Do not add network calls that can send
 captures, extracted text, or local history off-device without making the behavior
 explicit and user-controlled.
+
+## Python dependencies
+
+`src-tauri/resources/requirements.txt` is the human-edited source;
+`requirements.lock` is what ships. After changing requirements, regenerate:
+
+```bash
+cd src-tauri/resources
+uv pip compile requirements.txt -o requirements.lock --python-version 3.12
+```
+
+## Cutting a release
+
+1. Update the version in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`,
+   and `package.json`; add a `CHANGELOG.md` entry with the date.
+2. Merge to `main` with CI green.
+3. Run the **Release macOS** workflow with the tag (e.g. `v0.1.0`) — it builds,
+   signs, notarizes, and attaches the DMG to a draft release.
+4. Edit the draft's notes from the changelog and publish.

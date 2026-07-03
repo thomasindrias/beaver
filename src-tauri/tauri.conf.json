@@ -12,7 +12,7 @@
     "macOSPrivateApi": true,
     "windows": [],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src ipc: http://ipc.localhost"
     }
   },
   "bundle": {
@@ -33,7 +33,7 @@
     "resources": [
       "resources/uv",
       "resources/mlx_server.py",
-      "resources/requirements.txt"
+      "resources/requirements.lock"
     ]
   },
   "plugins": {}

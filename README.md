@@ -9,6 +9,10 @@ captures never leave your machine.
 > Apple Silicon only. The vision model runs on Apple's MLX framework, which
 > requires an M-series Mac.
 
+<!-- Demo assets: record with the capture flow + popover, save to docs/media/demo.gif, then uncomment.
+![Beaver turning a screenshot region into Markdown](docs/media/demo.gif)
+-->
+
 ## Install (macOS, Apple Silicon)
 
 1. Download `Beaver_<version>_aarch64.dmg`.
@@ -29,7 +33,9 @@ captures never leave your machine.
 
 On first launch Beaver downloads the ~3 GB vision model and prepares an
 on-device Python environment (the only time it needs the internet). A progress
-bar tracks the download; everything after runs offline.
+bar tracks the download; extraction then runs fully offline. The only later
+network call is an optional once-a-day version check against GitHub Releases
+(no capture data, ever) — set `BEAVER_DISABLE_UPDATE_CHECK=1` to turn it off.
 
 ## Stack
 
@@ -98,6 +104,15 @@ GitHub Actions includes:
 - `Release macOS` for manually building a DMG and optionally creating a draft
   GitHub release. It builds unsigned unless signing and notarization secrets are
   configured.
+
+## Troubleshooting
+
+- Logs live in `~/Library/Logs/se.djtl.beaver/` (`beaver.log` for the app,
+  `mlx-server.log` for the vision server). Attach both to bug reports.
+- If captures return a permission message, enable Beaver under
+  **System Settings → Privacy & Security → Screen Recording** and relaunch.
+- If setup fails, the onboarding screen shows the reason and a **Try again**
+  button; the menu-bar popover shows the same when Beaver is already set up.
 
 ## Security and Contributing
 

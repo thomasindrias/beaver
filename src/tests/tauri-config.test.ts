@@ -15,4 +15,15 @@ describe("tauri bundle config", () => {
   it("does not use Tauri's Finder-scripted dmg bundler", () => {
     expect(conf.bundle.macOS.dmg).toBeUndefined();
   });
+
+  it("bundles the pinned Python lockfile", () => {
+    expect(conf.bundle.resources).toContain("resources/requirements.lock");
+  });
+
+  it("sets a strict CSP", () => {
+    const csp = conf.app.security.csp;
+    expect(csp).toBe(
+      "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src ipc: http://ipc.localhost"
+    );
+  });
 });

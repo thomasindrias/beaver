@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { AlertCircle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,11 +22,14 @@ export function formatPhase(phase: string): string {
 interface StatusReport {
   phase: Phase;
   progress: number | null;
+  detail?: string | null;
 }
 
 export function ModelDownload({ onComplete }: Props) {
   const [phase, setPhase] = useState<Phase>("preparing");
   const [progress, setProgress] = useState<number | null>(null);
+  const [detail, setDetail] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -38,6 +41,7 @@ export function ModelDownload({ onComplete }: Props) {
         if (!active) return;
         setPhase(status.phase);
         setProgress(status.progress);
+        setDetail(status.detail ?? null);
         if (status.phase === "ready") {
           onComplete();
           return;
@@ -54,7 +58,15 @@ export function ModelDownload({ onComplete }: Props) {
       active = false;
       clearTimeout(timer);
     };
-  }, [onComplete]);
+  }, [onComplete, attempt]);
+
+  const retry = useCallback(async () => {
+    await invoke("retry_setup").catch(console.error);
+    setPhase("preparing");
+    setProgress(null);
+    setDetail(null);
+    setAttempt((a) => a + 1); // re-arms the polling effect
+  }, []);
 
   if (phase === "error") {
     return (
@@ -64,11 +76,11 @@ export function ModelDownload({ onComplete }: Props) {
         </div>
         <h2 className="text-lg font-semibold tracking-tight">Setup didn't finish</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Beaver couldn't finish setting up its local AI. Check your internet
-          connection and restart Beaver to try again.
+          {detail ??
+            "Beaver couldn't finish setting up its local AI. Check your internet connection and try again."}
         </p>
-        <Button className="mt-6 w-full" onClick={onComplete}>
-          Continue anyway
+        <Button className="mt-6 w-full" onClick={retry}>
+          Try again
         </Button>
       </div>
     );

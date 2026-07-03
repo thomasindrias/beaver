@@ -28,7 +28,7 @@ export default function App() {
     getCurrentWindow().close().catch(() => {});
   }, []);
 
-  const { state, runCapture } = useBeaver(saveCapture, closeWindow);
+  const { state, errorKind, runCapture } = useBeaver(saveCapture, closeWindow);
 
   // Keep the overlay window open to host the toast, but make it click-through
   // so it doesn't swallow clicks across the whole screen while processing —
@@ -47,7 +47,7 @@ export default function App() {
 
   if (view === "capture") {
     return origin
-      ? <CursorToast state={state} origin={origin} />
+      ? <CursorToast state={state} errorKind={errorKind} origin={origin} />
       : <CaptureOverlay onCapture={handleCapture} onCancel={handleCancel} />;
   }
 
