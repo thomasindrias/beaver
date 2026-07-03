@@ -4,6 +4,8 @@ import { useCaptures } from "../hooks/useCaptures";
 import { HistoryList } from "./HistoryList";
 import { Logo } from "./Logo";
 import { Kbd } from "./Kbd";
+import { StatusBanner } from "./StatusBanner";
+import { UpdatePill } from "./UpdatePill";
 
 export function TrayPopover() {
   const { captures, refresh } = useCaptures();
@@ -27,12 +29,16 @@ export function TrayPopover() {
       <header className="flex items-center gap-2.5 px-4 pb-3 pt-3.5">
         <Logo size={22} />
         <span className="text-[15px] font-semibold tracking-tight">Beaver</span>
-        <span className="ml-auto rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
-          {captures.length} {captures.length === 1 ? "capture" : "captures"}
-        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <UpdatePill />
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+            {captures.length} {captures.length === 1 ? "capture" : "captures"}
+          </span>
+        </div>
       </header>
 
       <div className="h-px bg-border" />
+      <StatusBanner />
 
       {/* History */}
       <div className="min-h-0 flex-1">
