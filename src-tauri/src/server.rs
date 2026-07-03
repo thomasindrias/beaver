@@ -69,6 +69,10 @@ fn app_data(app: &tauri::AppHandle) -> PathBuf {
         .expect("app data dir must resolve")
 }
 
+pub fn update_cache_path(app: &tauri::AppHandle) -> PathBuf {
+    app_data(app).join("update-check.json")
+}
+
 pub fn venv_python(app: &tauri::AppHandle) -> PathBuf {
     app_data(app).join(VENV_DIRNAME).join("bin").join("python")
 }

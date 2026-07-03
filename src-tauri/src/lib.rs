@@ -4,6 +4,7 @@ mod mlx;
 mod permission;
 mod server;
 mod shortcut;
+mod update;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::sync::Mutex;
@@ -181,7 +182,9 @@ pub fn run() {
             screen_permission_granted,
             request_screen_permission,
             open_screen_recording_settings,
-            relaunch_app
+            relaunch_app,
+            check_for_update,
+            open_external
         ])
         .build(tauri::generate_context!())
         .expect("error while building Beaver")
@@ -322,6 +325,56 @@ fn spawn_setup(handle: tauri::AppHandle) {
 #[tauri::command]
 fn retry_setup(app: tauri::AppHandle) {
     spawn_setup(app);
+}
+
+#[tauri::command]
+async fn check_for_update(app: tauri::AppHandle) -> Option<update::UpdateInfo> {
+    if is_truthy(std::env::var("BEAVER_DISABLE_UPDATE_CHECK").ok()) {
+        return None;
+    }
+    let current = app.package_info().version.to_string();
+    let cache_path = server::update_cache_path(&app);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs();
+
+    let cached: Option<update::CheckCache> = std::fs::read_to_string(&cache_path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok());
+
+    let cache = match cached {
+        Some(c) if update::cache_is_fresh(c.checked_at, now) => c,
+        _ => {
+            let (latest_tag, url) = update::fetch_latest().await?;
+            let c = update::CheckCache { checked_at: now, latest_tag, url };
+            if let Ok(json) = serde_json::to_string(&c) {
+                let _ = std::fs::write(&cache_path, json);
+            }
+            c
+        }
+    };
+
+    if update::is_newer(&current, &cache.latest_tag) {
+        Some(update::UpdateInfo {
+            version: cache.latest_tag.trim_start_matches('v').to_string(),
+            url: cache.url,
+        })
+    } else {
+        None
+    }
+}
+
+#[tauri::command]
+fn open_external(url: String) -> Result<(), String> {
+    if !update::allowed_external_url(&url) {
+        return Err("blocked url".to_string());
+    }
+    std::process::Command::new("open")
+        .arg(url)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
