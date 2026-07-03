@@ -33,7 +33,7 @@
     "resources": [
       "resources/uv",
       "resources/mlx_server.py",
-      "resources/requirements.txt"
+      "resources/requirements.lock"
     ]
   },
   "plugins": {}

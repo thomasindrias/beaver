@@ -15,4 +15,8 @@ describe("tauri bundle config", () => {
   it("does not use Tauri's Finder-scripted dmg bundler", () => {
     expect(conf.bundle.macOS.dmg).toBeUndefined();
   });
+
+  it("bundles the pinned Python lockfile", () => {
+    expect(conf.bundle.resources).toContain("resources/requirements.lock");
+  });
 });

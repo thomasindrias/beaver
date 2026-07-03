@@ -194,7 +194,7 @@ pub fn build_env(app: &tauri::AppHandle) -> Result<(), String> {
         ));
     }
 
-    let req = resolve_resource(app, "requirements.txt");
+    let req = resolve_resource(app, "requirements.lock");
     let install = uv_command(app)
         .args(["pip", "install", "--python"])
         .arg(venv_python(app))
