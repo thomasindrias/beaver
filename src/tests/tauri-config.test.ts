@@ -19,4 +19,10 @@ describe("tauri bundle config", () => {
   it("bundles the pinned Python lockfile", () => {
     expect(conf.bundle.resources).toContain("resources/requirements.lock");
   });
+
+  it("sets a strict CSP", () => {
+    const csp = conf.app.security.csp;
+    expect(csp).toBeTruthy();
+    expect(csp).toContain("default-src 'self'");
+  });
 });
