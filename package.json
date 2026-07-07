@@ -2,6 +2,7 @@
   "name": "beaver",
   "private": true,
   "version": "0.1.0",
+  "description": "A macOS menu-bar utility that turns a screenshot into structured Markdown, fully on-device.",
   "license": "MIT",
   "packageManager": "pnpm@11.7.0",
   "repository": {
