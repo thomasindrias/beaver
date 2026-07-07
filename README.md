@@ -9,9 +9,7 @@ captures never leave your machine.
 > Apple Silicon only. The vision model runs on Apple's MLX framework, which
 > requires an M-series Mac.
 
-<!-- Demo assets: record with the capture flow + popover, save to docs/media/demo.gif, then uncomment.
 ![Beaver turning a screenshot region into Markdown](docs/media/demo.gif)
--->
 
 ## Install (macOS, Apple Silicon)
 
