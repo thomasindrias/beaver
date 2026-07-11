@@ -145,10 +145,25 @@ Beaver stops being a utility and becomes infrastructure.
 core extraction is visibly better than the free alternatives. Live Text is
 the bar; "structure survives" is the pitch.
 
+## Monetization: one-time payment
+
+Direction (2026-07-10): **one-time purchase, no subscription.** Beaver's
+local-first architecture means zero marginal cost per user — no server bill
+forcing recurring revenue — and BYO cloud keys keep any API cost on the user.
+A lifetime license is both sustainable and on-message: *pay once, it's yours,
+runs on your machine.*
+
+Model: **pay for the built app, build from source for free.** The signed,
+notarized, auto-updating DMG is the paid artifact; the MIT repo stays open
+and self-buildable (à la Aseprite). The purchase buys convenience and trust,
+not artificial locks.
+
+Still open: price point, where the paywall starts (paid from v1.0 vs paid
+from the start), and license-key mechanics (prefer offline validation —
+phoning home for a license would undercut the privacy story).
+
 ## Open questions
 
-- **Monetization:** stay free OSS (reputation project) vs free core + paid
-  pro tier (presets/integrations). No decision needed before Phase 2.
 - **HUD hint semantics:** does the one-line hint re-run locally only, or may
   it use the cloud engine when configured? (Leaning: same engine as the
   original capture.)
