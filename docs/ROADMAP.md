@@ -108,6 +108,18 @@ These were discussed and settled (2026-07-10):
   reverse). Open and close are one continuous toggle of the same pill.
   `1–4` jump straight to a format, `/` opens custom. `Esc` backs out one
   level: input → chips → dismissed.
+  *Processing and errors live in the same pill*, with one shared grammar:
+  leading icon slot, text line, and at most one round amber action chip on
+  the right edge (the same position as the sparkle submit — "the thing on
+  the right is the action" holds in every state). Processing shows an amber
+  spinner with the rotating beaver one-liners (crossfade ~1.1s) and resolves
+  in place to the state-1 copied pill — one continuous container from drag
+  to result. Extraction errors show a soft-red triangle, "Dam — couldn't
+  read that", and a retry chip that re-runs the **same region without
+  re-dragging** (Enter retries, Esc dismisses). Permission errors show a
+  lock, "Needs Screen Recording access", and a settings chip that opens
+  System Settings; longer dwell. Red appears only in the icon — the pill
+  stays neutral so errors read calm.
   No printed keyboard legends, no format labels, no follow-up thread. The
   engine indicator (🔒/☁️) appears only inside the expanded state once BYO
   cloud ships. Modernity comes from one continuous pill morphing
