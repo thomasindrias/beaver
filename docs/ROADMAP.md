@@ -91,15 +91,18 @@ These were discussed and settled (2026-07-10):
      format chips (Markdown / table / JSON / plain), a hairline divider, then
      a **custom chip** (sparkles). Format switches re-render the same capture
      and re-copy instantly.
-  3. *Custom chip (or `/`):* the pill stretches **horizontally** — the chip
-     row swaps out in place for a single-line input that grows sideways,
-     ending in a round amber submit icon. The container never stops being a
-     pill. Focus lands in the input; Enter or pressing the submit icon runs
-     it; the extraction re-runs once and the HUD collapses back to the
-     state-1 pill with the new result. The reflex always ends closed.
-  Keyboard: `Tab` cycles focus through the chips (wrapping), Enter/Space
-  activates the focused chip, `1–4` jump straight to a format, `/` jumps
-  straight to custom. `Esc` backs out one level: input → chips → dismissed.
+  3. *Custom chip (or `/`):* the pill stretches **horizontally** — the four
+     format chips collapse away and a single-line input grows into their
+     space, while the sparkle chip stays planted on the right edge and turns
+     amber: **the sparkle is the submit button**. The container never stops
+     being a pill and nothing changes sides. Focus lands in the input; Enter
+     or pressing the sparkle runs it; the extraction re-runs once and the HUD
+     collapses back to the state-1 pill with the new result. The reflex
+     always ends closed.
+  Keyboard: `Tab` switches the active format directly (wrapping;
+  `Shift+Tab` reverses) — the amber active chip *is* the focus state, no
+  separate focus ring. `1–4` jump straight to a format, `/` opens custom.
+  `Esc` backs out one level: input → chips → dismissed.
   No printed keyboard legends, no format labels, no follow-up thread. The
   engine indicator (🔒/☁️) appears only inside the expanded state once BYO
   cloud ships. Modernity comes from one continuous pill morphing
