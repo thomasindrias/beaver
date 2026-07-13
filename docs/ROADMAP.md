@@ -99,10 +99,14 @@ These were discussed and settled (2026-07-10):
      or pressing the sparkle runs it; the extraction re-runs once and the HUD
      collapses back to the state-1 pill with the new result. The reflex
      always ends closed.
-  Keyboard: `Tab` switches the active format directly (wrapping;
-  `Shift+Tab` reverses) — the amber active chip *is* the focus state, no
-  separate focus ring. `1–4` jump straight to a format, `/` opens custom.
-  `Esc` backs out one level: input → chips → dismissed.
+  Keyboard: `Tab` cycles through all five chips (wrapping; `Shift+Tab`
+  reverses). On a format chip it switches the format directly — the amber
+  active chip *is* the focus state, no separate focus ring. On the sparkle
+  the amber moves to the sparkle (the applied format dims to a faint
+  highlight so it stays legible) and Enter/Space opens the input — landing
+  on it never auto-opens, so cycling past is safe. `1–4` jump straight to a
+  format, `/` opens custom. `Esc` backs out one level: input → chips →
+  dismissed.
   No printed keyboard legends, no format labels, no follow-up thread. The
   engine indicator (🔒/☁️) appears only inside the expanded state once BYO
   cloud ships. Modernity comes from one continuous pill morphing
