@@ -87,17 +87,22 @@ These were discussed and settled (2026-07-10):
   1. *Default:* a single pill — `✓ Copied as table` — confirming the copy and
      the detected content type. Auto-fades. Most captures end here with no
      visible controls.
-  2. *Hover or `1–4`:* the pill morphs into four icon-only format chips
-     (Markdown / table / JSON / plain); switching re-renders the same capture
-     and re-copies.
-  3. *Press `/`:* the chips swap for a single hint line (e.g. "headers are
-     dates") that re-runs the extraction once, then collapses back to the
-     pill. The hint *replaces* the chips — the HUD is never two rows tall.
-  `Esc` dismisses at any point. No printed keyboard legends, no format
-  labels, no follow-up thread. The engine indicator (🔒/☁️) appears only
-  inside the expanded state once BYO cloud ships. Modernity comes from the
-  pill→chips→input morph animation (one continuous container), not from
-  added elements.
+  2. *Hover or `1–4`:* the pill morphs into five icon-only chips — four
+     format chips (Markdown / table / JSON / plain), a hairline divider, then
+     a **custom chip** (sparkles). Format switches re-render the same capture
+     and re-copy instantly.
+  3. *Custom chip (or `/`):* the container expands **vertically** — corners
+     ease from full-round to 14px, an input row grows beneath the chips
+     (single-line hint + amber submit arrow), focus lands in the input.
+     Enter or the arrow submits; the extraction re-runs once and the HUD
+     collapses back to the state-1 pill with the new result.
+  Keyboard: `Tab` cycles focus through the chips (wrapping), Enter/Space
+  activates the focused chip, `1–4` jump straight to a format, `/` jumps
+  straight to custom. `Esc` backs out one level: input → chips → dismissed.
+  No printed keyboard legends, no format labels, no follow-up thread. The
+  engine indicator (🔒/☁️) appears only inside the expanded state once BYO
+  cloud ships. Modernity comes from one continuous container morphing
+  (pill → chip row → chip row + input), not from added elements.
 - **Presets are output modes, not prompts.** Fixed transformations bound to
   shortcuts — like choosing PNG vs PDF in a screenshot tool. User-authored
   free-text prompts as a primary flow would re-invent the chat box.
