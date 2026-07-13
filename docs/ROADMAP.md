@@ -79,16 +79,25 @@ These were discussed and settled (2026-07-10):
   Cloud is never the silent default; the privacy claim becomes *"private by
   default, provable when local."* Side benefit: a cloud engine path can later
   unlock non-Apple-Silicon Macs.
-- **Post-capture UX: instant copy + anchored HUD.** The default result is
-  copied immediately — nothing blocks the reflex. A small HUD appears
-  **anchored to the selection region** (not cursor-following, not a corner
-  toast) offering:
-  - format chips — `Markdown · Table/CSV · JSON · Plain` — that re-render the
-    same capture without re-shooting;
-  - one optional single-line formatting hint (e.g. "headers are dates",
-    "output Swedish") that re-runs the extraction once;
-  - keyboard-first: `1–4` switches format, `/` focuses the hint, `Esc`
-    dismisses. No follow-ups, no thread.
+- **Post-capture UX: instant copy + anchored HUD, minimal by default.** The
+  default result is copied immediately — nothing blocks the reflex. A small
+  HUD appears **anchored to the selection region** (not cursor-following, not
+  a corner toast) and uses **progressive disclosure — never more than one
+  layer of information at a time**:
+  1. *Default:* a single pill — `✓ Copied as table` — confirming the copy and
+     the detected content type. Auto-fades. Most captures end here with no
+     visible controls.
+  2. *Hover or `1–4`:* the pill morphs into four icon-only format chips
+     (Markdown / table / JSON / plain); switching re-renders the same capture
+     and re-copies.
+  3. *Press `/`:* the chips swap for a single hint line (e.g. "headers are
+     dates") that re-runs the extraction once, then collapses back to the
+     pill. The hint *replaces* the chips — the HUD is never two rows tall.
+  `Esc` dismisses at any point. No printed keyboard legends, no format
+  labels, no follow-up thread. The engine indicator (🔒/☁️) appears only
+  inside the expanded state once BYO cloud ships. Modernity comes from the
+  pill→chips→input morph animation (one continuous container), not from
+  added elements.
 - **Presets are output modes, not prompts.** Fixed transformations bound to
   shortcuts — like choosing PNG vs PDF in a screenshot tool. User-authored
   free-text prompts as a primary flow would re-invent the chat box.
