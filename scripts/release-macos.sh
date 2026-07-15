@@ -120,6 +120,9 @@ fi
 #    updater distributes exactly the bytes the DMG carries.
 if [[ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]]; then
   echo "==> Building updater artifacts"
+  if [[ "$MODE" == "unsigned" ]]; then
+    echo "!!  Updater key set but build is UNSIGNED — the updater would ship an un-notarized app."
+  fi
   UPDATER_DIR="$BUNDLE/updater"
   mkdir -p "$UPDATER_DIR"
   TARBALL="$UPDATER_DIR/Beaver_${VERSION}_aarch64.app.tar.gz"
@@ -129,6 +132,9 @@ if [[ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]]; then
   pnpm tauri signer sign "$TARBALL" --password "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}"
 
   TAG="${BEAVER_RELEASE_TAG:-v${VERSION}}"
+  if [[ "$TAG" != "v${VERSION}" ]]; then
+    echo "!!  Tag ${TAG} does not match package version v${VERSION} — latest.json will self-heal via fallback, but check your dispatch input."
+  fi
   ASSET_URL="https://github.com/thomasindrias/beaver/releases/download/${TAG}/$(basename "$TARBALL")"
   node -e '
     const fs = require("fs");
