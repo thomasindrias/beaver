@@ -4,6 +4,7 @@ import {
   CaptureHud,
   LOADING_MESSAGES,
   MESSAGE_ROTATE_MS,
+  FORMAT_COMMIT_MS,
 } from "../components/CaptureHud";
 
 const noop = () => {};
@@ -75,6 +76,22 @@ describe("CaptureHud rendering", () => {
     expect(screen.getByText("Dam — couldn't read that")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(onRetry).toHaveBeenCalled();
+  });
+
+  it("Escape cancels a pending debounced format commit", () => {
+    vi.useFakeTimers();
+    const onFormatChange = vi.fn();
+    const onDismiss = vi.fn();
+    render(
+      <CaptureHud {...baseProps} onFormatChange={onFormatChange} onDismiss={onDismiss} />
+    );
+    fireEvent.keyDown(window, { key: "Tab" }); // reveal
+    fireEvent.keyDown(window, { key: "Tab" }); // markdown -> csv (debounced)
+    fireEvent.keyDown(window, { key: "Escape" }); // dismiss before commit fires
+    act(() => vi.advanceTimersByTime(FORMAT_COMMIT_MS * 2));
+    expect(onDismiss).toHaveBeenCalled();
+    expect(onFormatChange).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it("permission errors offer to open System Settings", () => {

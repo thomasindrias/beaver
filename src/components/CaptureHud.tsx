@@ -110,6 +110,15 @@ export function CaptureHud({
     if (inputOpen) inputRef.current?.focus();
   }, [inputOpen]);
 
+  // A debounced commit must not outlive the HUD: fire-after-unmount would
+  // resurrect a dismissed capture via onFormatChange.
+  useEffect(
+    () => () => {
+      if (commitRef.current) clearTimeout(commitRef.current);
+    },
+    []
+  );
+
   const reveal = useCallback(() => {
     onEngage();
     setRevealed(true);
@@ -178,6 +187,11 @@ export function CaptureHud({
         reveal();
         selectFormat(FORMATS[Number(e.key) - 1].key, true);
       } else if (e.key === "Escape") {
+        // Cancel any pending debounced commit so it can't fire after dismissal.
+        if (commitRef.current) {
+          clearTimeout(commitRef.current);
+          commitRef.current = null;
+        }
         onDismiss();
       }
     };
@@ -254,6 +268,7 @@ export function CaptureHud({
                   <button
                     key={key}
                     aria-label={label}
+                    aria-pressed={active}
                     data-active={active}
                     onClick={() => selectFormat(key, true)}
                     className={`flex h-6 w-7 items-center justify-center rounded-full transition-colors ${
