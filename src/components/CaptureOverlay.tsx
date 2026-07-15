@@ -25,10 +25,11 @@ export function CaptureOverlay({ onCapture, onCancel, frozen }: Props) {
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
+    if (frozen) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
+  }, [onCancel, frozen]);
 
   const onDown = useCallback((e: React.MouseEvent) => {
     setDragging(true);

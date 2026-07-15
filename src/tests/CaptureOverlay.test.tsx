@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { normalizeRect, CaptureOverlay } from "../components/CaptureOverlay";
 
 describe("normalizeRect", () => {
@@ -34,5 +34,12 @@ describe("CaptureOverlay frozen mode", () => {
   it("frozen overlay ignores pointer events", () => {
     render(<CaptureOverlay frozen={sel} onCapture={() => {}} onCancel={() => {}} />);
     expect(screen.getByTestId("frozen-root").className).toContain("pointer-events-none");
+  });
+
+  it("does not listen for Escape while frozen", () => {
+    const onCancel = vi.fn();
+    render(<CaptureOverlay frozen={sel} onCapture={() => {}} onCancel={onCancel} />);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onCancel).not.toHaveBeenCalled();
   });
 });
