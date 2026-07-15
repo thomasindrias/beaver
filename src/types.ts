@@ -9,4 +9,6 @@ export interface Capture {
   app_context: string | null;
 }
 
-export type AppState = "idle" | "processing" | "success" | "error";
+export type ExtractFormat = "markdown" | "csv" | "json" | "plain";
+
+export type AppState = "idle" | "processing" | "success" | "rerendering" | "error";
