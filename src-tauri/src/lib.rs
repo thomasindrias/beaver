@@ -464,7 +464,8 @@ async fn capture_and_extract(
     let port = state.port;
     let bytes = capture::capture_region(&region).map_err(|e| e.to_string())?;
     let image_base64 = STANDARD.encode(&bytes);
-    mlx::extract_from_image(port, &image_base64).await
+    let prompt = mlx::prompt_for(mlx::ExtractFormat::Markdown, None);
+    mlx::extract_from_image(port, &image_base64, &prompt).await
 }
 
 #[tauri::command]
