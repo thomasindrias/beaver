@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { check } from "@tauri-apps/plugin-updater";
@@ -20,6 +20,9 @@ export function UpdatePill() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [percent, setPercent] = useState(0);
+  // Synchronous guard against double clicks: `phase` is closure state and
+  // stays "idle" for both clicks landed within the `await check()` window.
+  const busyRef = useRef(false);
 
   useEffect(() => {
     const checkPassive = () => {
@@ -43,7 +46,8 @@ export function UpdatePill() {
   }, []);
 
   const startUpdate = async () => {
-    if (!update || phase !== "idle") return;
+    if (!update || busyRef.current) return;
+    busyRef.current = true;
     try {
       const u = await check();
       if (!u) throw new Error("no updater manifest on the latest release");
@@ -60,6 +64,9 @@ export function UpdatePill() {
       });
       setPhase("ready");
     } catch {
+      // Not reset on success: the ready button's action is relaunch(), never
+      // another download.
+      busyRef.current = false;
       setPhase("idle");
       setPercent(0);
       invoke("open_external", { url: update.url }).catch(console.error);
@@ -73,9 +80,9 @@ export function UpdatePill() {
 
   if (phase === "downloading") {
     return (
-      <span aria-busy="true" className={pillClass}>
+      <button disabled aria-busy="true" className={pillClass}>
         Downloading… {percent}%
-      </span>
+      </button>
     );
   }
 

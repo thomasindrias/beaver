@@ -147,6 +147,20 @@ describe("UpdatePill one-click update", () => {
     expect(screen.getByRole("button", { name: "Update to v0.2.0" })).toBeInTheDocument();
   });
 
+  it("ignores a second click while the update is starting", async () => {
+    let resolveCheck: ((v: unknown) => void) | null = null;
+    checkMock.mockImplementation(() => new Promise(r => { resolveCheck = r; }));
+    render(<UpdatePill />);
+    const pill = await screen.findByRole("button", { name: "Update to v0.2.0" });
+    fireEvent.click(pill);
+    fireEvent.click(pill);
+    await waitFor(() => expect(checkMock).toHaveBeenCalledTimes(1));
+    resolveCheck!(null);
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("open_external", { url: RELEASE_URL })
+    );
+  });
+
   it("falls back to the release page when the download fails", async () => {
     checkMock.mockResolvedValue({
       downloadAndInstall: async () => {
