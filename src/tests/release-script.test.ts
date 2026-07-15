@@ -59,3 +59,30 @@ describe("headless dmg packaging", () => {
     expect(s).toContain("BEAVER_APP");
   });
 });
+
+describe("updater artifacts", () => {
+  const sh = readFileSync("scripts/release-macos.sh", "utf8");
+
+  it("gates updater artifacts on the signing key, not on Apple identity", () => {
+    expect(sh).toContain("TAURI_SIGNING_PRIVATE_KEY");
+    expect(sh).toContain("tauri signer sign");
+  });
+
+  it("tars the app only after Apple signing and stapling", () => {
+    const stapleApp = sh.indexOf('stapler staple "$APP"');
+    const tarball = sh.indexOf(".app.tar.gz");
+    expect(stapleApp).toBeGreaterThan(-1);
+    expect(tarball).toBeGreaterThan(stapleApp);
+  });
+
+  it("emits a latest.json manifest with the darwin-aarch64 platform", () => {
+    expect(sh).toContain("latest.json");
+    expect(sh).toContain("darwin-aarch64");
+  });
+
+  it("documents the updater key in .env.release.example", () => {
+    const ex = readFileSync(".env.release.example", "utf8");
+    expect(ex).toContain("TAURI_SIGNING_PRIVATE_KEY");
+    expect(ex).toContain("TAURI_SIGNING_PRIVATE_KEY_PASSWORD");
+  });
+});
