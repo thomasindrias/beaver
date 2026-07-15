@@ -159,4 +159,16 @@ describe("App capture flow", () => {
     fireEvent.mouseDown(screen.getByTestId("click-away"));
     expect(dismissMock).toHaveBeenCalled();
   });
+
+  it("re-enters click-through when retry returns to processing", () => {
+    beaverState.value = "success";
+    const { rerender } = render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: /do-capture/i }));
+    expect(ignoreCursorMock).toHaveBeenCalledWith(false);
+
+    ignoreCursorMock.mockClear();
+    beaverState.value = "processing";
+    rerender(<App />);
+    expect(ignoreCursorMock).toHaveBeenCalledWith(true);
+  });
 });

@@ -48,10 +48,13 @@ export default function App() {
   );
 
   // The overlay is click-through while processing (so the screen never feels
-  // frozen) and interactive once the HUD has something to offer.
+  // frozen) and interactive once the HUD has something to offer. Bidirectional
+  // because retry re-enters processing from an interactive error state.
   useEffect(() => {
-    if (!sel || state === "processing" || state === "idle") return;
-    getCurrentWindow().setIgnoreCursorEvents(false).catch(() => {});
+    if (!sel || state === "idle") return;
+    getCurrentWindow()
+      .setIgnoreCursorEvents(state === "processing")
+      .catch(() => {});
   }, [sel, state]);
 
   const handleCancel = useCallback(async () => {
