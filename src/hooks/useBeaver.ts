@@ -25,6 +25,10 @@ export function useBeaver(
   const regionRef = useRef<CaptureRegion | null>(null);
   const savedRef = useRef(false);
   const engagedRef = useRef(false);
+  // Bumped on every new request and on dismiss, so a stale in-flight
+  // capture/re-extract can recognize it's been superseded and no-op instead
+  // of writing the clipboard or reviving state out from under the user.
+  const genRef = useRef(0);
 
   const clearDwell = useCallback(() => {
     if (dwellRef.current) {
@@ -34,6 +38,7 @@ export function useBeaver(
   }, []);
 
   const dismiss = useCallback(() => {
+    genRef.current++;
     clearDwell();
     setState("idle");
     onComplete?.();
@@ -51,10 +56,12 @@ export function useBeaver(
     clearDwell();
   }, [clearDwell]);
 
-  const finish = useCallback(async (markdown: string) => {
+  const finish = useCallback(async (markdown: string, gen: number) => {
+    if (gen !== genRef.current) return;
     const ct = detectContentType(markdown);
     setContentType(ct);
     await invoke("write_to_clipboard", { text: markdown });
+    if (gen !== genRef.current) return;
     if (onSave && !savedRef.current) {
       savedRef.current = true;
       await onSave({
@@ -64,11 +71,13 @@ export function useBeaver(
         app_context: null,
       });
     }
+    if (gen !== genRef.current) return;
     setState("success");
     armDwell(SUCCESS_DWELL_MS);
   }, [onSave, armDwell]);
 
-  const fail = useCallback((e: unknown) => {
+  const fail = useCallback((e: unknown, gen: number) => {
+    if (gen !== genRef.current) return;
     const kind: CaptureErrorKind = String(e).includes("screen-permission-missing")
       ? "permission"
       : "generic";
@@ -78,6 +87,7 @@ export function useBeaver(
   }, [armDwell]);
 
   const runCapture = useCallback(async (region: CaptureRegion) => {
+    const gen = ++genRef.current;
     regionRef.current = region;
     setState("processing");
     try {
@@ -86,13 +96,14 @@ export function useBeaver(
         format: "markdown",
       });
       setFormat("markdown");
-      await finish(markdown);
+      await finish(markdown, gen);
     } catch (e) {
-      fail(e);
+      fail(e, gen);
     }
   }, [finish, fail]);
 
   const reExtract = useCallback(async (next: ExtractFormat, hint?: string) => {
+    const gen = ++genRef.current;
     engage();
     setFormat(next);
     setState("rerendering");
@@ -101,9 +112,9 @@ export function useBeaver(
         format: next,
         hint: hint ?? null,
       });
-      await finish(markdown);
+      await finish(markdown, gen);
     } catch (e) {
-      fail(e);
+      fail(e, gen);
     }
   }, [engage, finish, fail]);
 

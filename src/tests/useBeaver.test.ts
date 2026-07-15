@@ -177,4 +177,56 @@ describe("useBeaver", () => {
     expect(result.current.state).toBe("idle");
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
+
+  it("ignores a stale re_extract response that lands after a newer one", async () => {
+    const { result } = renderHook(() => useBeaver());
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    let rejectFirst: (e: unknown) => void;
+    invokeMock.mockImplementationOnce(
+      () => new Promise((_, reject) => { rejectFirst = reject; })
+    );
+    let first: Promise<void>;
+    act(() => {
+      first = result.current.reExtract("csv");
+    });
+    invokeMock.mockResolvedValue("second result");
+    await act(async () => {
+      await result.current.reExtract("json");
+    });
+    expect(result.current.state).toBe("success");
+    await act(async () => {
+      rejectFirst!("MLX request failed: slow timeout");
+      await first!.catch(() => {});
+    });
+    expect(result.current.state).toBe("success");
+    expect(result.current.format).toBe("json");
+  });
+
+  it("a response landing after dismiss neither writes the clipboard nor revives state", async () => {
+    const onComplete = vi.fn();
+    const { result } = renderHook(() => useBeaver(undefined, onComplete));
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    let resolveLate: (v: string) => void;
+    invokeMock.mockImplementationOnce(
+      () => new Promise(resolve => { resolveLate = resolve; })
+    );
+    let pending: Promise<void>;
+    act(() => {
+      pending = result.current.reExtract("csv");
+    });
+    act(() => {
+      result.current.dismiss();
+    });
+    invokeMock.mockClear();
+    await act(async () => {
+      resolveLate!("late content");
+      await pending!;
+    });
+    expect(invokeMock).not.toHaveBeenCalledWith("write_to_clipboard", { text: "late content" });
+    expect(result.current.state).toBe("idle");
+  });
 });
