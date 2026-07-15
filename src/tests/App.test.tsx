@@ -17,6 +17,8 @@ const {
   ignoreCursorMock: vi.fn().mockResolvedValue(undefined),
 }));
 
+const { dismissMock } = vi.hoisted(() => ({ dismissMock: vi.fn() }));
+
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
@@ -27,25 +29,40 @@ vi.mock("@tauri-apps/api/window", () => ({
   }),
 }));
 vi.mock("../hooks/useBeaver", () => ({
-  useBeaver: () => ({ state: beaverState.value, runCapture: runCaptureMock }),
+  useBeaver: () => ({
+    state: beaverState.value,
+    errorKind: "generic",
+    format: "markdown",
+    contentType: "prose",
+    runCapture: runCaptureMock,
+    reExtract: vi.fn(),
+    retry: vi.fn(),
+    engage: vi.fn(),
+    dismiss: dismissMock,
+  }),
 }));
 vi.mock("../components/CaptureOverlay", () => ({
   CaptureOverlay: ({
     onCapture,
+    frozen,
   }: {
     onCapture: (r: unknown, p: unknown) => void;
-  }) => (
-    <button
-      onClick={() =>
-        onCapture({ x: 1, y: 1, width: 20, height: 20 }, { x: 7, y: 9 })
-      }
-    >
-      do-capture
-    </button>
-  ),
+    frozen?: unknown;
+  }) =>
+    frozen ? (
+      <div>frozen-overlay</div>
+    ) : (
+      <button
+        onClick={() =>
+          onCapture({ x: 1, y: 1, width: 20, height: 20 }, { x: 7, y: 9 })
+        }
+      >
+        do-capture
+      </button>
+    ),
 }));
-vi.mock("../components/CursorToast", () => ({
-  CursorToast: ({ state }: { state: string }) => <div>cursor-toast:{state}</div>,
+vi.mock("../components/CaptureHud", () => ({
+  CaptureHud: ({ state }: { state: string }) => <div>capture-hud:{state}</div>,
 }));
 vi.mock("../components/TrayPopover", () => ({
   TrayPopover: () => <div>tray-popover</div>,
@@ -91,6 +108,7 @@ describe("App capture flow", () => {
     windowLabel.value = "capture-overlay";
     beaverState.value = "idle";
     runCaptureMock.mockReset();
+    dismissMock.mockReset();
     ignoreCursorMock.mockClear();
     window.history.pushState({}, "", "/capture");
   });
@@ -104,30 +122,41 @@ describe("App capture flow", () => {
     expect(
       screen.getByRole("button", { name: /do-capture/i })
     ).toBeInTheDocument();
-    expect(screen.queryByText(/cursor-toast/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/capture-hud/i)).not.toBeInTheDocument();
   });
 
-  it("swaps to the cursor toast after a selection and runs the capture", () => {
+  it("freezes the selection and mounts the HUD after a capture", () => {
     beaverState.value = "processing";
     render(<App />);
-
     fireEvent.click(screen.getByRole("button", { name: /do-capture/i }));
-
     expect(runCaptureMock).toHaveBeenCalledWith({
       x: 1,
       y: 1,
       width: 20,
       height: 20,
     });
-    expect(screen.getByText("cursor-toast:processing")).toBeInTheDocument();
+    expect(screen.getByText("frozen-overlay")).toBeInTheDocument();
+    expect(screen.getByText("capture-hud:processing")).toBeInTheDocument();
   });
 
-  // The overlay is fullscreen + always-on-top; if it kept capturing the mouse
-  // during processing it would swallow every click on screen (feels like a
-  // freeze). Going click-through lets clicks pass through to the apps beneath.
-  it("makes the overlay click-through once a selection is made", () => {
+  it("goes click-through while processing", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: /do-capture/i }));
     expect(ignoreCursorMock).toHaveBeenCalledWith(true);
+  });
+
+  it("becomes interactive again when the result arrives", () => {
+    beaverState.value = "success";
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: /do-capture/i }));
+    expect(ignoreCursorMock).toHaveBeenCalledWith(false);
+  });
+
+  it("clicking outside the HUD dismisses", () => {
+    beaverState.value = "success";
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: /do-capture/i }));
+    fireEvent.mouseDown(screen.getByTestId("click-away"));
+    expect(dismissMock).toHaveBeenCalled();
   });
 });

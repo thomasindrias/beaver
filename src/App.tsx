@@ -1,7 +1,9 @@
-import { useCallback, useState, lazy, Suspense } from "react";
+import { useCallback, useEffect, useState, lazy, Suspense } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { CaptureOverlay, type Rect, type Point } from "./components/CaptureOverlay";
-import { CursorToast } from "./components/CursorToast";
+import { CaptureOverlay, type Rect } from "./components/CaptureOverlay";
+import { CaptureHud } from "./components/CaptureHud";
+import { hudPosition } from "./lib/hudPosition";
 import { selectView } from "./lib/routing";
 import { useBeaver } from "./hooks/useBeaver";
 import { useCaptures } from "./hooks/useCaptures";
@@ -17,38 +19,81 @@ const Onboarding = lazy(() =>
 
 export default function App() {
   const route = window.location.pathname;
-  // App never renders the history list itself (TrayPopover does), so it only
-  // needs saveCapture — skip the redundant history fetch.
   const { saveCapture } = useCaptures({ autoLoad: false });
-  const [origin, setOrigin] = useState<Point | null>(null);
+  const [sel, setSel] = useState<Rect | null>(null);
 
-  // Once the result bubble has had its dwell, the overlay window has done its
-  // job — close it so the screen is interactive again.
   const closeWindow = useCallback(() => {
     getCurrentWindow().close().catch(() => {});
   }, []);
 
-  const { state, errorKind, runCapture } = useBeaver(saveCapture, closeWindow);
+  const {
+    state,
+    errorKind,
+    format,
+    contentType,
+    runCapture,
+    reExtract,
+    retry,
+    engage,
+    dismiss,
+  } = useBeaver(saveCapture, closeWindow);
 
-  // Keep the overlay window open to host the toast, but make it click-through
-  // so it doesn't swallow clicks across the whole screen while processing —
-  // otherwise the fullscreen, always-on-top overlay reads as a frozen screen.
-  const handleCapture = useCallback((region: Rect, point: Point) => {
-    setOrigin(point);
-    getCurrentWindow().setIgnoreCursorEvents(true).catch(() => {});
-    runCapture(region);
-  }, [runCapture]);
+  const handleCapture = useCallback(
+    (region: Rect) => {
+      setSel(region);
+      getCurrentWindow().setIgnoreCursorEvents(true).catch(() => {});
+      runCapture(region);
+    },
+    [runCapture]
+  );
+
+  // The overlay is click-through while processing (so the screen never feels
+  // frozen) and interactive once the HUD has something to offer.
+  useEffect(() => {
+    if (!sel || state === "processing" || state === "idle") return;
+    getCurrentWindow().setIgnoreCursorEvents(false).catch(() => {});
+  }, [sel, state]);
 
   const handleCancel = useCallback(async () => {
     await getCurrentWindow().close();
   }, []);
 
+  const openSettings = useCallback(() => {
+    invoke("open_screen_recording_settings").catch(() => {});
+    dismiss();
+  }, [dismiss]);
+
   const view = selectView(route, getCurrentWindow().label);
 
   if (view === "capture") {
-    return origin
-      ? <CursorToast state={state} errorKind={errorKind} origin={origin} />
-      : <CaptureOverlay onCapture={handleCapture} onCancel={handleCancel} />;
+    if (!sel) {
+      return <CaptureOverlay onCapture={handleCapture} onCancel={handleCancel} />;
+    }
+    return (
+      <div
+        data-testid="click-away"
+        className="fixed inset-0"
+        onMouseDown={() => dismiss()}
+      >
+        <CaptureOverlay frozen={sel} onCapture={() => {}} onCancel={() => {}} />
+        <CaptureHud
+          state={state}
+          errorKind={errorKind}
+          contentType={contentType}
+          format={format}
+          anchor={hudPosition(sel, {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          })}
+          onFormatChange={f => reExtract(f)}
+          onCustomSubmit={hint => reExtract(format, hint)}
+          onRetry={retry}
+          onOpenSettings={openSettings}
+          onEngage={engage}
+          onDismiss={dismiss}
+        />
+      </div>
+    );
   }
 
   return (
