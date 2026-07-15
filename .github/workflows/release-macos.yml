@@ -27,6 +27,9 @@ jobs:
       HAS_APP_STORE_CONNECT_API_KEY: ${{ secrets.APPLE_API_KEY != '' && secrets.APPLE_API_ISSUER != '' && secrets.APPLE_API_KEY_P8 != '' }}
       HAS_SIGNING_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 != '' }}
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      BEAVER_RELEASE_TAG: ${{ inputs.tag_name }}
 
     steps:
       - name: Check out repository
@@ -89,14 +92,27 @@ jobs:
           path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
           if-no-files-found: error
 
+      - name: Upload updater artifacts
+        if: env.TAURI_SIGNING_PRIVATE_KEY != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: Beaver-macOS-Updater
+          path: src-tauri/target/aarch64-apple-darwin/release/bundle/updater/*
+          if-no-files-found: error
+
       - name: Create or update GitHub release
         if: inputs.tag_name != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           DMG="$(find src-tauri/target/aarch64-apple-darwin/release/bundle/dmg -name '*.dmg' -print -quit)"
+          UPDATER_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle/updater"
+          ASSETS=("$DMG")
+          if [[ -f "$UPDATER_DIR/latest.json" ]]; then
+            ASSETS+=("$UPDATER_DIR"/*.app.tar.gz "$UPDATER_DIR/latest.json")
+          fi
           if gh release view "${{ inputs.tag_name }}" >/dev/null 2>&1; then
-            gh release upload "${{ inputs.tag_name }}" "$DMG" --clobber
+            gh release upload "${{ inputs.tag_name }}" "${ASSETS[@]}" --clobber
           else
-            gh release create "${{ inputs.tag_name }}" "$DMG" --draft --title "${{ inputs.tag_name }}" --notes "Draft Beaver macOS release."
+            gh release create "${{ inputs.tag_name }}" "${ASSETS[@]}" --draft --title "${{ inputs.tag_name }}" --notes "Draft Beaver macOS release."
           fi

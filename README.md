@@ -34,8 +34,12 @@ captures never leave your machine.
 On first launch Beaver downloads the ~3 GB vision model and prepares an
 on-device Python environment (the only time it needs the internet). A progress
 bar tracks the download; extraction then runs fully offline. The only later
-network call is an optional once-a-day version check against GitHub Releases
-(no capture data, ever) — set `BEAVER_DISABLE_UPDATE_CHECK=1` to turn it off.
+network calls are update-related and go exclusively to GitHub:
+an optional once-a-day version check against GitHub Releases, and — only when
+you click the update pill — downloading the new release from the same place.
+Updates are verified against a public key baked into the app before install
+(no capture data, ever). Set `BEAVER_DISABLE_UPDATE_CHECK=1` to turn all of it
+off.
 
 ## Stack
 

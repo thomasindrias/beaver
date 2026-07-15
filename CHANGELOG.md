@@ -12,6 +12,9 @@ All notable changes to Beaver are documented here. The format follows
   hint, a full Tab keyboard lap, and in-place retry for errors.
 - `re_extract` command re-runs the last capture with a new format or hint
   without re-shooting the screen.
+- One-click in-app updates: the update pill now downloads, verifies, and
+  installs new releases in place (restart to finish). Falls back to opening
+  the release page when a release has no updater assets.
 
 ### Changed
 - The cursor-following toast is retired in favor of the anchored HUD.
