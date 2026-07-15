@@ -3,11 +3,15 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 type FocusHandler = (event: { payload: boolean }) => void;
 
-const { invokeMock, focusHandlers } = vi.hoisted(() => ({
+const { invokeMock, focusHandlers, checkMock, relaunchMock } = vi.hoisted(() => ({
   invokeMock: vi.fn(),
   focusHandlers: [] as FocusHandler[],
+  checkMock: vi.fn(),
+  relaunchMock: vi.fn(),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
+vi.mock("@tauri-apps/plugin-updater", () => ({ check: checkMock }));
+vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: relaunchMock }));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     onFocusChanged: (handler: FocusHandler) => {
@@ -26,9 +30,19 @@ function emitFocus(focused: boolean) {
 
 import { UpdatePill } from "../components/UpdatePill";
 
-describe("UpdatePill", () => {
+const RELEASE_URL = "https://github.com/thomasindrias/beaver/releases/tag/v0.2.0";
+
+function mockUpdateAvailable() {
+  invokeMock.mockImplementation(async (cmd: string) =>
+    cmd === "check_for_update" ? { version: "0.2.0", url: RELEASE_URL } : undefined
+  );
+}
+
+describe("UpdatePill visibility (passive check)", () => {
   beforeEach(() => {
     invokeMock.mockReset();
+    checkMock.mockReset();
+    relaunchMock.mockReset();
     focusHandlers.length = 0;
   });
 
@@ -39,27 +53,6 @@ describe("UpdatePill", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("links to the release when an update exists", async () => {
-    invokeMock.mockImplementation(async (cmd: string) =>
-      cmd === "check_for_update"
-        ? { version: "0.2.0", url: "https://github.com/thomasindrias/beaver/releases/tag/v0.2.0" }
-        : undefined
-    );
-    render(<UpdatePill />);
-
-    const pill = await screen.findByRole("button", { name: /v0\.2\.0 available/i });
-    fireEvent.click(pill);
-    await waitFor(() =>
-      expect(invokeMock).toHaveBeenCalledWith("open_external", {
-        url: "https://github.com/thomasindrias/beaver/releases/tag/v0.2.0",
-      })
-    );
-  });
-
-  // The popover window is hidden/shown for weeks at a time rather than
-  // recreated, so a mount-only check would never run again after the first
-  // open. Re-checking on focus is what makes the "once a day" cache on the
-  // Rust side actually get exercised daily.
   it("re-checks for an update every time the window regains focus", async () => {
     invokeMock.mockResolvedValue(null);
     render(<UpdatePill />);
@@ -90,5 +83,82 @@ describe("UpdatePill", () => {
 
     unmount();
     await waitFor(() => expect(focusHandlers).toHaveLength(0));
+  });
+});
+
+describe("UpdatePill one-click update", () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+    checkMock.mockReset();
+    relaunchMock.mockReset();
+    relaunchMock.mockResolvedValue(undefined);
+    focusHandlers.length = 0;
+    mockUpdateAvailable();
+  });
+
+  it("downloads with progress and offers a restart", async () => {
+    checkMock.mockResolvedValue({
+      downloadAndInstall: async (cb: (e: unknown) => void) => {
+        cb({ event: "Started", data: { contentLength: 200 } });
+        cb({ event: "Progress", data: { chunkLength: 100 } });
+        cb({ event: "Finished" });
+      },
+    });
+    render(<UpdatePill />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Update to v0.2.0" }));
+
+    expect(await screen.findByRole("button", { name: "Restart to update" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Restart to update" }));
+    await waitFor(() => expect(relaunchMock).toHaveBeenCalledTimes(1));
+    expect(invokeMock).not.toHaveBeenCalledWith("open_external", expect.anything());
+  });
+
+  it("shows download progress as a percentage", async () => {
+    let emit: ((e: unknown) => void) | null = null;
+    let finish: (() => void) | null = null;
+    checkMock.mockResolvedValue({
+      downloadAndInstall: (cb: (e: unknown) => void) =>
+        new Promise<void>(resolve => {
+          emit = cb;
+          finish = resolve;
+        }),
+    });
+    render(<UpdatePill />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Update to v0.2.0" }));
+    await waitFor(() => expect(emit).not.toBeNull());
+    emit!({ event: "Started", data: { contentLength: 200 } });
+    emit!({ event: "Progress", data: { chunkLength: 100 } });
+
+    expect(await screen.findByText("Downloading… 50%")).toBeInTheDocument();
+    finish!();
+  });
+
+  it("falls back to the release page when no updater manifest exists", async () => {
+    checkMock.mockResolvedValue(null);
+    render(<UpdatePill />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Update to v0.2.0" }));
+
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("open_external", { url: RELEASE_URL })
+    );
+    expect(screen.getByRole("button", { name: "Update to v0.2.0" })).toBeInTheDocument();
+  });
+
+  it("falls back to the release page when the download fails", async () => {
+    checkMock.mockResolvedValue({
+      downloadAndInstall: async () => {
+        throw new Error("network");
+      },
+    });
+    render(<UpdatePill />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Update to v0.2.0" }));
+
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("open_external", { url: RELEASE_URL })
+    );
   });
 });
