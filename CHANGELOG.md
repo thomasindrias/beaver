@@ -4,6 +4,20 @@ All notable changes to Beaver are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+- Anchored capture HUD: the result pill now docks to the selection with
+  format chips (Markdown / Table-CSV / JSON / plain), a custom formatting
+  hint, a full Tab keyboard lap, and in-place retry for errors.
+- `re_extract` command re-runs the last capture with a new format or hint
+  without re-shooting the screen.
+
+### Changed
+- The cursor-following toast is retired in favor of the anchored HUD.
+- Re-rendered formats update the clipboard; history keeps the first
+  extraction of each capture.
+
 ## [0.1.0] — 2026-07-04
 
 First public release.
