@@ -4,7 +4,7 @@ All notable changes to Beaver are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## [0.1.1] — 2026-07-16
 
 ### Added
 - Anchored capture HUD: the result pill now docks to the selection with
