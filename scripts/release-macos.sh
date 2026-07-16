@@ -105,11 +105,47 @@ if [[ "$MODE" == "signed" ]]; then
       --wait
   fi
   xcrun stapler staple "$DMG"
+  xcrun stapler staple "$APP"
 
   echo "==> Verifying signature, Gatekeeper, and notarization staple"
   codesign --verify --deep --strict --verbose=2 "$APP"
   spctl -a -t open --context context:primary-signature -vvv "$DMG"
   xcrun stapler validate "$DMG"
+fi
+
+# 4. Updater artifacts: tar.gz of the (signed, stapled) .app plus a minisign
+#    signature and the latest.json manifest the in-app updater consumes.
+#    Gated on the updater key — local test builds without it skip this and
+#    ship a DMG only. The tarball is built AFTER codesigning/stapling so the
+#    updater distributes exactly the bytes the DMG carries.
+if [[ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]]; then
+  echo "==> Building updater artifacts"
+  if [[ "$MODE" == "unsigned" ]]; then
+    echo "!!  Updater key set but build is UNSIGNED — the updater would ship an un-notarized app."
+  fi
+  UPDATER_DIR="$BUNDLE/updater"
+  mkdir -p "$UPDATER_DIR"
+  TARBALL="$UPDATER_DIR/Beaver_${VERSION}_aarch64.app.tar.gz"
+  rm -f "$TARBALL" "$TARBALL.sig" "$UPDATER_DIR/latest.json"
+  tar -czf "$TARBALL" -C "$(dirname "$APP")" "$(basename "$APP")"
+
+  pnpm tauri signer sign "$TARBALL" --password "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}"
+
+  TAG="${BEAVER_RELEASE_TAG:-v${VERSION}}"
+  if [[ "$TAG" != "v${VERSION}" ]]; then
+    echo "!!  Tag ${TAG} does not match package version v${VERSION} — latest.json will self-heal via fallback, but check your dispatch input."
+  fi
+  ASSET_URL="https://github.com/thomasindrias/beaver/releases/download/${TAG}/$(basename "$TARBALL")"
+  node -e '
+    const fs = require("fs");
+    const [version, sigPath, url, out] = process.argv.slice(1);
+    fs.writeFileSync(out, JSON.stringify({
+      version,
+      pub_date: new Date().toISOString(),
+      platforms: { "darwin-aarch64": { signature: fs.readFileSync(sigPath, "utf8").trim(), url } },
+    }, null, 2) + "\n");
+  ' "$VERSION" "$TARBALL.sig" "$ASSET_URL" "$UPDATER_DIR/latest.json"
+  echo "==> Updater artifacts in $UPDATER_DIR"
 fi
 
 echo "==> Done (${MODE}). DMG: ${DMG}"

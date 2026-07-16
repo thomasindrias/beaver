@@ -160,3 +160,11 @@
 .animate-beaver-pulse {
   animation: beaver-pulse 1.6s ease-in-out infinite;
 }
+
+.hud-input {
+  width: 0;
+  animation: hud-input-grow 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes hud-input-grow {
+  to { width: 170px; }
+}

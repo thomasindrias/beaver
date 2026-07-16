@@ -34,3 +34,8 @@ reason for any new permission.
   most once per day, only when the popover opens. The request carries no
   capture data or identifiers beyond a generic user agent, and
   `BEAVER_DISABLE_UPDATE_CHECK=1` disables it entirely.
+
+- **Update integrity:** in-app updates are downloaded only from this
+  repository's GitHub Releases and verified with minisign (public key baked
+  into the app via `tauri-plugin-updater`) before installation, in addition
+  to Apple code signing and notarization of the app itself.

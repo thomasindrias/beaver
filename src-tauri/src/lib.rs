@@ -15,6 +15,12 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
+/// The most recent capture's PNG bytes, kept so the HUD can re-extract with a
+/// different format or hint without re-shooting the screen (which may have
+/// changed, and which our own HUD could contaminate).
+#[derive(Default)]
+pub struct LastCapture(pub std::sync::Mutex<Option<Vec<u8>>>);
+
 // Tracks when the popover was last auto-hidden on focus loss, so a tray-icon
 // click that triggered that blur doesn't immediately re-open the window.
 struct PopoverHideTime(Mutex<Option<std::time::Instant>>);
@@ -68,6 +74,8 @@ pub fn run() {
         )
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             log::info!(
                 "Beaver v{} starting; logs in {:?}",
@@ -79,6 +87,7 @@ pub fn run() {
             let _ = app.handle().set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             app.manage(PopoverHideTime(Mutex::new(None)));
+            app.manage(LastCapture::default());
 
             // Right-click tray menu. Beaver stays alive when its windows close
             // (see the ExitRequested guard in `run`), so this Quit item is the
@@ -175,6 +184,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             capture_and_extract,
+            re_extract,
             mlx_status,
             write_to_clipboard,
             finish_onboarding,
@@ -456,7 +466,9 @@ async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<MlxSta
 #[tauri::command]
 async fn capture_and_extract(
     region: capture::CaptureRegion,
+    format: Option<mlx::ExtractFormat>,
     state: tauri::State<'_, server::MlxServer>,
+    last: tauri::State<'_, LastCapture>,
 ) -> Result<String, String> {
     if !permission::screen_capture_granted() {
         return Err(permission::PERMISSION_ERROR.to_string());
@@ -464,7 +476,27 @@ async fn capture_and_extract(
     let port = state.port;
     let bytes = capture::capture_region(&region).map_err(|e| e.to_string())?;
     let image_base64 = STANDARD.encode(&bytes);
-    mlx::extract_from_image(port, &image_base64).await
+    *last.0.lock().unwrap() = Some(bytes);
+    let prompt = mlx::prompt_for(format.unwrap_or(mlx::ExtractFormat::Markdown), None);
+    mlx::extract_from_image(port, &image_base64, &prompt).await
+}
+
+#[tauri::command]
+async fn re_extract(
+    format: mlx::ExtractFormat,
+    hint: Option<String>,
+    state: tauri::State<'_, server::MlxServer>,
+    last: tauri::State<'_, LastCapture>,
+) -> Result<String, String> {
+    let bytes = last
+        .0
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or_else(|| "no-capture-cached".to_string())?;
+    let image_base64 = STANDARD.encode(&bytes);
+    let prompt = mlx::prompt_for(format, hint.as_deref());
+    mlx::extract_from_image(state.port, &image_base64, &prompt).await
 }
 
 #[tauri::command]
@@ -698,5 +730,13 @@ mod tests {
         assert!(!is_truthy(Some("false".into())));
         assert!(!is_truthy(Some("no".into())));
         assert!(!is_truthy(Some("  ".into())));
+    }
+
+    #[test]
+    fn last_capture_starts_empty_and_roundtrips_bytes() {
+        let last = LastCapture::default();
+        assert!(last.0.lock().unwrap().is_none());
+        *last.0.lock().unwrap() = Some(vec![1, 2, 3]);
+        assert_eq!(last.0.lock().unwrap().clone().unwrap(), vec![1, 2, 3]);
     }
 }

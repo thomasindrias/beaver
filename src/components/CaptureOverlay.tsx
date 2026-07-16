@@ -15,19 +15,21 @@ export function normalizeRect(start: Point, end: Point): Rect {
 interface Props {
   onCapture: (region: Rect, origin: Point) => void;
   onCancel: () => void;
+  frozen?: Rect | null;
 }
 
-export function CaptureOverlay({ onCapture, onCancel }: Props) {
+export function CaptureOverlay({ onCapture, onCancel, frozen }: Props) {
   const [start, setStart] = useState<Point | null>(null);
   const [current, setCurrent] = useState<Point | null>(null);
   const [cursor, setCursor] = useState<Point | null>(null);
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
+    if (frozen) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
+  }, [onCancel, frozen]);
 
   const onDown = useCallback((e: React.MouseEvent) => {
     setDragging(true);
@@ -47,6 +49,28 @@ export function CaptureOverlay({ onCapture, onCancel }: Props) {
     if (rect.width > 5 && rect.height > 5) onCapture(rect, current);
     else onCancel();
   }, [dragging, start, current, onCapture, onCancel]);
+
+  // Hooks above; early return below (React hooks must not sit under a conditional return).
+  if (frozen) {
+    return (
+      <div
+        data-testid="frozen-root"
+        className="pointer-events-none fixed inset-0 select-none overflow-hidden"
+      >
+        <div
+          data-testid="frozen-selection"
+          className="absolute rounded-[3px] ring-2 ring-primary"
+          style={{
+            left: frozen.x,
+            top: frozen.y,
+            width: frozen.width,
+            height: frozen.height,
+            boxShadow: "0 0 0 100vmax rgba(0,0,0,0.45)",
+          }}
+        />
+      </div>
+    );
+  }
 
   const sel = start && current ? normalizeRect(start, current) : null;
   const hasSel = !!sel && sel.width > 1 && sel.height > 1;

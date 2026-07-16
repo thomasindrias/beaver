@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { normalizeRect } from "../components/CaptureOverlay";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { normalizeRect, CaptureOverlay } from "../components/CaptureOverlay";
 
 describe("normalizeRect", () => {
   it("top-left to bottom-right drag", () => {
@@ -18,5 +19,27 @@ describe("normalizeRect", () => {
     expect(normalizeRect({ x: 50, y: 50 }, { x: 50, y: 50 })).toEqual(
       { x: 50, y: 50, width: 0, height: 0 }
     );
+  });
+});
+
+describe("CaptureOverlay frozen mode", () => {
+  const sel = { x: 10, y: 20, width: 100, height: 80 };
+
+  it("renders only the selection ring when frozen", () => {
+    render(<CaptureOverlay frozen={sel} onCapture={() => {}} onCancel={() => {}} />);
+    expect(screen.getByTestId("frozen-selection")).toBeInTheDocument();
+    expect(screen.queryByText(/Drag to capture/)).not.toBeInTheDocument();
+  });
+
+  it("frozen overlay ignores pointer events", () => {
+    render(<CaptureOverlay frozen={sel} onCapture={() => {}} onCancel={() => {}} />);
+    expect(screen.getByTestId("frozen-root").className).toContain("pointer-events-none");
+  });
+
+  it("does not listen for Escape while frozen", () => {
+    const onCancel = vi.fn();
+    render(<CaptureOverlay frozen={sel} onCapture={() => {}} onCancel={onCancel} />);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onCancel).not.toHaveBeenCalled();
   });
 });
