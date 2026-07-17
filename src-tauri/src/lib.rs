@@ -2,6 +2,7 @@ mod capture;
 mod db;
 mod mlx;
 mod permission;
+mod prompts;
 mod server;
 mod shortcut;
 mod update;
