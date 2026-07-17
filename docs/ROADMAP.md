@@ -1,6 +1,6 @@
 # Beaver Roadmap
 
-_Last updated: 2026-07-10_
+_Last updated: 2026-07-17_
 
 ## Purpose
 
@@ -77,8 +77,8 @@ These were discussed and settled (2026-07-10):
   model (e.g. Claude Haiku, GPT-4o-mini-class, Gemini Flash) in Settings.
   Every capture visibly shows which engine ran (🔒 on-device / ☁️ provider).
   Cloud is never the silent default; the privacy claim becomes *"private by
-  default, provable when local."* Side benefit: a cloud engine path can later
-  unlock non-Apple-Silicon Macs.
+  default, provable when local."* This generalizes across hardware — see the
+  engine matrix below.
 - **Post-capture UX: instant copy + anchored HUD, minimal by default.** The
   default result is copied immediately — nothing blocks the reflex. A small
   HUD appears **anchored to the selection region** (not cursor-following, not
@@ -128,6 +128,47 @@ These were discussed and settled (2026-07-10):
   shortcuts — like choosing PNG vs PDF in a screenshot tool. User-authored
   free-text prompts as a primary flow would re-invent the chat box.
 
+## Engine matrix: universal hardware support
+
+Decided (2026-07-17): the local/cloud engine choice is not an Apple-Silicon
+special case — it generalizes across hardware. Local inference is the piece
+that's platform-dependent; cloud is the constant that works identically
+everywhere Beaver runs, since it's just an HTTPS call.
+
+| Platform | Local engine | Cloud engine (BYO key) | Status |
+|---|---|---|---|
+| **Apple Silicon Mac** | MLX (Qwen2.5-VL-3B), on-device | Any provider (Claude, GPT, Gemini, …) | Local shipping today (v0.1); cloud engine is Phase 2 |
+| **Intel Mac** | llama.cpp-class runtime, quantized vision model | Same, any provider | Not yet built — same app, same distribution, new local backend |
+| **Windows** | llama.cpp-class runtime | Same, any provider | Stretch goal — needs a real port (capture overlay, global shortcut, tray, permissions) |
+| **Linux** | llama.cpp-class runtime | Same, any provider | Stretch goal — same as Windows; capture APIs vary per desktop environment |
+
+Why this shape:
+
+- **Cloud is the free column.** The moment Beaver runs on a platform at all,
+  cloud engine support comes for free — it's a network call, not a hardware
+  dependency. Every engineering hour for "universal support" goes into the
+  *local* column, not cloud.
+- **MLX cannot be the universal local engine.** It's built specifically around
+  Apple Silicon's unified memory architecture, with no supported Intel or
+  non-Apple path — a second local backend is required for anything beyond
+  Apple Silicon.
+- **llama.cpp is the natural second backend, not a new concept.** Mature,
+  genuinely cross-platform (CPU, plus Metal/CUDA/Vulkan), and already runs
+  the same class of quantized multimodal models (Qwen2-VL and similar) Beaver
+  targets today. It would ship the same way MLX does — bundled, no separate
+  install — as a second engine option, not a replacement.
+- **Intel Mac is the concrete near-term target; Windows/Linux are a stretch,
+  not a committed phase.** Tauri supports both, but Beaver's capture overlay,
+  global shortcut, and permission flow are macOS-specific today. Intel Mac
+  only changes the inference backend — same app, same DMG, same permission
+  model. Windows/Linux change everything else too, so that's its own project,
+  not a checkbox on this one.
+
+This reframes the Phase 4 item below: the path to "everyone else" isn't
+"cloud only" — it's local gaining a second backend everywhere Beaver already
+ships (Intel Mac), with cloud covering every platform immediately regardless
+of local-engine maturity.
+
 ## Phases
 
 ### Phase 1 — Nail the loop (v0.1 → v0.5)
@@ -157,7 +198,9 @@ Beaver currently has no settings surface; this phase creates it.
 - **Presets:** built-in library (table→CSV, invoice→JSON, translate,
   explain-error), each bindable to its own shortcut.
 - Local model options (smaller = faster for plain text; larger for gnarly
-  tables) behind the same engine picker.
+  tables) behind the same engine picker. The picker is platform-aware: it
+  only ever offers local backends the current hardware can actually run (see
+  the engine matrix above) — cloud is always offered everywhere.
 
 ### Phase 3 — Become the bridge (v1.0)
 
@@ -174,7 +217,12 @@ Beaver stops being a utility and becomes infrastructure.
 
 - Full-window and multi-region capture.
 - Batch PDF processing.
-- Revisit non-Apple-Silicon support via the cloud engine path.
+- **Intel Mac support:** add the llama.cpp-class local engine per the engine
+  matrix above; same app, same DMG, just a second local backend. Cloud engine
+  already covers Intel Mac as soon as Phase 2 ships, independent of this.
+- **Windows/Linux:** explicitly a stretch goal, not scheduled — requires its
+  own port of capture/shortcut/tray/permissions, tracked separately from this
+  roadmap if it happens.
 
 **Sequencing discipline:** no new capture surfaces or integrations before the
 core extraction is visibly better than the free alternatives. Live Text is
@@ -199,6 +247,10 @@ phoning home for a license would undercut the privacy story).
 
 ## Open questions
 
+- **Default engine on non-Apple-Silicon hardware:** does Intel Mac default to
+  local (llama.cpp-class, likely slower/lower-quality than MLX on comparable
+  Apple Silicon) or default to cloud until local quality is proven out? No
+  decision yet — revisit when Phase 4's local backend lands.
 - **HUD hint semantics:** does the one-line hint re-run locally only, or may
   it use the cloud engine when configured? (Leaning: same engine as the
   original capture.)
