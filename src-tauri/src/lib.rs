@@ -1,6 +1,8 @@
 mod capture;
 mod db;
 mod mlx;
+#[cfg(target_arch = "x86_64")]
+mod llamacpp;
 mod permission;
 mod prompts;
 mod server;
