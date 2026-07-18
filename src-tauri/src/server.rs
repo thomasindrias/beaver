@@ -275,6 +275,20 @@ fn download_fraction(downloaded: u64, total: u64) -> f64 {
     (downloaded as f64 / total as f64).min(1.0)
 }
 
+/// Whether a download should be considered complete: the byte count must
+/// match the expected total exactly, or the total must be unknown (no
+/// `Content-Length` header) — mirroring `download_fraction`'s own handling
+/// of `total: Option<u64>` for the progress percentage.
+#[cfg(target_arch = "x86_64")]
+fn download_is_complete(downloaded: u64, total: Option<u64>) -> bool {
+    total.map_or(true, |t| downloaded == t)
+}
+
+/// Downloads to a temporary `.part` file next to `dest`, then atomically
+/// renames it into place only once the byte count is verified complete.
+/// This keeps a crash or power loss mid-download from ever leaving a
+/// truncated file at `dest` — callers that only check `dest.exists()` (see
+/// `build_env`'s early-return) must never observe a partial download there.
 #[cfg(target_arch = "x86_64")]
 async fn download_with_progress(
     client: &reqwest::Client,
@@ -284,6 +298,8 @@ async fn download_with_progress(
 ) -> Result<(), String> {
     use tokio::io::AsyncWriteExt;
 
+    let tmp_dest = dest.with_extension("part");
+
     let mut resp = client
         .get(url)
         .send()
@@ -292,9 +308,9 @@ async fn download_with_progress(
         .error_for_status()
         .map_err(|e| format!("download failed: {e}"))?;
     let total = resp.content_length();
-    let mut file = tokio::fs::File::create(dest)
+    let mut file = tokio::fs::File::create(&tmp_dest)
         .await
-        .map_err(|e| format!("create {}: {e}", dest.display()))?;
+        .map_err(|e| format!("create {}: {e}", tmp_dest.display()))?;
     let mut downloaded: u64 = 0;
     while let Some(chunk) = resp
         .chunk()
@@ -303,12 +319,28 @@ async fn download_with_progress(
     {
         file.write_all(&chunk)
             .await
-            .map_err(|e| format!("write {}: {e}", dest.display()))?;
+            .map_err(|e| format!("write {}: {e}", tmp_dest.display()))?;
         downloaded += chunk.len() as u64;
         if let Some(total) = total {
             *progress.lock().unwrap() = Some(download_fraction(downloaded, total));
         }
     }
+    drop(file);
+
+    if !download_is_complete(downloaded, total) {
+        let _ = tokio::fs::remove_file(&tmp_dest).await;
+        // `download_is_complete` only returns false when `total` is known
+        // (see its doc comment), so this unwrap is safe.
+        let total = total.expect("total is Some when download_is_complete is false");
+        return Err(format!(
+            "download incomplete: got {downloaded} of {total} bytes for {}",
+            dest.display()
+        ));
+    }
+
+    tokio::fs::rename(&tmp_dest, dest)
+        .await
+        .map_err(|e| format!("rename {} to {}: {e}", tmp_dest.display(), dest.display()))?;
     Ok(())
 }
 
@@ -525,5 +557,23 @@ mod tests {
     #[test]
     fn download_fraction_avoids_division_by_zero() {
         assert_eq!(download_fraction(0, 0), 1.0);
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn download_is_complete_when_sizes_match() {
+        assert!(download_is_complete(200, Some(200)));
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn download_is_complete_false_when_truncated() {
+        assert!(!download_is_complete(150, Some(200)));
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn download_is_complete_when_total_unknown() {
+        assert!(download_is_complete(150, None));
     }
 }
