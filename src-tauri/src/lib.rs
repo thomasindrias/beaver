@@ -276,7 +276,7 @@ fn spawn_setup(handle: tauri::AppHandle) {
             }
             if let Err(e) = server::build_env(&handle) {
                 state.fail(format!(
-                    "Couldn't prepare the on-device Python environment. Check your \
+                    "Couldn't prepare the on-device model environment. Check your \
                      internet connection and try again. ({e})"
                 ));
                 return;

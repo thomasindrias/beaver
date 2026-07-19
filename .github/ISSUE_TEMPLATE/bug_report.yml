@@ -28,6 +28,6 @@ body:
     attributes:
       label: Logs
       description: >
-        Attach `beaver.log` and `mlx-server.log` from
+        Attach `beaver.log` and `engine-server.log` from
         `~/Library/Logs/se.djtl.beaver/` if you can — they contain no capture
         content, only setup/runtime diagnostics.

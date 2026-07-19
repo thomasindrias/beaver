@@ -31,6 +31,14 @@ const GGUF_MODEL_URL: &str =
 #[cfg(target_arch = "x86_64")]
 const MMPROJ_URL: &str =
     "https://huggingface.co/openbmb/MiniCPM-V-2_6-gguf/resolve/main/mmproj-model-f16.gguf";
+/// Pinned expected sizes (bytes) for the two downloads, per the implementation
+/// plan's Global Constraints section. The download URLs point at `main`, not a
+/// pinned commit, so a size mismatch is the signal that the upstream file
+/// changed underneath us — see `download_with_progress`'s fail-fast check.
+#[cfg(target_arch = "x86_64")]
+const GGUF_MODEL_SIZE_BYTES: u64 = 4_681_089_344;
+#[cfg(target_arch = "x86_64")]
+const MMPROJ_SIZE_BYTES: u64 = 1_044_425_152;
 
 /// Coarse setup phase tracked on the Rust side. The fine-grained
 /// downloading/loading/ready states come from the server's /health.
@@ -289,11 +297,19 @@ fn download_is_complete(downloaded: u64, total: Option<u64>) -> bool {
 /// This keeps a crash or power loss mid-download from ever leaving a
 /// truncated file at `dest` — callers that only check `dest.exists()` (see
 /// `build_env`'s early-return) must never observe a partial download there.
+///
+/// `expected_size` is the caller's pinned, known-correct size for `url` (see
+/// `GGUF_MODEL_SIZE_BYTES` / `MMPROJ_SIZE_BYTES`). It's used two ways: first,
+/// to fail fast if the server's own `Content-Length` disagrees (a sign the
+/// upstream file changed since it was validated); then, as the sole source of
+/// truth for progress and completeness, independent of whether the server
+/// even sends `Content-Length` at all.
 #[cfg(target_arch = "x86_64")]
 async fn download_with_progress(
     client: &reqwest::Client,
     url: &str,
     dest: &std::path::Path,
+    expected_size: u64,
     progress: &Mutex<Option<f64>>,
 ) -> Result<(), String> {
     use tokio::io::AsyncWriteExt;
@@ -307,7 +323,15 @@ async fn download_with_progress(
         .map_err(|e| format!("download request failed: {e}"))?
         .error_for_status()
         .map_err(|e| format!("download failed: {e}"))?;
-    let total = resp.content_length();
+    if let Some(reported) = resp.content_length() {
+        if reported != expected_size {
+            return Err(format!(
+                "unexpected download size for {}: server reports {reported} bytes, expected \
+                 {expected_size} (the source file may have changed)",
+                dest.display()
+            ));
+        }
+    }
     let mut file = tokio::fs::File::create(&tmp_dest)
         .await
         .map_err(|e| format!("create {}: {e}", tmp_dest.display()))?;
@@ -321,19 +345,14 @@ async fn download_with_progress(
             .await
             .map_err(|e| format!("write {}: {e}", tmp_dest.display()))?;
         downloaded += chunk.len() as u64;
-        if let Some(total) = total {
-            *progress.lock().unwrap() = Some(download_fraction(downloaded, total));
-        }
+        *progress.lock().unwrap() = Some(download_fraction(downloaded, expected_size));
     }
     drop(file);
 
-    if !download_is_complete(downloaded, total) {
+    if !download_is_complete(downloaded, Some(expected_size)) {
         let _ = tokio::fs::remove_file(&tmp_dest).await;
-        // `download_is_complete` only returns false when `total` is known
-        // (see its doc comment), so this unwrap is safe.
-        let total = total.expect("total is Some when download_is_complete is false");
         return Err(format!(
-            "download incomplete: got {downloaded} of {total} bytes for {}",
+            "download incomplete: got {downloaded} of {expected_size} bytes for {}",
             dest.display()
         ));
     }
@@ -350,10 +369,14 @@ async fn download_with_progress(
 /// binary is executable. No venv, no pip install — see the module doc.
 #[cfg(target_arch = "x86_64")]
 pub fn build_env(app: &tauri::AppHandle) -> Result<(), String> {
-    let data = app_data(app);
-    std::fs::create_dir_all(&data).map_err(|e| format!("create app data dir: {e}"))?;
-
     let llama_server = resolve_resource(app, "llama/llama-server");
+    if !llama_server.exists() {
+        return Err(format!(
+            "bundled llama-server binary not found at {} — this build is missing the \
+             resources/llama bundle",
+            llama_server.display()
+        ));
+    }
     if let Ok(meta) = std::fs::metadata(&llama_server) {
         if meta.permissions().mode() & 0o111 == 0 {
             let mut perms = meta.permissions();
@@ -362,31 +385,36 @@ pub fn build_env(app: &tauri::AppHandle) -> Result<(), String> {
         }
     }
 
+    let data = app_data(app);
+    std::fs::create_dir_all(&data).map_err(|e| format!("create app data dir: {e}"))?;
+
     let models_dir = data.join(MODEL_DIRNAME);
     std::fs::create_dir_all(&models_dir).map_err(|e| format!("create models dir: {e}"))?;
     let model_path = models_dir.join(GGUF_MODEL_FILENAME);
     let mmproj_path = models_dir.join(MMPROJ_FILENAME);
 
-    if model_path.exists() && mmproj_path.exists() {
-        return Ok(());
-    }
-
     let state = app.state::<MlxServer>();
     let client = reqwest::Client::builder()
         .build()
         .map_err(|e| format!("build download client: {e}"))?;
-    tauri::async_runtime::block_on(download_with_progress(
-        &client,
-        GGUF_MODEL_URL,
-        &model_path,
-        &state.download_progress,
-    ))?;
-    tauri::async_runtime::block_on(download_with_progress(
-        &client,
-        MMPROJ_URL,
-        &mmproj_path,
-        &state.download_progress,
-    ))?;
+    if !model_path.exists() {
+        tauri::async_runtime::block_on(download_with_progress(
+            &client,
+            GGUF_MODEL_URL,
+            &model_path,
+            GGUF_MODEL_SIZE_BYTES,
+            &state.download_progress,
+        ))?;
+    }
+    if !mmproj_path.exists() {
+        tauri::async_runtime::block_on(download_with_progress(
+            &client,
+            MMPROJ_URL,
+            &mmproj_path,
+            MMPROJ_SIZE_BYTES,
+            &state.download_progress,
+        ))?;
+    }
     Ok(())
 }
 

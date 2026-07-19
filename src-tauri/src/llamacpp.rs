@@ -9,6 +9,7 @@ use std::time::Duration;
 /// identically on both targets.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ServerStatus {
+    #[allow(dead_code)]
     Downloading,
     Loading,
     Ready,
