@@ -33,7 +33,8 @@
     "resources": [
       "resources/uv",
       "resources/mlx_server.py",
-      "resources/requirements.lock"
+      "resources/requirements.lock",
+      "resources/llama"
     ]
   },
   "plugins": {
