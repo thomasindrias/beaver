@@ -1,8 +1,5 @@
 use std::time::Duration;
 
-// Re-export prompts for backward compatibility with existing code
-pub use crate::prompts::{prompt_for, ExtractFormat};
-
 pub fn api_url(port: u16, path: &str) -> String {
     format!("http://127.0.0.1:{port}{path}")
 }

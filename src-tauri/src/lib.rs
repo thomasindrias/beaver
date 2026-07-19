@@ -1,5 +1,6 @@
 mod capture;
 mod db;
+#[cfg(target_arch = "aarch64")]
 mod mlx;
 #[cfg(target_arch = "x86_64")]
 mod llamacpp;
@@ -8,6 +9,11 @@ mod prompts;
 mod server;
 mod shortcut;
 mod update;
+
+#[cfg(target_arch = "aarch64")]
+use mlx as engine;
+#[cfg(target_arch = "x86_64")]
+use llamacpp as engine;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::sync::Mutex;
@@ -295,16 +301,16 @@ fn spawn_setup(handle: tauri::AppHandle) {
         let unreachable_grace = std::time::Duration::from_secs(60);
         let absolute_cap = std::time::Duration::from_secs(3600);
         loop {
-            match tauri::async_runtime::block_on(mlx::health(state.port)) {
+            match tauri::async_runtime::block_on(engine::health(state.port)) {
                 Ok(h) => {
                     last_reachable = std::time::Instant::now();
                     match h.status {
-                        mlx::ServerStatus::Ready => {
+                        engine::ServerStatus::Ready => {
                             *state.phase.lock().unwrap() = server::SetupPhase::ServerUp;
                             server::mark_setup_complete(&handle);
                             break;
                         }
-                        mlx::ServerStatus::Error => {
+                        engine::ServerStatus::Error => {
                             state.fail(
                                 "The on-device model failed to load. Try again — the \
                                  log file has details."
@@ -438,16 +444,18 @@ async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<MlxSta
     let port = state.port;
 
     let (label, progress) = match phase {
-        server::SetupPhase::BuildingEnv => ("preparing".to_string(), None),
+        server::SetupPhase::BuildingEnv => {
+            ("preparing".to_string(), *state.download_progress.lock().unwrap())
+        }
         server::SetupPhase::Failed => ("error".to_string(), None),
         server::SetupPhase::StartingServer | server::SetupPhase::ServerUp => {
-            match mlx::health(port).await {
+            match engine::health(port).await {
                 Ok(h) => {
                     let label = match h.status {
-                        mlx::ServerStatus::Downloading => "downloading",
-                        mlx::ServerStatus::Loading => "loading",
-                        mlx::ServerStatus::Ready => "ready",
-                        mlx::ServerStatus::Error => "error",
+                        engine::ServerStatus::Downloading => "downloading",
+                        engine::ServerStatus::Loading => "loading",
+                        engine::ServerStatus::Ready => "ready",
+                        engine::ServerStatus::Error => "error",
                     }
                     .to_string();
                     (label, h.progress)
@@ -469,7 +477,7 @@ async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<MlxSta
 #[tauri::command]
 async fn capture_and_extract(
     region: capture::CaptureRegion,
-    format: Option<mlx::ExtractFormat>,
+    format: Option<prompts::ExtractFormat>,
     state: tauri::State<'_, server::MlxServer>,
     last: tauri::State<'_, LastCapture>,
 ) -> Result<String, String> {
@@ -480,13 +488,13 @@ async fn capture_and_extract(
     let bytes = capture::capture_region(&region).map_err(|e| e.to_string())?;
     let image_base64 = STANDARD.encode(&bytes);
     *last.0.lock().unwrap() = Some(bytes);
-    let prompt = mlx::prompt_for(format.unwrap_or(mlx::ExtractFormat::Markdown), None);
-    mlx::extract_from_image(port, &image_base64, &prompt).await
+    let prompt = prompts::prompt_for(format.unwrap_or(prompts::ExtractFormat::Markdown), None);
+    engine::extract_from_image(port, &image_base64, &prompt).await
 }
 
 #[tauri::command]
 async fn re_extract(
-    format: mlx::ExtractFormat,
+    format: prompts::ExtractFormat,
     hint: Option<String>,
     state: tauri::State<'_, server::MlxServer>,
     last: tauri::State<'_, LastCapture>,
@@ -498,8 +506,8 @@ async fn re_extract(
         .clone()
         .ok_or_else(|| "no-capture-cached".to_string())?;
     let image_base64 = STANDARD.encode(&bytes);
-    let prompt = mlx::prompt_for(format, hint.as_deref());
-    mlx::extract_from_image(state.port, &image_base64, &prompt).await
+    let prompt = prompts::prompt_for(format, hint.as_deref());
+    engine::extract_from_image(state.port, &image_base64, &prompt).await
 }
 
 #[tauri::command]
