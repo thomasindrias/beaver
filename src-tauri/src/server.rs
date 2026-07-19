@@ -576,4 +576,36 @@ mod tests {
     fn download_is_complete_when_total_unknown() {
         assert!(download_is_complete(150, None));
     }
+
+    #[cfg(target_arch = "x86_64")]
+    fn llama_resource_dir() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources").join("llama")
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn llama_server_binary_is_bundled_and_executable() {
+        let bin = llama_resource_dir().join("llama-server");
+        assert!(bin.exists(), "expected {} to exist", bin.display());
+        let meta = std::fs::metadata(&bin).unwrap();
+        assert!(meta.permissions().mode() & 0o111 != 0, "llama-server must be executable");
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn every_rpath_dylib_dependency_is_present_alongside_the_binary() {
+        let dir = llama_resource_dir();
+        let bin = dir.join("llama-server");
+        let output = std::process::Command::new("otool")
+            .arg("-L")
+            .arg(&bin)
+            .output()
+            .expect("otool must be available on macOS");
+        let text = String::from_utf8_lossy(&output.stdout);
+        for line in text.lines().skip(1) {
+            if let Some(name) = line.trim().split(' ').next().and_then(|p| p.strip_prefix("@rpath/")) {
+                assert!(dir.join(name).exists(), "missing bundled dependency: {name}");
+            }
+        }
+    }
 }
