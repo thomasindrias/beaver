@@ -1,0 +1,50 @@
+name: Test llama.cpp Intel engine
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src-tauri/src/llamacpp.rs'
+      - 'src-tauri/src/server.rs'
+      - 'src-tauri/src/prompts.rs'
+      - 'src-tauri/src/lib.rs'
+      - 'src-tauri/resources/llama/**'
+      - 'src-tauri/tests/fixtures/**'
+      - '.github/workflows/test-llamacpp-intel.yml'
+
+jobs:
+  test:
+    name: Build and test (native Intel)
+    runs-on: macos-15-intel
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Cache the MiniCPM-V test model
+        id: model-cache
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/tests/.model-cache
+          key: minicpmv-2_6-q4_k_m-mmproj-f16-v1
+
+      - name: Download the test model (cache miss only)
+        if: steps.model-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p src-tauri/tests/.model-cache
+          curl -sL -o src-tauri/tests/.model-cache/model.gguf \
+            "https://huggingface.co/openbmb/MiniCPM-V-2_6-gguf/resolve/main/ggml-model-Q4_K_M.gguf"
+          curl -sL -o src-tauri/tests/.model-cache/mmproj.gguf \
+            "https://huggingface.co/openbmb/MiniCPM-V-2_6-gguf/resolve/main/mmproj-model-f16.gguf"
+
+      - name: cargo test (including the real end-to-end extraction)
+        working-directory: src-tauri
+        env:
+          BEAVER_TEST_GGUF_MODEL: ${{ github.workspace }}/src-tauri/tests/.model-cache/model.gguf
+          BEAVER_TEST_MMPROJ: ${{ github.workspace }}/src-tauri/tests/.model-cache/mmproj.gguf
+        run: cargo test -- --include-ignored

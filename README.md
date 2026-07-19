@@ -50,10 +50,12 @@ off.
 
 ## Prerequisites
 
-- macOS on Apple Silicon
+- macOS (Apple Silicon uses the MLX vision backend; Intel Macs can now build
+  and run from source against a llama.cpp local engine — see
+  `src-tauri/src/llamacpp.rs`. Packaged Intel releases aren't shipped yet.)
 - [Rust](https://rustup.rs) (stable)
 - [Node.js](https://nodejs.org) + [pnpm](https://pnpm.io)
-- [uv](https://github.com/astral-sh/uv) — used to provision the Python vision environment
+- [uv](https://github.com/astral-sh/uv) — used to provision the Python vision environment on Apple Silicon
 
 ## Development
 

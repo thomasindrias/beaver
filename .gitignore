@@ -15,6 +15,9 @@ dist-ssr
 target/
 *.local
 
+# llama.cpp Intel CI test model cache (downloaded, not committed)
+src-tauri/tests/.model-cache/
+
 # Python (MLX vision server bytecode)
 __pycache__/
 *.pyc
