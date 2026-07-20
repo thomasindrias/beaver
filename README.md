@@ -136,9 +136,10 @@ GitHub Actions includes:
   expectations.
 - Beaver is released under the [MIT License](LICENSE).
 
-The macOS app requires screen capture and a bundled Python/MLX runtime. Keep
-changes to Tauri permissions, hardened-runtime entitlements, and network
-behavior narrow and documented.
+The macOS app requires screen capture and a bundled on-device vision runtime
+(Python/MLX on Apple Silicon, llama.cpp on Intel). Keep changes to Tauri
+permissions, hardened-runtime entitlements, and network behavior narrow and
+documented.
 
 ## Project layout
 
