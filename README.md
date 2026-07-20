@@ -6,16 +6,18 @@ inside it as clean Markdown — tables stay tables, lists stay lists, code stays
 code. Vision runs **fully on-device** after a one-time model download, so
 captures never leave your machine.
 
-> Apple Silicon only. The vision model runs on Apple's MLX framework, which
-> requires an M-series Mac.
+> Vision runs on-device via [MLX](https://github.com/ml-explore/mlx) on Apple
+> Silicon, or [llama.cpp](https://github.com/ggml-org/llama.cpp) on Intel Macs
+> — same install, same privacy guarantee, either way.
 
 <!-- Demo assets: record with the capture flow + popover, save to docs/media/demo.gif, then uncomment.
 ![Beaver turning a screenshot region into Markdown](docs/media/demo.gif)
 -->
 
-## Install (macOS, Apple Silicon)
+## Install (macOS)
 
-1. Download `Beaver_<version>_aarch64.dmg`.
+1. Download `Beaver_<version>_aarch64.dmg` (Apple Silicon) or
+   `Beaver_<version>_x86_64.dmg` (Intel).
 2. Open the DMG and drag **Beaver** into **Applications**.
 3. Launch Beaver from Applications. Grant Screen Recording permission when asked.
 
@@ -50,9 +52,9 @@ off.
 
 ## Prerequisites
 
-- macOS (Apple Silicon uses the MLX vision backend; Intel Macs can now build
-  and run from source against a llama.cpp local engine — see
-  `src-tauri/src/llamacpp.rs`. Packaged Intel releases aren't shipped yet.)
+- macOS (Apple Silicon uses the MLX vision backend; Intel Macs use a
+  llama.cpp local engine — see `src-tauri/src/llamacpp.rs`. Both ship as
+  packaged, notarized releases.)
 - [Rust](https://rustup.rs) (stable)
 - [Node.js](https://nodejs.org) + [pnpm](https://pnpm.io)
 - [uv](https://github.com/astral-sh/uv) — used to provision the Python vision environment on Apple Silicon
@@ -91,10 +93,12 @@ pnpm tauri build        # produce the signed .app / .dmg
 
 ## Building a release
 
-Requires Apple Silicon, Rust, and pnpm.
+Requires Apple Silicon, Rust, and pnpm. The script cross-compiles either
+target from the same machine:
 
 ```bash
-pnpm release:mac
+pnpm release:mac                      # aarch64-apple-darwin (default)
+pnpm release:mac x86_64-apple-darwin  # cross-compiled Intel build
 ```
 
 Without credentials this produces an **unsigned** DMG for local testing. To sign
