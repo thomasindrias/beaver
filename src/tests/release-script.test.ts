@@ -75,9 +75,21 @@ describe("updater artifacts", () => {
     expect(tarball).toBeGreaterThan(stapleApp);
   });
 
-  it("emits a latest.json manifest with the darwin-aarch64 platform", () => {
-    expect(sh).toContain("latest.json");
-    expect(sh).toContain("darwin-aarch64");
+  it("emits a per-architecture latest-fragment.json, not a full manifest", () => {
+    expect(sh).toContain("latest-fragment.json");
+    expect(sh).toContain('"darwin-${ARCH}"');
+    expect(sh).not.toContain("latest.json");
+  });
+
+  it("accepts the target architecture as an optional first argument, defaulting to aarch64-apple-darwin", () => {
+    expect(sh).toContain('TARGET="${1:-aarch64-apple-darwin}"');
+    expect(sh).toContain('ARCH="${TARGET%%-*}"');
+  });
+
+  it("names the DMG and updater tarball after the resolved architecture, not hardcoded to aarch64", () => {
+    expect(sh).toContain("Beaver_${VERSION}_${ARCH}.dmg");
+    expect(sh).toContain("Beaver_${VERSION}_${ARCH}.app.tar.gz");
+    expect(sh).not.toContain("Beaver_${VERSION}_aarch64.app.tar.gz");
   });
 
   it("documents the updater key in .env.release.example", () => {

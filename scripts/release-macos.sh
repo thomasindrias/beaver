@@ -22,7 +22,8 @@ if [[ "${1:-}" == "--print-mode" ]]; then
   exit 0
 fi
 
-TARGET="aarch64-apple-darwin"
+TARGET="${1:-aarch64-apple-darwin}"
+ARCH="${TARGET%%-*}"
 MODE="$(print_mode)"
 echo "==> Beaver release (mode: ${MODE}, target: ${TARGET})"
 if [[ "$MODE" == "unsigned" ]]; then
@@ -71,7 +72,7 @@ fi
 
 VERSION="$(node -p "require('./package.json').version")"
 DMG_DIR="$BUNDLE/dmg"
-DMG="${DMG_DIR}/Beaver_${VERSION}_${TARGET%%-*}.dmg"
+DMG="${DMG_DIR}/Beaver_${VERSION}_${ARCH}.dmg"
 mkdir -p "$DMG_DIR"
 rm -f "$DMG"
 
@@ -114,7 +115,10 @@ if [[ "$MODE" == "signed" ]]; then
 fi
 
 # 4. Updater artifacts: tar.gz of the (signed, stapled) .app plus a minisign
-#    signature and the latest.json manifest the in-app updater consumes.
+#    signature and a per-architecture latest-fragment.json. A separate
+#    "publish" CI job (release-macos.yml) merges one fragment per
+#    architecture into the single manifest the in-app updater actually
+#    consumes — this script only ever knows about its own $ARCH.
 #    Gated on the updater key — local test builds without it skip this and
 #    ship a DMG only. The tarball is built AFTER codesigning/stapling so the
 #    updater distributes exactly the bytes the DMG carries.
@@ -125,26 +129,24 @@ if [[ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]]; then
   fi
   UPDATER_DIR="$BUNDLE/updater"
   mkdir -p "$UPDATER_DIR"
-  TARBALL="$UPDATER_DIR/Beaver_${VERSION}_aarch64.app.tar.gz"
-  rm -f "$TARBALL" "$TARBALL.sig" "$UPDATER_DIR/latest.json"
+  TARBALL="$UPDATER_DIR/Beaver_${VERSION}_${ARCH}.app.tar.gz"
+  rm -f "$TARBALL" "$TARBALL.sig" "$UPDATER_DIR/latest-fragment.json"
   tar -czf "$TARBALL" -C "$(dirname "$APP")" "$(basename "$APP")"
 
   pnpm tauri signer sign "$TARBALL" --password "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}"
 
   TAG="${BEAVER_RELEASE_TAG:-v${VERSION}}"
   if [[ "$TAG" != "v${VERSION}" ]]; then
-    echo "!!  Tag ${TAG} does not match package version v${VERSION} — latest.json will self-heal via fallback, but check your dispatch input."
+    echo "!!  Tag ${TAG} does not match package version v${VERSION} — the merged manifest (built during publish) uses \$VERSION regardless of \$TAG, so double-check your dispatch input."
   fi
   ASSET_URL="https://github.com/thomasindrias/beaver/releases/download/${TAG}/$(basename "$TARBALL")"
   node -e '
     const fs = require("fs");
-    const [version, sigPath, url, out] = process.argv.slice(1);
+    const [platformKey, sigPath, url, out] = process.argv.slice(1);
     fs.writeFileSync(out, JSON.stringify({
-      version,
-      pub_date: new Date().toISOString(),
-      platforms: { "darwin-aarch64": { signature: fs.readFileSync(sigPath, "utf8").trim(), url } },
+      [platformKey]: { signature: fs.readFileSync(sigPath, "utf8").trim(), url },
     }, null, 2) + "\n");
-  ' "$VERSION" "$TARBALL.sig" "$ASSET_URL" "$UPDATER_DIR/latest.json"
+  ' "darwin-${ARCH}" "$TARBALL.sig" "$ASSET_URL" "$UPDATER_DIR/latest-fragment.json"
   echo "==> Updater artifacts in $UPDATER_DIR"
 fi
 
