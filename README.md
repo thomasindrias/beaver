@@ -28,14 +28,16 @@ captures never leave your machine.
 
 1. `Cmd+Shift+D` opens a full-screen capture overlay.
 2. You drag a bounding box around the region of interest.
-3. The cropped image is sent to a local FastAPI server running
-   `Qwen2.5-VL-3B-Instruct-4bit` via MLX.
+3. The cropped image is sent to a local vision server — `Qwen2.5-VL-3B-Instruct-4bit`
+   via MLX on Apple Silicon, or MiniCPM-V 2.6 via llama.cpp's `llama-server`
+   on Intel.
 4. The extracted Markdown is returned, stored in a local SQLite history, and
    copied to your clipboard.
 
-On first launch Beaver downloads the ~3 GB vision model and prepares an
-on-device Python environment (the only time it needs the internet). A progress
-bar tracks the download; extraction then runs fully offline. The only later
+On first launch Beaver downloads its vision model and (on Apple Silicon)
+prepares an on-device Python environment — the only time it needs the
+internet. A progress bar tracks the download; extraction then runs fully
+offline. The only later
 network calls are update-related and go exclusively to GitHub:
 an optional once-a-day version check against GitHub Releases, and — only when
 you click the update pill — downloading the new release from the same place.
@@ -47,7 +49,9 @@ off.
 
 - **Shell:** [Tauri 2](https://tauri.app) (Rust core, macOS menu-bar app)
 - **Frontend:** React 19 + TypeScript + Vite 7, Tailwind CSS v4, shadcn
-- **Vision backend:** Python FastAPI + [MLX](https://github.com/ml-explore/mlx) (`mlx-vlm`)
+- **Vision backend:** Python FastAPI + [MLX](https://github.com/ml-explore/mlx) (`mlx-vlm`) on
+  Apple Silicon, or [llama.cpp](https://github.com/ggml-org/llama.cpp)'s `llama-server`
+  (no Python) on Intel
 - **Storage:** SQLite via `tauri-plugin-sql`
 
 ## Prerequisites
