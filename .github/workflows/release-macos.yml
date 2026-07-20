@@ -128,15 +128,20 @@ jobs:
         run: |
           VERSION="$(node -p "require('./package.json').version")"
           node scripts/merge-release-manifest.mjs "$VERSION" artifacts latest.json
-          echo "==> Merged manifest:"
-          cat latest.json
+          if [[ -f latest.json ]]; then
+            echo "==> Merged manifest:"
+            cat latest.json
+          else
+            echo "==> No updater fragments found; publishing DMGs only."
+          fi
 
       - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           shopt -s nullglob
-          ASSETS=(latest.json)
+          ASSETS=()
+          [[ -f latest.json ]] && ASSETS+=(latest.json)
           for dmg_dir in artifacts/Beaver-macOS-DMG-*; do
             ASSETS+=("$dmg_dir"/*.dmg)
           done

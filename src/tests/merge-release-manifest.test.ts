@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -46,16 +46,15 @@ describe("merge-release-manifest.mjs", () => {
     expect(typeof manifest.pub_date).toBe("string");
   });
 
-  it("errors out when no fragments are found", () => {
+  it("skips writing the manifest when no fragments are found, exiting cleanly", () => {
     const artifactsDir = join(scratch, "empty-artifacts");
     mkdirSync(artifactsDir, { recursive: true });
     const outPath = join(scratch, "latest.json");
 
-    expect(() =>
-      execFileSync("node", ["scripts/merge-release-manifest.mjs", "0.2.0", artifactsDir, outPath], {
-        encoding: "utf8",
-        stdio: "pipe",
-      })
-    ).toThrow();
+    execFileSync("node", ["scripts/merge-release-manifest.mjs", "0.2.0", artifactsDir, outPath], {
+      encoding: "utf8",
+    });
+
+    expect(existsSync(outPath)).toBe(false);
   });
 });

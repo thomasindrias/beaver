@@ -3,6 +3,10 @@
 // release-macos.sh) into the single latest.json the in-app updater consumes.
 //
 // Usage: merge-release-manifest.mjs <version> <artifacts-dir> <out-path>
+// If no fragments are found (e.g. the updater signing key was unset for
+// every matrix leg), skips writing the manifest entirely and exits 0 — the
+// release still publishes with DMGs only, matching how a single-target
+// build without the updater key has always degraded gracefully.
 import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 
 const [, , version, artifactsDir, outPath] = process.argv;
@@ -20,8 +24,8 @@ for (const entry of readdirSync(artifactsDir)) {
 }
 
 if (Object.keys(platforms).length === 0) {
-  console.error(`no updater fragments found under ${artifactsDir}`);
-  process.exit(1);
+  console.log(`no updater fragments found under ${artifactsDir} — skipping manifest, releasing DMGs only`);
+  process.exit(0);
 }
 
 writeFileSync(
