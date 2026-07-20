@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "GitHub release tag to create or update, for example v0.1.0. Leave blank to only upload an artifact."
+        description: "GitHub release tag to create or update, for example v0.2.0. Leave blank to only upload build artifacts."
         required: false
         type: string
 
@@ -13,8 +13,12 @@ permissions:
 
 jobs:
   build:
-    name: Build macOS DMG
+    name: Build macOS DMG (${{ matrix.target }})
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
 
     env:
       APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -50,7 +54,7 @@ jobs:
         run: |
           rustup toolchain install stable --profile minimal
           rustup default stable
-          rustup target add aarch64-apple-darwin
+          rustup target add ${{ matrix.target }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
@@ -83,34 +87,63 @@ jobs:
           printf '%s' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY_PATH"
 
       - name: Build release DMG
-        run: pnpm release:mac
+        run: pnpm release:mac ${{ matrix.target }}
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Beaver-macOS-DMG
-          path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          name: Beaver-macOS-DMG-${{ matrix.target }}
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
           if-no-files-found: error
 
       - name: Upload updater artifacts
         if: env.TAURI_SIGNING_PRIVATE_KEY != ''
         uses: actions/upload-artifact@v4
         with:
-          name: Beaver-macOS-Updater
-          path: src-tauri/target/aarch64-apple-darwin/release/bundle/updater/*
+          name: Beaver-macOS-Updater-${{ matrix.target }}
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/updater/*
           if-no-files-found: error
 
+  publish:
+    name: Publish GitHub release
+    needs: build
+    if: inputs.tag_name != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Beaver-macOS-*
+          path: artifacts
+
+      - name: Merge per-architecture updater fragments into one latest.json
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/merge-release-manifest.mjs "$VERSION" artifacts latest.json
+          echo "==> Merged manifest:"
+          cat latest.json
+
       - name: Create or update GitHub release
-        if: inputs.tag_name != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          DMG="$(find src-tauri/target/aarch64-apple-darwin/release/bundle/dmg -name '*.dmg' -print -quit)"
-          UPDATER_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle/updater"
-          ASSETS=("$DMG")
-          if [[ -f "$UPDATER_DIR/latest.json" ]]; then
-            ASSETS+=("$UPDATER_DIR"/*.app.tar.gz "$UPDATER_DIR/latest.json")
-          fi
+          shopt -s nullglob
+          ASSETS=(latest.json)
+          for dmg_dir in artifacts/Beaver-macOS-DMG-*; do
+            ASSETS+=("$dmg_dir"/*.dmg)
+          done
+          for updater_dir in artifacts/Beaver-macOS-Updater-*; do
+            ASSETS+=("$updater_dir"/*.app.tar.gz "$updater_dir"/*.app.tar.gz.sig)
+          done
+          shopt -u nullglob
           if gh release view "${{ inputs.tag_name }}" >/dev/null 2>&1; then
             gh release upload "${{ inputs.tag_name }}" "${ASSETS[@]}" --clobber
           else
