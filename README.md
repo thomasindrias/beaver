@@ -57,8 +57,8 @@ off.
 ## Prerequisites
 
 - macOS (Apple Silicon uses the MLX vision backend; Intel Macs use a
-  llama.cpp local engine — see `src-tauri/src/llamacpp.rs`. Both ship as
-  packaged, notarized releases.)
+  llama.cpp local engine — see `src-tauri/src/engine/llamacpp.rs`. Both ship
+  as packaged, notarized releases.)
 - [Rust](https://rustup.rs) (stable)
 - [Node.js](https://nodejs.org) + [pnpm](https://pnpm.io)
 - [uv](https://github.com/astral-sh/uv) — used to provision the Python vision environment on Apple Silicon
@@ -147,13 +147,18 @@ documented.
 src/                       React frontend
   components/              UI (capture overlay, onboarding, toast, …)
   hooks/                   useBeaver (capture flow), useCaptures (history)
+  lib/api.ts               typed wrappers for every Tauri command
   tests/                   vitest specs
 src-tauri/                 Rust core
   src/
-    lib.rs                 app setup, Tauri commands, window wiring
+    lib.rs                 app wiring: plugins, tray, shortcut, run events
+    commands.rs            every #[tauri::command] the frontend can invoke
+    windows.rs             popover/overlay/onboarding window management
     capture.rs             screen capture + region crop
-    server.rs              MLX server lifecycle (venv build, spawn, health)
-    mlx.rs                 HTTP client for the vision server
+    server.rs              engine-neutral setup supervision + app-data paths
+    engine/                vision backends behind one shared contract
+      mlx.rs               MLX (Apple Silicon): venv build, spawn, HTTP client
+      llamacpp.rs          llama.cpp (Intel): model download, spawn, client
     shortcut.rs            global shortcut binding
     db.rs                  SQLite schema + migrations
   resources/
