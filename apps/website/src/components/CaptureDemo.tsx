@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
+import { useEffect, useState } from "react";
+import { useInView } from "../hooks/useInView";
 
 const MARKDOWN = `| Plan     | Seats | Price   |
 | -------- | ----- | ------- |
@@ -14,35 +14,12 @@ const CHARS_PER_TICK = 6;
 type Phase = "selecting" | "typing" | "done";
 
 export function CaptureDemo() {
-  const prefersReducedMotion = usePrefersReducedMotion();
-  const boxRef = useRef<HTMLDivElement | null>(null);
-  const [inView, setInView] = useState(false);
+  const { ref: boxRef, inView, prefersReducedMotion } = useInView<HTMLDivElement>(0.4);
   const [phase, setPhase] = useState<Phase>("selecting");
   const [typed, setTyped] = useState("");
   const [replayKey, setReplayKey] = useState(0);
 
-  // Wait until the demo scrolls into view before starting the capture.
-  useEffect(() => {
-    if (prefersReducedMotion || inView) return;
-    const node = boxRef.current;
-    if (!node || typeof IntersectionObserver === "undefined") {
-      setInView(true);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.4 },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [prefersReducedMotion, inView]);
-
-  // Run (or replay) the select-then-type sequence.
+  // Run (or replay) the select-then-type sequence, once in view.
   useEffect(() => {
     if (prefersReducedMotion) {
       setPhase("done");
@@ -87,7 +64,7 @@ export function CaptureDemo() {
           on your screen
         </span>
         <div className="relative overflow-hidden rounded-lg border-[1.5px] border-line text-xs">
-          <div className="bg-[#efe7d8] px-2.5 py-1 text-[10.5px] text-muted">
+          <div className="bg-[#efe7d8] px-2.5 py-1 text-2xs text-muted">
             plans.pdf · page 3 of 12 · read-only
           </div>
           <table className="w-full border-collapse bg-white">
@@ -156,7 +133,7 @@ export function CaptureDemo() {
           <button
             type="button"
             onClick={() => setReplayKey((k) => k + 1)}
-            className="mt-3 text-[11.5px] font-semibold text-sun/70 hover:text-sun"
+            className="mt-3 text-2xs font-semibold text-sun/70 hover:text-sun"
           >
             ↻ Replay capture
           </button>

@@ -15,11 +15,11 @@ export function Nav() {
       ].join(" ")}
     >
       <div className="mx-auto flex max-w-[1040px] items-center justify-between px-6 py-5">
-        <a href="#" className="flex items-center gap-2.5 text-[19px] font-extrabold">
+        <a href="#" className="flex items-center gap-2.5 text-body-lg font-extrabold">
           <BrandMark size={34} decorative />
           Beaver
         </a>
-        <div className="flex flex-wrap items-center justify-end gap-3 text-[14px] font-semibold sm:gap-5 sm:text-[15px]">
+        <div className="flex flex-wrap items-center justify-end gap-3 text-body-sm font-semibold sm:gap-5">
           <a href="#how" className="hidden text-bark-soft hover:text-ink sm:block">
             How it works
           </a>

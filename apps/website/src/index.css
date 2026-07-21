@@ -26,6 +26,15 @@
   --shadow-sticker: 0 5px 0 var(--color-ink);
   --shadow-sticker-lg: 0 7px 0 var(--color-ink);
   --shadow-sticker-dark: 0 5px 0 rgba(0, 0, 0, 0.4);
+
+  /* Five named sizes cover every piece of body/label text on the page.
+     Tailwind's own xs/sm/base scale and headline clamp() sizes are
+     untouched — this only replaces the arbitrary text-[Npx] sprawl. */
+  --text-2xs: 11px;
+  --text-caption: 13px;
+  --text-body-sm: 15px;
+  --text-body: 17px;
+  --text-body-lg: 19px;
 }
 
 @layer base {

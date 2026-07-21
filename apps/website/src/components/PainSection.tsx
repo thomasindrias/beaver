@@ -34,7 +34,7 @@ export function PainSection() {
             <h2 className="font-display text-[clamp(30px,4vw,46px)] leading-[1.05] font-extrabold">
               The busywork nobody signed up for
             </h2>
-            <p className="max-w-[480px] text-[16.5px] text-[#dff3ee]">
+            <p className="max-w-[480px] text-body text-[#dff3ee]">
               Information you can see but can't use, so you type it out again.
               Sound familiar?
             </p>
@@ -51,13 +51,13 @@ export function PainSection() {
                 i % 2 === 0 ? "-rotate-1" : "rotate-1",
               ].join(" ")}
             >
-              <span className="mb-2.5 inline-block rounded-md bg-[#d9efe9] px-2 py-0.5 text-[11.5px] font-extrabold tracking-wider text-river-deep uppercase">
+              <span className="mb-2.5 inline-block rounded-md bg-[#d9efe9] px-2 py-0.5 text-2xs font-extrabold tracking-wider text-river-deep uppercase">
                 {pain.tag}
               </span>
-              <h3 className="mb-1.5 text-[16.5px] font-extrabold">
+              <h3 className="mb-1.5 text-body font-extrabold">
                 {pain.title}
               </h3>
-              <p className="text-sm text-bark-soft">{pain.body}</p>
+              <p className="text-body-sm text-bark-soft">{pain.body}</p>
             </Reveal>
           ))}
         </div>

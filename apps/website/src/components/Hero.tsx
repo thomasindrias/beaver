@@ -9,7 +9,7 @@ export function Hero() {
           Stop <em className="font-semibold text-orange">retyping</em> your
           screen.
         </h1>
-        <p className="mb-7 max-w-[480px] text-[18.5px] text-bark-soft">
+        <p className="mb-7 max-w-[480px] text-body-lg text-bark-soft">
           Tables in PDFs. Code in videos. Slides on calls. You can see the
           data, you just can't copy it.{" "}
           <strong className="text-ink">Beaver can.</strong> One drag, and it's
@@ -26,14 +26,14 @@ export function Hero() {
             See how it works
           </a>
         </div>
-        <p className="mt-3.5 text-[13.5px] font-semibold text-muted">
+        <p className="mt-3.5 text-caption font-semibold text-muted">
           {QUALIFIER}
         </p>
       </div>
       <div className="relative text-center max-md:order-first">
         <span
           aria-hidden
-          className="bubble-tail absolute top-[-12px] right-[4%] rotate-3 rounded-2xl border-[2.5px] border-ink bg-paper px-4 py-2.5 text-[14.5px] font-extrabold shadow-[0_4px_0_var(--color-ink)]"
+          className="bubble-tail absolute top-[-12px] right-[4%] rotate-3 rounded-2xl border-[2.5px] border-ink bg-paper px-4 py-2.5 text-body-sm font-extrabold shadow-[0_4px_0_var(--color-ink)]"
         >
           Drag a box around anything.
         </span>

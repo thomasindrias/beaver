@@ -19,17 +19,17 @@ describe("App", () => {
       "One drag. Dam, done.",
       "paste it into ChatGPT",
       "Your data sleeps at home.",
-      "What people grab with it",
+      "It doesn't care where it came from.",
       "Give your Mac a beaver.",
     ].map((needle) => headings.findIndex((h) => h.includes(needle)));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
-  it("shows four busywork stickers and four use cases", () => {
+  it("shows four busywork stickers and a broader spread of use-case chips", () => {
     render(<App />);
     expect(screen.getAllByTestId("pain-sticker")).toHaveLength(4);
-    expect(screen.getAllByTestId("use-case")).toHaveLength(4);
+    expect(screen.getAllByTestId("use-case").length).toBeGreaterThan(4);
   });
 
   it("offers a download CTA in the nav and the closer", () => {

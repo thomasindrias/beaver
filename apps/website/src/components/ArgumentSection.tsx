@@ -1,5 +1,6 @@
 import { Mascot } from "./Mascot";
 import { Reveal } from "./Reveal";
+import { Receipt } from "./Receipt";
 
 const POINTS = [
   {
@@ -44,32 +45,6 @@ const POINTS = [
   },
 ];
 
-const RECEIPT_ROWS: Array<{
-  text: string;
-  amount: string;
-  kind: "head-burn" | "head-calm" | "burn" | "calm" | "fine" | "total";
-}> = [
-  { text: "ATTACH SCREENSHOT", amount: "", kind: "head-burn" },
-  { text: "1× window shot, 1440×900", amount: "1,928 tk", kind: "burn" },
-  { text: "· downscaled before reading", amount: "incl.", kind: "fine" },
-  { text: "· illegible digits guessed", amount: "incl.", kind: "fine" },
-  { text: "· uploaded to a datacenter", amount: "incl.", kind: "fine" },
-  { text: "SAME TABLE, VIA BEAVER", amount: "", kind: "head-calm" },
-  { text: "1× markdown table, this size", amount: "184 tk", kind: "calm" },
-  { text: "· structure intact", amount: "incl.", kind: "fine" },
-  { text: "· never left your mac", amount: "incl.", kind: "fine" },
-  { text: "YOU SAVE", amount: "usually 90%+", kind: "total" },
-];
-
-const ROW_STYLES: Record<string, string> = {
-  "head-burn": "font-extrabold text-burn",
-  "head-calm": "font-extrabold text-river-deep",
-  burn: "text-burn",
-  calm: "text-river-deep",
-  fine: "text-[11.5px] font-normal text-muted",
-  total: "text-sm font-extrabold",
-};
-
 export function ArgumentSection() {
   return (
     <section id="argument" className="bg-cream-deep">
@@ -79,7 +54,7 @@ export function ArgumentSection() {
             <h2 className="font-display text-[clamp(30px,4vw,46px)] leading-[1.05] font-extrabold">
               "Can't I just paste it into ChatGPT?"
             </h2>
-            <p className="mt-3.5 max-w-[54ch] text-base text-bark-soft">
+            <p className="mt-3.5 max-w-[54ch] text-body text-bark-soft">
               You can, and for a meme it's fine. For data it's slow, pricier
               than it looks, and lossy in ways you don't see until a number is
               wrong. <strong className="text-ink">Here's the receipt.</strong>
@@ -88,7 +63,7 @@ export function ArgumentSection() {
           <div className="relative text-center">
             <span
               aria-hidden
-              className="absolute top-0 right-[8%] rotate-8 rounded-[10px] border-[3px] border-orange-deep bg-cream/80 px-3 py-1.5 font-display text-[15px] font-[850] text-orange-deep italic"
+              className="absolute top-0 right-[8%] rotate-8 rounded-[10px] border-[3px] border-orange-deep bg-cream/80 px-3 py-1.5 font-display text-body-sm font-[850] text-orange-deep italic"
             >
               no thanks
             </span>
@@ -101,49 +76,8 @@ export function ArgumentSection() {
         </div>
 
         <div className="grid items-start gap-12 max-md:grid-cols-1 md:grid-cols-[420px_1fr]">
-          <Reveal
-            index={0}
-            className="relative max-md:mx-auto max-md:max-w-[420px]"
-          >
-            <span
-              aria-hidden
-              className="absolute top-[-13px] left-1/2 z-10 h-[26px] w-[92px] -translate-x-1/2 -rotate-3 border-x border-dashed border-ink/25 bg-sun/50"
-            />
-            <div
-              role="img"
-              aria-label="Receipt comparing the token cost of a screenshot against Beaver's Markdown output"
-              className="lift-on-hover -rotate-[1.4deg] border-[2.5px] border-ink bg-paper px-6 py-7 pb-5 font-mono text-[13px] leading-[1.9] font-semibold shadow-[var(--shadow-sticker-lg)]"
-            >
-              <p className="text-center text-sm font-bold tracking-wider">
-                *** YOUR TOKEN RECEIPT ***
-              </p>
-              <p className="mb-3.5 text-center text-[11px] font-normal text-muted">
-                one table, sent to a vision model two ways
-              </p>
-              {RECEIPT_ROWS.map((row) => (
-                <div key={row.text}>
-                  {(row.kind === "head-calm" || row.kind === "total") && (
-                    <div className="my-3 border-t-2 border-dashed border-line" />
-                  )}
-                  <div
-                    className={`flex justify-between gap-3 ${ROW_STYLES[row.kind]}`}
-                  >
-                    <span>{row.text}</span>
-                    {row.amount && (
-                      <>
-                        <span className="-translate-y-[5px] flex-1 border-b-2 border-dotted border-line" />
-                        <span className="whitespace-nowrap tabular-nums">
-                          {row.amount}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-              <p className="mt-3.5 text-center text-[11px] font-normal text-muted">
-                thank you for reading the fine print
-              </p>
-            </div>
+          <Reveal index={0}>
+            <Receipt />
           </Reveal>
 
           <div className="flex flex-col gap-4.5">
@@ -153,13 +87,13 @@ export function ArgumentSection() {
                 index={i + 1}
                 className="card-sticker lift-on-hover rounded-[14px] px-5 py-4.5"
               >
-                <h3 className="mb-1 text-[16.5px] font-extrabold">
+                <h3 className="mb-1 text-body font-extrabold">
                   <span className="mr-2 font-display text-[19px] text-burn">
                     {i + 1}
                   </span>
                   {point.title}
                 </h3>
-                <p className="text-[14.5px] text-bark-soft">{point.body}</p>
+                <p className="text-body-sm text-bark-soft">{point.body}</p>
               </Reveal>
             ))}
             <Reveal index={POINTS.length + 1}>
@@ -171,7 +105,7 @@ export function ArgumentSection() {
           </div>
         </div>
 
-        <p className="mt-11 text-center text-[16.5px] text-bark-soft">
+        <p className="mt-11 text-center text-body text-bark-soft">
           Beaver reads the exact region you box, at full resolution, on your
           Mac. The exact savings depend on the table, but the direction
           never flips:{" "}

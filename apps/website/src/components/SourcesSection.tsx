@@ -22,10 +22,10 @@ export function SourcesSection() {
       data-testid="sources"
       className="mx-auto max-w-[1040px] px-6 pb-2.5"
     >
-      <h3 className="mb-3 text-[13px] font-extrabold tracking-wider text-muted uppercase">
+      <h3 className="mb-3 text-caption font-extrabold tracking-wider text-muted uppercase">
         Sources
       </h3>
-      <ol className="list-decimal pl-5 text-[13px] text-muted">
+      <ol className="list-decimal pl-5 text-caption text-muted">
         {SOURCES.map((source) => (
           <li key={source.id} id={source.id} className="mb-1.5">
             {source.text}

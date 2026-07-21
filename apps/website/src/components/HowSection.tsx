@@ -7,7 +7,7 @@ const STEPS = [
     title: (
       <>
         Press{" "}
-        <kbd className="rounded-md border-[1.5px] border-b-[3px] border-ink bg-cream-deep px-1.5 py-0.5 font-mono text-[13px]">
+        <kbd className="rounded-md border-[1.5px] border-b-[3px] border-ink bg-cream-deep px-1.5 py-0.5 font-mono text-caption">
           ⌘⇧D
         </kbd>
       </>
@@ -50,14 +50,14 @@ export function HowSection() {
                 {i + 1}
               </span>
               <div>
-                <h3 className="mb-0.5 text-[16.5px] font-extrabold">
+                <h3 className="mb-0.5 text-body font-extrabold">
                   {step.title}
                 </h3>
-                <p className="text-[14.5px] text-bark-soft">{step.body}</p>
+                <p className="text-body-sm text-bark-soft">{step.body}</p>
               </div>
             </Reveal>
           ))}
-          <p className="mt-2 text-[14.5px] font-bold text-river-deep">
+          <p className="mt-2 text-body-sm font-bold text-river-deep">
             The vision model lives on your Mac. No upload, no waiting, no
             meter.
           </p>
@@ -65,7 +65,7 @@ export function HowSection() {
       </div>
 
       <CaptureDemo />
-      <p className="mt-5 text-center text-sm text-muted">
+      <p className="mt-5 text-center text-body-sm text-muted">
         That's Markdown, not code — the pipes and dashes disappear into real
         columns the moment you paste into Excel or Sheets. Paste into Notion
         or a chat with your favorite model and it stays exact text.

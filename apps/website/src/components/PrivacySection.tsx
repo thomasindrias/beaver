@@ -15,7 +15,7 @@ export function PrivacySection() {
           <h2 className="mb-3.5 font-display text-[clamp(30px,4vw,46px)] leading-[1.05] font-extrabold text-cream">
             Your data sleeps at home.
           </h2>
-          <p className="mb-3.5 max-w-[56ch] text-base text-[#cbb9a4]">
+          <p className="mb-3.5 max-w-[56ch] text-body text-[#cbb9a4]">
             Beaver's vision model runs on your Mac. A capture is processed
             locally and lands on your clipboard;{" "}
             <strong className="text-cream">
@@ -25,16 +25,16 @@ export function PrivacySection() {
             built. That matters for invoices, contracts, patient notes, and
             anything under NDA.
           </p>
-          <p className="mb-4 text-[15px] font-bold text-cream">
+          <p className="mb-4 text-body-sm font-bold text-cream">
             Plain version: nothing about your capture goes online, ever.
           </p>
-          <ul className="moon-list list-none space-y-3 p-0 text-[15px] text-[#e6d9c7]">
+          <ul className="moon-list list-none space-y-3 p-0 text-body-sm text-[#e6d9c7]">
             <li>On-device model: MLX on Apple Silicon, llama.cpp on Intel</li>
             <li>Open source (MIT), build it from source if you like</li>
             <li>History is a local SQLite file, yours to keep or delete</li>
             <li>
               Only network call: an optional update check.{" "}
-              <code className="font-mono text-[13px] text-sun">
+              <code className="font-mono text-caption text-sun">
                 BEAVER_DISABLE_UPDATE_CHECK=1
               </code>{" "}
               kills it.
