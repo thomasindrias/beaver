@@ -48,7 +48,7 @@ const POINTS = [
 export function ArgumentSection() {
   return (
     <section id="argument" className="bg-cream-deep">
-      <div className="mx-auto max-w-[1040px] px-6 pt-[76px] pb-[84px]">
+      <div className="mx-auto max-w-[1040px] px-6 pt-[76px] pb-12">
         <div className="mb-14 grid items-center gap-10 max-md:grid-cols-1 md:grid-cols-[1.1fr_0.9fr]">
           <div>
             <h2 className="font-display text-[clamp(30px,4vw,46px)] leading-[1.05] font-extrabold">

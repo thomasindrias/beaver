@@ -18,24 +18,23 @@ const SOURCES = [
 
 export function SourcesSection() {
   return (
-    <div
-      data-testid="sources"
-      className="mx-auto max-w-[1040px] px-6 pb-2.5"
-    >
-      <h3 className="mb-3 text-caption font-extrabold tracking-wider text-muted uppercase">
-        Sources
-      </h3>
-      <ol className="list-decimal pl-5 text-caption text-muted">
-        {SOURCES.map((source) => (
-          <li key={source.id} id={source.id} className="mb-1.5">
-            {source.text}
-            <a href={source.href} className="underline underline-offset-2">
-              {source.linkText}
-            </a>
-            {source.suffix}
-          </li>
-        ))}
-      </ol>
+    <div data-testid="sources" className="bg-cream-deep px-6 pt-2 pb-14">
+      <div className="mx-auto max-w-[1040px]">
+        <h3 className="mb-3 text-caption font-extrabold tracking-wider text-muted uppercase">
+          Sources
+        </h3>
+        <ol className="list-decimal pl-5 text-caption text-muted">
+          {SOURCES.map((source) => (
+            <li key={source.id} id={source.id} className="mb-1.5">
+              {source.text}
+              <a href={source.href} className="underline underline-offset-2">
+                {source.linkText}
+              </a>
+              {source.suffix}
+            </li>
+          ))}
+        </ol>
+      </div>
     </div>
   );
 }
