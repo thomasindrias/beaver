@@ -1,8 +1,6 @@
 import { useState, useCallback, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { captureAndExtract, reExtract as reExtractCommand, writeToClipboard, type CaptureRegion } from "../lib/api";
 import type { AppState, Capture, ContentType, ExtractFormat } from "../types";
-
-interface CaptureRegion { x: number; y: number; width: number; height: number }
 
 // Success auto-dismiss is short: the HUD's job is done unless the user
 // reaches for it. Errors linger longer so their action chip can be read,
@@ -60,7 +58,7 @@ export function useBeaver(
     if (gen !== genRef.current) return;
     const ct = detectContentType(markdown);
     setContentType(ct);
-    await invoke("write_to_clipboard", { text: markdown });
+    await writeToClipboard(markdown);
     if (gen !== genRef.current) return;
     if (onSave && !savedRef.current) {
       savedRef.current = true;
@@ -91,10 +89,7 @@ export function useBeaver(
     regionRef.current = region;
     setState("processing");
     try {
-      const markdown: string = await invoke("capture_and_extract", {
-        region,
-        format: "markdown",
-      });
+      const markdown = await captureAndExtract(region, "markdown");
       setFormat("markdown");
       await finish(markdown, gen);
     } catch (e) {
@@ -108,10 +103,7 @@ export function useBeaver(
     setFormat(next);
     setState("rerendering");
     try {
-      const markdown: string = await invoke("re_extract", {
-        format: next,
-        hint: hint ?? null,
-      });
+      const markdown = await reExtractCommand(next, hint);
       await finish(markdown, gen);
     } catch (e) {
       fail(e, gen);

@@ -4,7 +4,21 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 
-import { ModelDownload } from "../components/ModelDownload";
+import { ModelDownload, formatPhase } from "../components/ModelDownload";
+
+describe("formatPhase", () => {
+  it("maps known phases to human labels", () => {
+    expect(formatPhase("preparing")).toBe("Preparing environment…");
+    expect(formatPhase("starting")).toBe("Starting…");
+    expect(formatPhase("downloading")).toBe("Downloading model…");
+    expect(formatPhase("loading")).toBe("Loading model…");
+    expect(formatPhase("ready")).toBe("Ready");
+  });
+
+  it("falls back to a generic label for unknown values", () => {
+    expect(formatPhase("something-else")).toBe("Setting up…");
+  });
+});
 
 describe("ModelDownload progress", () => {
   beforeEach(() => invokeMock.mockReset());
@@ -71,7 +85,7 @@ describe("ModelDownload failure", () => {
 
     const btn = await screen.findByRole("button", { name: /try again/i });
     invokeMock.mockImplementation(async (cmd: string) =>
-      cmd === "mlx_status" ? { phase: "downloading", progress: 0.3, detail: null } : undefined
+      cmd === "engine_status" ? { phase: "downloading", progress: 0.3, detail: null } : undefined
     );
     fireEvent.click(btn);
 

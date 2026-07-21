@@ -4,7 +4,8 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'src-tauri/src/llamacpp.rs'
+      - 'src-tauri/src/engine/**'
+      - 'src-tauri/src/commands.rs'
       - 'src-tauri/src/server.rs'
       - 'src-tauri/src/prompts.rs'
       - 'src-tauri/src/lib.rs'

@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { MonitorCheck, MonitorUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  openScreenRecordingSettings,
+  relaunchApp,
+  requestScreenPermission,
+  screenPermissionGranted,
+} from "../lib/api";
 
 // Onboarding step shown when Screen Recording access is missing. Polls the
 // grant every second (System Settings toggles don't push events) and flips to
@@ -15,7 +20,7 @@ export function PermissionStep() {
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
-        const ok = await invoke<boolean>("screen_permission_granted");
+        const ok = await screenPermissionGranted();
         if (active) setGranted(ok);
       } catch {
         // backend not ready — keep polling
@@ -41,7 +46,7 @@ export function PermissionStep() {
         </p>
         <Button
           className="mt-6 w-full"
-          onClick={() => invoke("relaunch_app").catch(console.error)}
+          onClick={() => relaunchApp().catch(console.error)}
         >
           Relaunch Beaver
         </Button>
@@ -61,14 +66,14 @@ export function PermissionStep() {
       </p>
       <Button
         className="mt-6 w-full"
-        onClick={() => invoke("request_screen_permission").catch(console.error)}
+        onClick={() => requestScreenPermission().catch(console.error)}
       >
         Grant access
       </Button>
       <Button
         variant="ghost"
         className="mt-2 w-full text-muted-foreground"
-        onClick={() => invoke("open_screen_recording_settings").catch(console.error)}
+        onClick={() => openScreenRecordingSettings().catch(console.error)}
       >
         Open System Settings
       </Button>

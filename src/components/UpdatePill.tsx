@@ -1,13 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
-
-interface UpdateInfo {
-  version: string;
-  url: string;
-}
+import { checkForUpdate, openExternal, type UpdateInfo } from "../lib/api";
 
 type Phase = "idle" | "downloading" | "ready";
 
@@ -26,7 +21,7 @@ export function UpdatePill() {
 
   useEffect(() => {
     const checkPassive = () => {
-      invoke<UpdateInfo | null>("check_for_update")
+      checkForUpdate()
         .then(setUpdate)
         .catch(() => {});
     };
@@ -69,7 +64,7 @@ export function UpdatePill() {
       busyRef.current = false;
       setPhase("idle");
       setPercent(0);
-      invoke("open_external", { url: update.url }).catch(console.error);
+      openExternal(update.url).catch(console.error);
     }
   };
 

@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { AlertCircle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { engineStatus, retrySetup, type EnginePhase } from "../lib/api";
 import { BeaverAnimation } from "./BeaverAnimation";
 
 interface Props { onComplete: () => void }
-
-type Phase = "preparing" | "starting" | "downloading" | "loading" | "ready" | "error";
 
 export function formatPhase(phase: string): string {
   switch (phase) {
@@ -19,14 +17,8 @@ export function formatPhase(phase: string): string {
   }
 }
 
-interface StatusReport {
-  phase: Phase;
-  progress: number | null;
-  detail?: string | null;
-}
-
 export function ModelDownload({ onComplete }: Props) {
-  const [phase, setPhase] = useState<Phase>("preparing");
+  const [phase, setPhase] = useState<EnginePhase>("preparing");
   const [progress, setProgress] = useState<number | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -37,7 +29,7 @@ export function ModelDownload({ onComplete }: Props) {
 
     const poll = async () => {
       try {
-        const status = await invoke<StatusReport>("mlx_status");
+        const status = await engineStatus();
         if (!active) return;
         setPhase(status.phase);
         setProgress(status.progress);
@@ -61,7 +53,7 @@ export function ModelDownload({ onComplete }: Props) {
   }, [onComplete, attempt]);
 
   const retry = useCallback(async () => {
-    await invoke("retry_setup").catch(console.error);
+    await retrySetup().catch(console.error);
     setPhase("preparing");
     setProgress(null);
     setDetail(null);
