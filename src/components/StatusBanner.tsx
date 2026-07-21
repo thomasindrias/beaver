@@ -1,20 +1,20 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AlertCircle, MonitorUp } from "lucide-react";
-
-interface StatusReport {
-  phase: string;
-  progress: number | null;
-  detail?: string | null;
-}
+import {
+  engineStatus,
+  openScreenRecordingSettings,
+  retrySetup,
+  screenPermissionGranted,
+  type EngineStatusReport,
+} from "../lib/api";
 
 // Thin banner under the popover header for the two states a user must act on:
 // missing Screen Recording permission and a failed model setup. Polls while
 // visible; disappears once everything is healthy.
 export function StatusBanner() {
   const [granted, setGranted] = useState(true);
-  const [status, setStatus] = useState<StatusReport | null>(null);
+  const [status, setStatus] = useState<EngineStatusReport | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -28,8 +28,8 @@ export function StatusBanner() {
     const poll = async () => {
       try {
         const [ok, s] = await Promise.all([
-          invoke<boolean>("screen_permission_granted"),
-          invoke<StatusReport>("engine_status"),
+          screenPermissionGranted(),
+          engineStatus(),
         ]);
         if (!active) return;
         setGranted(ok);
@@ -60,7 +60,7 @@ export function StatusBanner() {
   }, []);
 
   const retry = () => {
-    invoke("retry_setup").catch(console.error);
+    retrySetup().catch(console.error);
   };
 
   if (!granted) {
@@ -69,7 +69,7 @@ export function StatusBanner() {
         <MonitorUp className="size-3.5 shrink-0" />
         <span className="min-w-0 flex-1">Screen Recording is off — captures won't work.</span>
         <button
-          onClick={() => invoke("open_screen_recording_settings").catch(console.error)}
+          onClick={() => openScreenRecordingSettings().catch(console.error)}
           className="shrink-0 rounded-md bg-amber-500/20 px-2 py-1 font-medium hover:bg-amber-500/30"
         >
           Open Settings

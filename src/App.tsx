@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, lazy, Suspense } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { openScreenRecordingSettings } from "./lib/api";
 import { CaptureOverlay, type Rect } from "./components/CaptureOverlay";
 import { CaptureHud } from "./components/CaptureHud";
 import { hudPosition } from "./lib/hudPosition";
@@ -62,7 +62,7 @@ export default function App() {
   }, []);
 
   const openSettings = useCallback(() => {
-    invoke("open_screen_recording_settings").catch(() => {});
+    openScreenRecordingSettings().catch(() => {});
     dismiss();
   }, [dismiss]);
 

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { Scan, Sparkles, Lock, ArrowRight, Check } from "lucide-react";
+import { finishOnboarding, screenPermissionGranted } from "../lib/api";
 import { Button } from "@/components/ui/button";
 import { BeaverAnimation } from "./BeaverAnimation";
 import { Kbd } from "./Kbd";
@@ -24,13 +24,13 @@ export function Onboarding() {
   const handleDownloadComplete = useCallback(async () => {
     // If Screen Recording is already granted (or the check fails), skip the
     // permission detour — the guard at capture time is the safety net.
-    const granted = await invoke<boolean>("screen_permission_granted").catch(() => true);
+    const granted = await screenPermissionGranted().catch(() => true);
     setStep(granted ? "ready" : "permission");
   }, []);
 
   // Closes the onboarding window and opens the popover at the menu bar.
   const finish = useCallback(() => {
-    invoke("finish_onboarding").catch(console.error);
+    finishOnboarding().catch(console.error);
   }, []);
 
   useEffect(() => {
