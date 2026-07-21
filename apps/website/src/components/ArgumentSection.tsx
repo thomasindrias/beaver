@@ -1,4 +1,5 @@
 import { Mascot } from "./Mascot";
+import { Reveal } from "./Reveal";
 
 const POINTS = [
   {
@@ -100,7 +101,10 @@ export function ArgumentSection() {
         </div>
 
         <div className="grid items-start gap-12 max-md:grid-cols-1 md:grid-cols-[420px_1fr]">
-          <div className="relative max-md:mx-auto max-md:max-w-[420px]">
+          <Reveal
+            index={0}
+            className="relative max-md:mx-auto max-md:max-w-[420px]"
+          >
             <span
               aria-hidden
               className="absolute top-[-13px] left-1/2 z-10 h-[26px] w-[92px] -translate-x-1/2 -rotate-3 border-x border-dashed border-ink/25 bg-sun/50"
@@ -108,7 +112,7 @@ export function ArgumentSection() {
             <div
               role="img"
               aria-label="Receipt comparing the token cost of a screenshot against Beaver's Markdown output"
-              className="-rotate-[1.4deg] border-[2.5px] border-ink bg-paper px-6 py-7 pb-5 font-mono text-[13px] leading-[1.9] font-semibold shadow-[0_6px_0_var(--color-ink)]"
+              className="lift-on-hover -rotate-[1.4deg] border-[2.5px] border-ink bg-paper px-6 py-7 pb-5 font-mono text-[13px] leading-[1.9] font-semibold shadow-[0_6px_0_var(--color-ink)]"
             >
               <p className="text-center text-sm font-bold tracking-wider">
                 *** YOUR TOKEN RECEIPT ***
@@ -140,11 +144,15 @@ export function ArgumentSection() {
                 thank you for reading the fine print
               </p>
             </div>
-          </div>
+          </Reveal>
 
           <div className="flex flex-col gap-4.5">
             {POINTS.map((point, i) => (
-              <div key={point.title} className="card-sticker rounded-[14px] px-5 py-4.5">
+              <Reveal
+                key={point.title}
+                index={i + 1}
+                className="card-sticker lift-on-hover rounded-[14px] px-5 py-4.5"
+              >
                 <h3 className="mb-1 text-[16.5px] font-extrabold">
                   <span className="mr-2 font-display text-[19px] text-burn">
                     {i + 1}
@@ -152,20 +160,22 @@ export function ArgumentSection() {
                   {point.title}
                 </h3>
                 <p className="text-[14.5px] text-bark-soft">{point.body}</p>
-              </div>
+              </Reveal>
             ))}
-            <p className="border-l-4 border-burn py-1.5 pl-4.5 font-display text-[clamp(19px,2.4vw,24px)] leading-[1.4] font-bold italic">
-              In one published evaluation, GPT-4V answered{" "}
-              <span className="font-mono text-[0.85em] not-italic">
-                35 of 50
-              </span>{" "}
-              table questions incorrectly.
-              <sup>
-                <a href="#src3" className="text-burn no-underline">
-                  3
-                </a>
-              </sup>
-            </p>
+            <Reveal index={POINTS.length + 1}>
+              <p className="border-l-4 border-burn py-1.5 pl-4.5 font-display text-[clamp(19px,2.4vw,24px)] leading-[1.4] font-bold italic">
+                In one published evaluation, GPT-4V answered{" "}
+                <span className="font-mono text-[0.85em] not-italic">
+                  35 of 50
+                </span>{" "}
+                table questions incorrectly.
+                <sup>
+                  <a href="#src3" className="text-burn no-underline">
+                    3
+                  </a>
+                </sup>
+              </p>
+            </Reveal>
           </div>
         </div>
 

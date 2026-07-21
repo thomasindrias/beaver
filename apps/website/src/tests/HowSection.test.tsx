@@ -1,11 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, act } from "@testing-library/react";
 import { HowSection } from "../components/HowSection";
 import { stubMatchMedia } from "./helpers";
 
 describe("HowSection", () => {
-  beforeEach(() => stubMatchMedia(false));
-  afterEach(() => vi.unstubAllGlobals());
+  beforeEach(() => {
+    stubMatchMedia(false);
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
   it("anchors at #how so the hero CTA can reach it", () => {
     render(<HowSection />);
@@ -28,9 +34,12 @@ describe("HowSection", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the before and after exhibit with real Markdown output", () => {
+  it("shows the before and after exhibit with real Markdown output once captured", () => {
     render(<HowSection />);
     expect(screen.getByText("on your screen")).toBeInTheDocument();
+    act(() => {
+      vi.runAllTimers();
+    });
     const clipboard = screen.getByTestId("exhibit-markdown");
     expect(within(clipboard).getByText(/\| Plan/)).toBeInTheDocument();
   });

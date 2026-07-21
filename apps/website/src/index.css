@@ -102,4 +102,59 @@
     color: var(--color-sun);
     font-weight: 800;
   }
+
+  /* Small hover lift for sticker/step/point cards: un-rotates and rises. */
+  .lift-on-hover {
+    transition: transform 0.18s ease;
+  }
+  .lift-on-hover:hover {
+    transform: translateY(-4px) rotate(0deg);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lift-on-hover:hover {
+      transform: none;
+    }
+  }
+
+  /* The capture demo's dashed selection box: draws in, then breathes while selecting. */
+  .capture-select-box {
+    animation:
+      select-draw 0.5s cubic-bezier(0.3, 0.9, 0.3, 1) both,
+      select-pulse 1.1s ease-in-out 0.5s infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .capture-select-box {
+      animation: none;
+    }
+  }
+
+  /* Blinking type cursor in the capture demo's clipboard panel. */
+  .capture-caret {
+    animation: caret-blink 1s step-end infinite;
+  }
+}
+
+@keyframes select-draw {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 100% 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes select-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
 }

@@ -1,4 +1,5 @@
 import { Mascot } from "./Mascot";
+import { Reveal } from "./Reveal";
 
 const USES = [
   {
@@ -40,11 +41,12 @@ export function UsesSection() {
         </p>
       </div>
       <div className="grid grid-cols-2 gap-4.5 max-md:grid-cols-1">
-        {USES.map((use) => (
-          <article
+        {USES.map((use, i) => (
+          <Reveal
             key={use.title}
-            data-testid="use-case"
-            className="card-sticker flex items-start gap-4 p-5.5"
+            index={i}
+            testId="use-case"
+            className="card-sticker lift-on-hover flex items-start gap-4 p-5.5"
           >
             <span aria-hidden className="flex-none text-[26px]">
               {use.icon}
@@ -53,7 +55,7 @@ export function UsesSection() {
               <h3 className="mb-1 text-[17px] font-extrabold">{use.title}</h3>
               <p className="text-[14.5px] text-bark-soft">{use.body}</p>
             </div>
-          </article>
+          </Reveal>
         ))}
       </div>
     </section>

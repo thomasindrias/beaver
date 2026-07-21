@@ -1,4 +1,5 @@
 import { Mascot } from "./Mascot";
+import { Reveal } from "./Reveal";
 
 const PAINS = [
   {
@@ -41,11 +42,12 @@ export function PainSection() {
         </div>
         <div className="grid grid-cols-2 gap-5 max-md:grid-cols-1">
           {PAINS.map((pain, i) => (
-            <article
+            <Reveal
               key={pain.title}
-              data-testid="pain-sticker"
+              index={i}
+              testId="pain-sticker"
               className={[
-                "rounded-2xl border-[2.5px] border-ink bg-paper p-5 text-ink shadow-[0_5px_0_rgba(31,41,38,0.55)]",
+                "lift-on-hover rounded-2xl border-[2.5px] border-ink bg-paper p-5 text-ink shadow-[0_5px_0_rgba(31,41,38,0.55)]",
                 i % 2 === 0 ? "-rotate-1" : "rotate-1",
               ].join(" ")}
             >
@@ -56,7 +58,7 @@ export function PainSection() {
                 {pain.title}
               </h3>
               <p className="text-sm text-bark-soft">{pain.body}</p>
-            </article>
+            </Reveal>
           ))}
         </div>
       </div>
