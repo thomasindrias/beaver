@@ -1,6 +1,6 @@
 [package]
 name = "beaver"
-version = "0.1.1"
+version = "0.2.0"
 description = "Beaver — macOS menu bar data capture utility"
 authors = ["Thomas Indrias"]
 edition = "2021"

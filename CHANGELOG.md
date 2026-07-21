@@ -4,6 +4,19 @@ All notable changes to Beaver are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] — 2026-07-20
+
+### Added
+- Intel Mac support: Beaver ships a signed, notarized `x86_64` DMG
+  alongside the existing Apple Silicon build, running a local llama.cpp
+  vision engine (MiniCPM-V 2.6) in place of MLX. Same install flow, same
+  in-app update path — the updater automatically serves the right
+  architecture.
+
+### Changed
+- The release pipeline now builds and publishes both architectures from a
+  single workflow dispatch, with one merged updater manifest covering both.
+
 ## [0.1.1] — 2026-07-16
 
 ### Added

@@ -6,16 +6,18 @@ inside it as clean Markdown — tables stay tables, lists stay lists, code stays
 code. Vision runs **fully on-device** after a one-time model download, so
 captures never leave your machine.
 
-> Apple Silicon only. The vision model runs on Apple's MLX framework, which
-> requires an M-series Mac.
+> Vision runs on-device via [MLX](https://github.com/ml-explore/mlx) on Apple
+> Silicon, or [llama.cpp](https://github.com/ggml-org/llama.cpp) on Intel Macs
+> — same install, same privacy guarantee, either way.
 
 <!-- Demo assets: record with the capture flow + popover, save to docs/media/demo.gif, then uncomment.
 ![Beaver turning a screenshot region into Markdown](docs/media/demo.gif)
 -->
 
-## Install (macOS, Apple Silicon)
+## Install (macOS)
 
-1. Download `Beaver_<version>_aarch64.dmg`.
+1. Download `Beaver_<version>_aarch64.dmg` (Apple Silicon) or
+   `Beaver_<version>_x86_64.dmg` (Intel).
 2. Open the DMG and drag **Beaver** into **Applications**.
 3. Launch Beaver from Applications. Grant Screen Recording permission when asked.
 
@@ -26,14 +28,16 @@ captures never leave your machine.
 
 1. `Cmd+Shift+D` opens a full-screen capture overlay.
 2. You drag a bounding box around the region of interest.
-3. The cropped image is sent to a local FastAPI server running
-   `Qwen2.5-VL-3B-Instruct-4bit` via MLX.
+3. The cropped image is sent to a local vision server — `Qwen2.5-VL-3B-Instruct-4bit`
+   via MLX on Apple Silicon, or MiniCPM-V 2.6 via llama.cpp's `llama-server`
+   on Intel.
 4. The extracted Markdown is returned, stored in a local SQLite history, and
    copied to your clipboard.
 
-On first launch Beaver downloads the ~3 GB vision model and prepares an
-on-device Python environment (the only time it needs the internet). A progress
-bar tracks the download; extraction then runs fully offline. The only later
+On first launch Beaver downloads its vision model and (on Apple Silicon)
+prepares an on-device Python environment — the only time it needs the
+internet. A progress bar tracks the download; extraction then runs fully
+offline. The only later
 network calls are update-related and go exclusively to GitHub:
 an optional once-a-day version check against GitHub Releases, and — only when
 you click the update pill — downloading the new release from the same place.
@@ -45,14 +49,16 @@ off.
 
 - **Shell:** [Tauri 2](https://tauri.app) (Rust core, macOS menu-bar app)
 - **Frontend:** React 19 + TypeScript + Vite 7, Tailwind CSS v4, shadcn
-- **Vision backend:** Python FastAPI + [MLX](https://github.com/ml-explore/mlx) (`mlx-vlm`)
+- **Vision backend:** Python FastAPI + [MLX](https://github.com/ml-explore/mlx) (`mlx-vlm`) on
+  Apple Silicon, or [llama.cpp](https://github.com/ggml-org/llama.cpp)'s `llama-server`
+  (no Python) on Intel
 - **Storage:** SQLite via `tauri-plugin-sql`
 
 ## Prerequisites
 
-- macOS (Apple Silicon uses the MLX vision backend; Intel Macs can now build
-  and run from source against a llama.cpp local engine — see
-  `src-tauri/src/llamacpp.rs`. Packaged Intel releases aren't shipped yet.)
+- macOS (Apple Silicon uses the MLX vision backend; Intel Macs use a
+  llama.cpp local engine — see `src-tauri/src/llamacpp.rs`. Both ship as
+  packaged, notarized releases.)
 - [Rust](https://rustup.rs) (stable)
 - [Node.js](https://nodejs.org) + [pnpm](https://pnpm.io)
 - [uv](https://github.com/astral-sh/uv) — used to provision the Python vision environment on Apple Silicon
@@ -91,10 +97,12 @@ pnpm tauri build        # produce the signed .app / .dmg
 
 ## Building a release
 
-Requires Apple Silicon, Rust, and pnpm.
+Requires Apple Silicon, Rust, and pnpm. The script cross-compiles either
+target from the same machine:
 
 ```bash
-pnpm release:mac
+pnpm release:mac                      # aarch64-apple-darwin (default)
+pnpm release:mac x86_64-apple-darwin  # cross-compiled Intel build
 ```
 
 Without credentials this produces an **unsigned** DMG for local testing. To sign
@@ -128,9 +136,10 @@ GitHub Actions includes:
   expectations.
 - Beaver is released under the [MIT License](LICENSE).
 
-The macOS app requires screen capture and a bundled Python/MLX runtime. Keep
-changes to Tauri permissions, hardened-runtime entitlements, and network
-behavior narrow and documented.
+The macOS app requires screen capture and a bundled on-device vision runtime
+(Python/MLX on Apple Silicon, llama.cpp on Intel). Keep changes to Tauri
+permissions, hardened-runtime entitlements, and network behavior narrow and
+documented.
 
 ## Project layout
 
