@@ -29,7 +29,7 @@ export function StatusBanner() {
       try {
         const [ok, s] = await Promise.all([
           invoke<boolean>("screen_permission_granted"),
-          invoke<StatusReport>("mlx_status"),
+          invoke<StatusReport>("engine_status"),
         ]);
         if (!active) return;
         setGranted(ok);

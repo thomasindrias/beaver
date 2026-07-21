@@ -71,7 +71,7 @@ describe("ModelDownload failure", () => {
 
     const btn = await screen.findByRole("button", { name: /try again/i });
     invokeMock.mockImplementation(async (cmd: string) =>
-      cmd === "mlx_status" ? { phase: "downloading", progress: 0.3, detail: null } : undefined
+      cmd === "engine_status" ? { phase: "downloading", progress: 0.3, detail: null } : undefined
     );
     fireEvent.click(btn);
 

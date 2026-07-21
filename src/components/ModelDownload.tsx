@@ -37,7 +37,7 @@ export function ModelDownload({ onComplete }: Props) {
 
     const poll = async () => {
       try {
-        const status = await invoke<StatusReport>("mlx_status");
+        const status = await invoke<StatusReport>("engine_status");
         if (!active) return;
         setPhase(status.phase);
         setProgress(status.progress);

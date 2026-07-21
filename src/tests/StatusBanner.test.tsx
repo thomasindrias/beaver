@@ -29,7 +29,7 @@ import { StatusBanner } from "../components/StatusBanner";
 function mockBackend(opts: { granted: boolean; phase: string; detail?: string | null }) {
   invokeMock.mockImplementation(async (cmd: string) => {
     if (cmd === "screen_permission_granted") return opts.granted;
-    if (cmd === "mlx_status")
+    if (cmd === "engine_status")
       return { phase: opts.phase, progress: null, detail: opts.detail ?? null };
     return undefined;
   });
@@ -44,7 +44,7 @@ describe("StatusBanner", () => {
   it("renders nothing when ready and permitted", async () => {
     mockBackend({ granted: true, phase: "ready" });
     const { container } = render(<StatusBanner />);
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("mlx_status"));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("engine_status"));
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -84,7 +84,7 @@ describe("StatusBanner", () => {
   it("resumes polling on focus after having gone quiet, and surfaces a state that broke in the meantime", async () => {
     mockBackend({ granted: true, phase: "ready" });
     render(<StatusBanner />);
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("mlx_status"));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("engine_status"));
 
     const callsAfterQuiet = invokeMock.mock.calls.length;
     // Give the (now-stopped) loop a chance to wrongly reschedule itself.
@@ -104,7 +104,7 @@ describe("StatusBanner", () => {
   it("does not restart the poll loop on blur", async () => {
     mockBackend({ granted: true, phase: "ready" });
     render(<StatusBanner />);
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("mlx_status"));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("engine_status"));
     invokeMock.mockClear();
 
     emitFocus(false);
@@ -115,7 +115,7 @@ describe("StatusBanner", () => {
   it("stops listening for focus changes after unmount", async () => {
     mockBackend({ granted: true, phase: "ready" });
     const { unmount } = render(<StatusBanner />);
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("mlx_status"));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("engine_status"));
     expect(focusHandlers).toHaveLength(1);
 
     unmount();

@@ -1,19 +1,11 @@
 mod capture;
 mod db;
-#[cfg(target_arch = "aarch64")]
-mod mlx;
-#[cfg(target_arch = "x86_64")]
-mod llamacpp;
+mod engine;
 mod permission;
 mod prompts;
 mod server;
 mod shortcut;
 mod update;
-
-#[cfg(target_arch = "aarch64")]
-use mlx as engine;
-#[cfg(target_arch = "x86_64")]
-use llamacpp as engine;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::sync::Mutex;
@@ -147,7 +139,7 @@ pub fn run() {
             // Pick a free localhost port and register server state up front so
             // commands can read it immediately.
             let port = server::free_port().unwrap_or(11500);
-            app.manage(server::MlxServer::new(port));
+            app.manage(server::EngineState::new(port));
 
             // Show onboarding immediately when the model isn't cached yet, so the
             // user watches setup progress instead of a blank app. Created here
@@ -181,7 +173,7 @@ pub fn run() {
 
             // Build the venv (first run only), spawn the server, and poll it to
             // readiness — all off the main thread so the tray is usable at once.
-            spawn_setup(app.handle().clone());
+            server::spawn_setup(app.handle().clone());
 
             // After the permission relaunch, surface the popover once so the
             // user lands somewhere instead of a silent menu-bar app.
@@ -194,7 +186,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             capture_and_extract,
             re_extract,
-            mlx_status,
+            engine_status,
             write_to_clipboard,
             finish_onboarding,
             retry_setup,
@@ -218,7 +210,7 @@ pub fn run() {
                 api.prevent_exit();
             }
             tauri::RunEvent::Exit => {
-                if let Some(state) = app.try_state::<server::MlxServer>() {
+                if let Some(state) = app.try_state::<server::EngineState>() {
                     if let Ok(mut guard) = state.child.lock() {
                         if let Some(mut child) = guard.take() {
                             let _ = child.kill();
@@ -230,120 +222,9 @@ pub fn run() {
         });
 }
 
-/// Build the env (first run), spawn the MLX server, and poll it to readiness —
-/// all off the main thread. Re-runnable: `retry_setup` calls this again after a
-/// failure. The `setup_running` flag makes concurrent calls a no-op.
-fn spawn_setup(handle: tauri::AppHandle) {
-    {
-        let state = handle.state::<server::MlxServer>();
-        if state
-            .setup_running
-            .swap(true, std::sync::atomic::Ordering::SeqCst)
-        {
-            return; // a setup pass is already in flight
-        }
-        *state.failure.lock().unwrap() = None;
-        *state.phase.lock().unwrap() = server::SetupPhase::BuildingEnv;
-        // A retry after a spawn-then-crash leaves a stale child; reap it.
-        if let Ok(mut guard) = state.child.lock() {
-            if let Some(mut child) = guard.take() {
-                let _ = child.kill();
-            }
-        };
-    }
-
-    std::thread::spawn(move || {
-        // Clear the running flag on every exit path, including panics —
-        // otherwise a single panicked setup pass would permanently disable
-        // retry_setup for the rest of the process's life.
-        struct ClearRunningOnExit(tauri::AppHandle);
-        impl Drop for ClearRunningOnExit {
-            fn drop(&mut self) {
-                let state = self.0.state::<server::MlxServer>();
-                state
-                    .setup_running
-                    .store(false, std::sync::atomic::Ordering::SeqCst);
-            }
-        }
-        let _clear_running = ClearRunningOnExit(handle.clone());
-
-        let state = handle.state::<server::MlxServer>();
-
-        if !server::env_is_ready(&handle) {
-            if let Err(msg) = server::preflight_disk(&handle) {
-                state.fail(msg);
-                return;
-            }
-            if let Err(e) = server::build_env(&handle) {
-                state.fail(format!(
-                    "Couldn't prepare the on-device model environment. Check your \
-                     internet connection and try again. ({e})"
-                ));
-                return;
-            }
-        }
-
-        *state.phase.lock().unwrap() = server::SetupPhase::StartingServer;
-        match server::spawn_server(&handle, state.port) {
-            Ok(child) => {
-                *state.child.lock().unwrap() = Some(child);
-            }
-            Err(e) => {
-                state.fail(format!("Couldn't start the on-device model server. ({e})"));
-                return;
-            }
-        }
-
-        // Poll to readiness (same policy as before: no wall-clock deadline while
-        // reachable; fail on sustained unreachability, with an absolute cap).
-        let started = std::time::Instant::now();
-        let mut last_reachable = std::time::Instant::now();
-        let unreachable_grace = std::time::Duration::from_secs(60);
-        let absolute_cap = std::time::Duration::from_secs(3600);
-        loop {
-            match tauri::async_runtime::block_on(engine::health(state.port)) {
-                Ok(h) => {
-                    last_reachable = std::time::Instant::now();
-                    match h.status {
-                        engine::ServerStatus::Ready => {
-                            *state.phase.lock().unwrap() = server::SetupPhase::ServerUp;
-                            server::mark_setup_complete(&handle);
-                            break;
-                        }
-                        engine::ServerStatus::Error => {
-                            state.fail(
-                                "The on-device model failed to load. Try again — the \
-                                 log file has details."
-                                    .to_string(),
-                            );
-                            break;
-                        }
-                        _ => {} // downloading / loading — keep waiting
-                    }
-                }
-                Err(_) => {
-                    if last_reachable.elapsed() > unreachable_grace {
-                        state.fail(
-                            "Lost contact with the on-device model server. Check your \
-                             internet connection and try again."
-                                .to_string(),
-                        );
-                        break;
-                    }
-                }
-            }
-            if started.elapsed() > absolute_cap {
-                state.fail("Setup took too long and was stopped. Try again.".to_string());
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(500));
-        }
-    });
-}
-
 #[tauri::command]
 fn retry_setup(app: tauri::AppHandle) {
-    spawn_setup(app);
+    server::spawn_setup(app);
 }
 
 #[tauri::command]
@@ -428,7 +309,7 @@ fn relaunch_app(app: tauri::AppHandle) {
 }
 
 #[derive(serde::Serialize)]
-struct MlxStatus {
+struct EngineStatusReport {
     phase: String,
     /// Download progress 0.0–1.0 during the downloading phase; `None` otherwise.
     progress: Option<f64>,
@@ -437,7 +318,9 @@ struct MlxStatus {
 }
 
 #[tauri::command]
-async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<MlxStatus, ()> {
+async fn engine_status(
+    state: tauri::State<'_, server::EngineState>,
+) -> Result<EngineStatusReport, ()> {
     // Copy the cheap bits out before any await so we never hold the lock across it.
     let phase = *state.phase.lock().unwrap();
     let detail = state.failure.lock().unwrap().clone();
@@ -449,7 +332,7 @@ async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<MlxSta
         }
         server::SetupPhase::Failed => ("error".to_string(), None),
         server::SetupPhase::StartingServer | server::SetupPhase::ServerUp => {
-            match engine::health(port).await {
+            match engine::local::health(port).await {
                 Ok(h) => {
                     let label = match h.status {
                         engine::ServerStatus::Downloading => "downloading",
@@ -464,7 +347,7 @@ async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<MlxSta
             }
         }
     };
-    Ok(MlxStatus {
+    Ok(EngineStatusReport {
         phase: label.clone(),
         progress,
         detail: if label == "error" { detail } else { None },
@@ -478,7 +361,7 @@ async fn mlx_status(state: tauri::State<'_, server::MlxServer>) -> Result<MlxSta
 async fn capture_and_extract(
     region: capture::CaptureRegion,
     format: Option<prompts::ExtractFormat>,
-    state: tauri::State<'_, server::MlxServer>,
+    state: tauri::State<'_, server::EngineState>,
     last: tauri::State<'_, LastCapture>,
 ) -> Result<String, String> {
     if !permission::screen_capture_granted() {
@@ -489,14 +372,14 @@ async fn capture_and_extract(
     let image_base64 = STANDARD.encode(&bytes);
     *last.0.lock().unwrap() = Some(bytes);
     let prompt = prompts::prompt_for(format.unwrap_or(prompts::ExtractFormat::Markdown), None);
-    engine::extract_from_image(port, &image_base64, &prompt).await
+    engine::local::extract_from_image(port, &image_base64, &prompt).await
 }
 
 #[tauri::command]
 async fn re_extract(
     format: prompts::ExtractFormat,
     hint: Option<String>,
-    state: tauri::State<'_, server::MlxServer>,
+    state: tauri::State<'_, server::EngineState>,
     last: tauri::State<'_, LastCapture>,
 ) -> Result<String, String> {
     let bytes = last
@@ -507,7 +390,7 @@ async fn re_extract(
         .ok_or_else(|| "no-capture-cached".to_string())?;
     let image_base64 = STANDARD.encode(&bytes);
     let prompt = prompts::prompt_for(format, hint.as_deref());
-    engine::extract_from_image(state.port, &image_base64, &prompt).await
+    engine::local::extract_from_image(state.port, &image_base64, &prompt).await
 }
 
 #[tauri::command]
