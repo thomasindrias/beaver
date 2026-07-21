@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Beaver · Nothing leaves this machine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #101613;
+    --panel: #161f1a;
+    --panel-2: #1b2620;
+    --hairline: #2b3a32;
+    --text: #e9ede8;
+    --dim: #94a29a;
+    --amber: #ffb454;
+    --amber-deep: #e89a33;
+    --red: #e5684f;
+    --green: #7fd8a4;
+    --sans: "Archivo", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--sans); font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--amber); text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+  .wrap { max-width: 1020px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; color: var(--text); text-decoration: none; }
+  .brand img { width: 28px; height: 28px; }
+  .nav-right { display: flex; gap: 22px; align-items: center; font-size: 14px; }
+  .nav-right a { color: var(--dim); text-decoration: none; }
+  .nav-right a:hover { color: var(--text); }
+  .btn {
+    display: inline-block; text-decoration: none; cursor: pointer; border: none;
+    font: 700 15px var(--sans); border-radius: 8px; padding: 13px 24px;
+    background: var(--amber); color: #1a1204;
+  }
+  .btn:hover { background: var(--amber-deep); }
+  .btn.ghost { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1px var(--hairline); }
+  .btn.ghost:hover { box-shadow: inset 0 0 0 1px var(--dim); }
+  .btn.small { padding: 9px 16px; font-size: 13.5px; }
+
+  /* ---------- hero ---------- */
+  .hero { padding-top: 64px; padding-bottom: 30px; }
+  .spec-tag {
+    font: 500 12px var(--mono); color: var(--amber); letter-spacing: 0.14em;
+    text-transform: uppercase; margin-bottom: 18px; display: block;
+  }
+  h1 {
+    font-family: var(--sans); font-variation-settings: "wdth" 118;
+    font-weight: 850; font-size: clamp(42px, 6.6vw, 78px);
+    line-height: 0.98; letter-spacing: -0.02em; text-transform: none;
+    margin-bottom: 22px; max-width: 12ch;
+  }
+  .hero .sub { font-size: 18px; color: var(--dim); max-width: 600px; margin-bottom: 30px; }
+  .hero .sub strong { color: var(--text); font-weight: 600; }
+  .cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .qualifier { margin-top: 14px; font: 400 12.5px var(--mono); color: var(--dim); }
+
+  /* ---------- diagram ---------- */
+  .diagram-panel {
+    margin: 44px 0 0; background: var(--panel); border: 1px solid var(--hairline);
+    border-radius: 14px; padding: 34px 30px 26px; overflow-x: auto;
+  }
+  .diagram { min-width: 640px; }
+  .machine {
+    border: 1.5px solid var(--dim); border-radius: 12px; position: relative;
+    padding: 40px 26px 26px; display: flex; gap: 0; align-items: center;
+  }
+  .machine-label {
+    position: absolute; top: -11px; left: 22px; background: var(--panel);
+    padding: 0 10px; font: 700 12px var(--mono); letter-spacing: 0.12em; color: var(--text);
+  }
+  .node {
+    background: var(--panel-2); border: 1px solid var(--hairline); border-radius: 10px;
+    padding: 14px 18px; text-align: center; flex: 1;
+  }
+  .node .t { font-weight: 700; font-size: 14.5px; }
+  .node .d { font: 400 11.5px var(--mono); color: var(--dim); margin-top: 3px; }
+  .pipe { flex: 0 0 64px; height: 2px; background: var(--hairline); position: relative; }
+  .pipe .dot {
+    position: absolute; top: -3px; left: 0; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--amber); animation: travel 2.6s linear infinite;
+  }
+  .pipe.p2 .dot { animation-delay: 1.3s; }
+  @keyframes travel { 0% { left: 0; opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { left: calc(100% - 8px); opacity: 0; } }
+
+  .outside { display: flex; align-items: center; margin-top: 26px; }
+  .no-route { flex: 1; display: flex; align-items: center; gap: 14px; }
+  .cut-line { flex: 1; border-top: 2px dashed #4a3f35; position: relative; }
+  .cut-line::after {
+    content: "✕"; position: absolute; left: 50%; top: -13px; transform: translateX(-50%);
+    color: var(--red); font-weight: 800; font-size: 17px; background: var(--panel); padding: 0 8px;
+  }
+  .cloud {
+    border: 1px dashed #4a3f35; color: #7d7365; border-radius: 10px;
+    padding: 12px 18px; font: 500 13px var(--mono); white-space: nowrap;
+  }
+  .no-route-label { font: 500 12px var(--mono); color: var(--red); white-space: nowrap; }
+  .net-ticker {
+    margin-top: 22px; font: 500 12.5px var(--mono); color: var(--green);
+    display: flex; gap: 18px; flex-wrap: wrap;
+  }
+  .net-ticker .k { color: var(--dim); }
+
+  /* ---------- sections ---------- */
+  section { padding-top: 76px; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 10px; }
+  .sec-head .no { font: 700 13px var(--mono); color: var(--amber); }
+  h2 {
+    font-variation-settings: "wdth" 112; font-weight: 800;
+    font-size: clamp(26px, 3.4vw, 38px); letter-spacing: -0.01em;
+  }
+  .lede { color: var(--dim); max-width: 620px; margin-bottom: 30px; font-size: 16px; }
+  .lede strong { color: var(--text); }
+
+  /* lifecycle */
+  .lifecycle { border-left: 1.5px solid var(--hairline); margin-left: 6px; padding-left: 30px; }
+  .lc-step { position: relative; padding-bottom: 26px; max-width: 640px; }
+  .lc-step::before {
+    content: ""; position: absolute; left: -36px; top: 6px; width: 10px; height: 10px;
+    border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 4px rgba(255, 180, 84, 0.15);
+  }
+  .lc-step .t { font-weight: 700; font-size: 16px; }
+  .lc-step .t .ms { font: 500 11.5px var(--mono); color: var(--dim); margin-left: 10px; }
+  .lc-step p { color: var(--dim); font-size: 14.5px; margin-top: 3px; }
+  .lc-step p code { font: 500 12.5px var(--mono); color: var(--text); background: var(--panel-2); padding: 1px 6px; border-radius: 5px; }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 13px 16px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+  th { font: 700 11.5px var(--mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--dim); }
+  td.mono { font: 500 13px var(--mono); }
+  td .never { color: var(--green); font-weight: 700; }
+  td .opt { color: var(--amber); font-weight: 600; }
+  .table-panel { background: var(--panel); border: 1px solid var(--hairline); border-radius: 14px; overflow: hidden; overflow-x: auto; }
+  .table-note { font: 400 12.5px var(--mono); color: var(--dim); margin-top: 14px; }
+  .table-note code { color: var(--amber); }
+
+  /* verify */
+  .verify-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .verify-card { background: var(--panel); border: 1px solid var(--hairline); border-radius: 12px; padding: 22px; }
+  .verify-card h4 { font-size: 15.5px; font-weight: 700; margin-bottom: 6px; }
+  .verify-card p { font-size: 13.5px; color: var(--dim); }
+  .verify-card .term {
+    margin-top: 14px; background: #0b100d; border-radius: 8px; padding: 12px 14px;
+    font: 500 12px var(--mono); color: var(--green); overflow-x: auto; white-space: nowrap;
+  }
+  .verify-card .term .p { color: var(--dim); }
+
+  /* why-it-matters strip */
+  .matters {
+    background: var(--panel); border: 1px solid var(--hairline); border-radius: 14px;
+    padding: 34px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px;
+  }
+  .matters h3 { font-size: 19px; font-weight: 800; margin-bottom: 8px; }
+  .matters p { color: var(--dim); font-size: 14.5px; }
+  .matters p strong { color: var(--text); }
+
+  /* comparison line */
+  .oneliner {
+    font-variation-settings: "wdth" 108; font-weight: 700;
+    font-size: clamp(21px, 2.8vw, 30px); line-height: 1.3; max-width: 30ch;
+  }
+  .oneliner .a { color: var(--amber); }
+
+  /* final */
+  .final { text-align: center; padding-top: 90px; padding-bottom: 90px; }
+  .final h2 { margin-bottom: 12px; }
+  .final p { color: var(--dim); margin-bottom: 28px; }
+  .final .cta-row { justify-content: center; }
+  footer {
+    border-top: 1px solid var(--hairline); padding: 26px 0 44px; margin-top: 20px;
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    font: 400 12.5px var(--mono); color: var(--dim);
+  }
+  footer a { color: var(--dim); }
+
+  @media (max-width: 780px) {
+    .nav-right a:not(.btn) { display: none; }
+    .verify-grid { grid-template-columns: 1fr; }
+    .matters { grid-template-columns: 1fr; padding: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .pipe .dot { animation: none; opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav>
+    <a class="brand" href="#"><img src="../../public/beaver-head.webp" alt="" /> Beaver</a>
+    <div class="nav-right">
+      <a href="#datapath">Data path</a>
+      <a href="#threat">What leaves</a>
+      <a href="https://github.com/thomasindrias/beaver">Source</a>
+      <a class="btn small" href="https://github.com/thomasindrias/beaver/releases/latest">Download for Mac</a>
+    </div>
+  </nav>
+</div>
+
+<header class="wrap hero">
+  <span class="spec-tag">Beaver / screenshot → structured data / macOS</span>
+  <h1>Nothing leaves this machine.</h1>
+  <p class="sub">
+    Beaver turns anything on your screen into clean Markdown: tables, code,
+    invoices, slides. The vision model runs <strong>on your Mac</strong>, so a
+    capture has no network path. Cloud tools promise privacy.
+    <strong>Beaver can prove it.</strong> This page is the proof.
+  </p>
+  <div class="cta-row">
+    <a class="btn" href="https://github.com/thomasindrias/beaver/releases/latest">Download for Mac</a>
+    <a class="btn ghost" href="#datapath">Read the spec</a>
+  </div>
+  <p class="qualifier">free · open source (MIT) · macOS · apple silicon + intel</p>
+</header>
+
+<section class="wrap" id="datapath" style="padding-top: 40px">
+  <div class="sec-head"><span class="no">§1</span><h2>The data path</h2></div>
+  <p class="lede">Every capture makes this trip. Note what's missing: a server.</p>
+  <div class="diagram-panel">
+    <div class="diagram">
+      <div class="machine">
+        <span class="machine-label">YOUR MAC</span>
+        <div class="node"><div class="t">Screen region</div><div class="d">you drag a box</div></div>
+        <div class="pipe"><span class="dot"></span></div>
+        <div class="node"><div class="t">On-device vision model</div><div class="d">mlx / llama.cpp</div></div>
+        <div class="pipe p2"><span class="dot"></span></div>
+        <div class="node"><div class="t">Clipboard + history</div><div class="d">local sqlite</div></div>
+      </div>
+      <div class="outside">
+        <div class="no-route">
+          <span class="no-route-label">no route</span>
+          <div class="cut-line"></div>
+          <div class="cloud">☁ somebody else's datacenter</div>
+        </div>
+      </div>
+      <div class="net-ticker" role="status">
+        <span><span class="k">network requests during capture:</span> 0</span>
+        <span><span class="k">bytes uploaded:</span> 0</span>
+        <span><span class="k">works offline:</span> yes</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="sec-head"><span class="no">§2</span><h2>Life of a capture</h2></div>
+  <p class="lede">From keystroke to clipboard, all local.</p>
+  <div class="lifecycle">
+    <div class="lc-step">
+      <div class="t">Shortcut pressed <span class="ms">t+0</span></div>
+      <p>You hit <code>⌘⇧D</code>. A capture overlay covers the screen. Any app, any video, any call.</p>
+    </div>
+    <div class="lc-step">
+      <div class="t">Region cropped <span class="ms">local</span></div>
+      <p>You drag a box around the thing you need. Only that crop moves forward, at full native resolution. Nothing is shrunk, nothing is uploaded.</p>
+    </div>
+    <div class="lc-step">
+      <div class="t">Vision model reads it <span class="ms">on-device</span></div>
+      <p>A local model (<code>Qwen2.5-VL</code> via MLX on Apple Silicon, <code>MiniCPM-V</code> via llama.cpp on Intel) extracts the content with structure intact: tables, lists, code, indentation.</p>
+    </div>
+    <div class="lc-step">
+      <div class="t">Result lands <span class="ms">t+seconds</span></div>
+      <p>Clean Markdown is on your clipboard and in a local SQLite history you can search, export, or delete. Done. No chat window ever opened.</p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" id="threat">
+  <div class="sec-head"><span class="no">§3</span><h2>What leaves your Mac</h2></div>
+  <p class="lede">The whole table. It's short.</p>
+  <div class="table-panel">
+    <table>
+      <thead><tr><th>Data</th><th>Leaves the machine?</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">capture pixels</td><td><span class="never">never</span></td><td>processed by the on-device model, then discarded</td></tr>
+        <tr><td class="mono">extracted text</td><td><span class="never">never</span></td><td>clipboard + local SQLite only</td></tr>
+        <tr><td class="mono">capture history</td><td><span class="never">never</span></td><td>a file on your disk; yours to delete</td></tr>
+        <tr><td class="mono">telemetry / analytics</td><td><span class="never">never</span></td><td>none exists in the codebase</td></tr>
+        <tr><td class="mono">update check</td><td><span class="opt">optional</span></td><td>a version number against GitHub Releases, once a day; disable with one flag</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">Kill switch: <code>BEAVER_DISABLE_UPDATE_CHECK=1</code> turns off the only network call there is.</p>
+</section>
+
+<section class="wrap">
+  <div class="sec-head"><span class="no">§4</span><h2>Don't trust us. Check.</h2></div>
+  <p class="lede">Three ways to verify the claim, from casual to paranoid.</p>
+  <div class="verify-grid">
+    <div class="verify-card">
+      <h4>Read the source</h4>
+      <p>MIT licensed, all of it. The capture path, the model server, the update check. If it phoned home, it would be in the diff.</p>
+      <div class="term"><span class="p">$</span> git clone github.com/thomasindrias/beaver</div>
+    </div>
+    <div class="verify-card">
+      <h4>Watch the network</h4>
+      <p>Run Little Snitch or Lulu while you capture all day. The interesting part is how boring it is.</p>
+      <div class="term"><span class="p">observed:</span> 0 connections</div>
+    </div>
+    <div class="verify-card">
+      <h4>Build it yourself</h4>
+      <p>The DMG is a convenience, not a requirement. Build from source and you don't have to trust our binaries either.</p>
+      <div class="term"><span class="p">$</span> pnpm tauri build</div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="sec-head"><span class="no">§5</span><h2>Why this matters</h2></div>
+  <div class="matters">
+    <div>
+      <h3>Some screens can't go to a chatbot.</h3>
+      <p>
+        Invoices. Bank statements. Patient notes. Contracts under NDA. Legal
+        discovery. The moment a screenshot lands in a chat window, it's in a
+        datacenter and subject to somebody else's retention policy.
+        <strong>Beaver extracts the data while it stays in the room.</strong>
+      </p>
+    </div>
+    <div>
+      <h3>And it's better input for AI anyway.</h3>
+      <p>
+        When you do want a model's help, send it Beaver's output instead of
+        the screenshot. Exact text at roughly a tenth of the tokens, with
+        nothing lost to image downscaling. <strong>The model reasons about
+        your data instead of squinting at a shrunk picture of it.</strong>
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" style="padding-top: 84px">
+  <p class="oneliner">
+    OCR-fast. Chatbot-smart. <span class="a">Neither one's compromise.</span>
+  </p>
+  <p class="lede" style="margin-top: 14px">
+    Live Text is instant but flattens tables into word soup. Cloud AI
+    understands structure but is slow, metered, and elsewhere. Beaver is the
+    missing middle: structure survives, and it never leaves.
+  </p>
+</section>
+
+<div class="wrap final">
+  <h2>Capture like nobody's watching.</h2>
+  <p>Because nobody is. Free, open source, one shortcut away.</p>
+  <div class="cta-row">
+    <a class="btn" href="https://github.com/thomasindrias/beaver/releases/latest">Download for Mac</a>
+    <a class="btn ghost" href="https://github.com/thomasindrias/beaver">Audit the source</a>
+  </div>
+</div>
+
+<div class="wrap">
+  <footer>
+    <span>© 2026 beaver · mit license</span>
+    <span><a href="https://github.com/thomasindrias/beaver">github</a> · <a href="https://github.com/thomasindrias/beaver/blob/main/SECURITY.md">security.md</a> · <a href="https://github.com/thomasindrias/beaver/blob/main/docs/ROADMAP.md">roadmap</a></span>
+  </footer>
+</div>
+
+</body>
+</html>

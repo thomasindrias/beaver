@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>beaver.md · Your screen, as data</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #faf8f2;
+    --ink: #23201a;
+    --muted: #7a7263;
+    --accent: #dd6b27;
+    --accent-deep: #b5511a;
+    --green: #3f7d5c;
+    --line: #e6e1d3;
+    --card: #ffffff;
+    --codebg: #262119;
+    --codeink: #efe9dd;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --sans: "IBM Plex Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: var(--mono); font-size: 15px; line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 64px;
+  }
+  a { color: var(--accent-deep); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* -------- editor chrome -------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(250, 248, 242, 0.92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    max-width: 860px; margin: 0 auto; padding: 12px 24px;
+    display: flex; align-items: center; gap: 14px; font-size: 13px;
+  }
+  .topbar .file { display: flex; align-items: center; gap: 9px; font-weight: 600; }
+  .topbar .file img { width: 22px; height: 22px; }
+  .topbar .dirty { color: var(--muted); font-weight: 400; }
+  .mode { margin-left: auto; display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .mode button {
+    font: 500 12.5px var(--mono); border: none; background: var(--card);
+    color: var(--muted); padding: 7px 14px; cursor: pointer;
+  }
+  .mode button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .topbar .dl {
+    font: 600 12.5px var(--mono); text-decoration: none; color: #fff;
+    background: var(--accent); padding: 8px 14px; border-radius: 8px;
+  }
+  .topbar .dl:hover { background: var(--accent-deep); }
+
+  .statusbar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+    background: var(--ink); color: #cfc8ba;
+    font-size: 12px; padding: 7px 18px;
+    display: flex; gap: 22px; justify-content: center; flex-wrap: wrap;
+  }
+  .statusbar .ok { color: #8fd4a8; }
+
+  /* -------- document -------- */
+  .doc { max-width: 860px; margin: 0 auto; padding: 64px 24px 96px; }
+  .block { margin-bottom: 64px; }
+
+  h1, h2 { font-family: var(--mono); font-weight: 700; letter-spacing: -0.015em; }
+  h1 { font-size: clamp(34px, 5.4vw, 54px); line-height: 1.12; margin-bottom: 20px; }
+  h2 { font-size: clamp(21px, 2.6vw, 27px); margin-bottom: 18px; }
+  p  { margin-bottom: 16px; max-width: 68ch; }
+  p.muted { color: var(--muted); }
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+
+  /* markdown syntax marks, visible only in source mode */
+  .h-mark, .md-mark { color: var(--accent); font-weight: 700; display: none; }
+  .link-mark { color: var(--muted); display: none; }
+  body.raw .h-mark, body.raw .md-mark, body.raw .link-mark { display: inline; }
+  body.raw a { text-decoration: none; }
+  .only-raw { display: none; }
+  body.raw .only-raw { display: block; }
+  body.raw .only-rendered { display: none; }
+
+  /* hero */
+  .hero p.lede { font-size: 16.5px; }
+  .cursor { display: inline-block; width: 11px; height: 1.05em; background: var(--accent); vertical-align: -0.15em; animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .cta-block { margin: 26px 0 8px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .cta {
+    font: 600 15px var(--mono); text-decoration: none; border-radius: 10px;
+    padding: 13px 22px; display: inline-block;
+  }
+  .cta.primary { background: var(--accent); color: #fff; }
+  .cta.primary:hover { background: var(--accent-deep); }
+  .cta.secondary { color: var(--ink); border: 1.5px solid var(--ink); }
+  .cta.secondary:hover { background: var(--ink); color: var(--paper); }
+  .qualifier { font-size: 13px; color: var(--muted); }
+
+  /* the before/after exhibit */
+  .exhibit { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin: 26px 0 10px; }
+  .shot {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px; transform: rotate(-1.1deg);
+    box-shadow: 0 10px 28px rgba(35, 32, 26, 0.09);
+  }
+  .shot .shot-label { font-size: 11.5px; color: var(--muted); margin-bottom: 10px; display: flex; justify-content: space-between; }
+  .shot-img { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; font-size: 11.5px; }
+  .shot-img .bar { background: #ece9df; padding: 6px 10px; color: var(--muted); font-size: 10.5px; }
+  .shot-img table { width: 100%; border-collapse: collapse; background: #fff; }
+  .shot-img th, .shot-img td { padding: 5px 8px; border-bottom: 1px solid #eee9dc; text-align: left; }
+  .shot-img th { background: #f6f3ea; font-weight: 600; }
+  .md-out {
+    background: var(--codebg); color: var(--codeink); border-radius: 10px;
+    padding: 18px; font-size: 12.5px; line-height: 1.8; overflow-x: auto;
+    box-shadow: 0 10px 28px rgba(35, 32, 26, 0.16);
+  }
+  .md-out .out-label { color: #a89f8d; font-size: 11.5px; margin-bottom: 10px; display: flex; justify-content: space-between; }
+  .md-out .out-label .copied { color: #8fd4a8; }
+  .md-out pre { margin: 0; white-space: pre; }
+  .exhibit-cap { font-size: 13px; color: var(--muted); }
+
+  /* tables (rendered) */
+  table.md { border-collapse: collapse; width: 100%; margin: 20px 0 8px; font-size: 13.5px; background: var(--card); }
+  table.md th, table.md td { border: 1px solid var(--line); padding: 10px 14px; text-align: left; vertical-align: top; }
+  table.md th { background: #f1ede1; font-weight: 700; }
+  table.md td.win { color: var(--green); font-weight: 600; }
+  table.md td.lose { color: #a4471f; }
+  pre.rawtable {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 16px; font-size: 12.5px; overflow-x: auto; margin: 20px 0 8px;
+  }
+
+  /* checklist */
+  ul.checks { list-style: none; padding: 0; margin: 18px 0; }
+  ul.checks li { padding-left: 34px; position: relative; margin-bottom: 12px; }
+  ul.checks li::before {
+    content: "[x]"; position: absolute; left: 0; color: var(--green); font-weight: 700;
+  }
+
+  /* steps: ordered list, order is real */
+  ol.steps { margin: 18px 0 0; padding-left: 0; list-style: none; counter-reset: step; }
+  ol.steps li { counter-increment: step; padding-left: 44px; position: relative; margin-bottom: 18px; }
+  ol.steps li::before {
+    content: counter(step) "."; position: absolute; left: 0; top: 0;
+    font-weight: 700; color: var(--accent); font-size: 17px;
+  }
+  ol.steps li .k { background: var(--card); border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px; padding: 2px 7px; font-size: 13px; }
+
+  /* blockquote */
+  blockquote {
+    border-left: 3px solid var(--accent); padding: 4px 0 4px 20px; margin: 22px 0;
+    color: var(--ink); font-size: 15.5px;
+  }
+  blockquote .bq-mark { display: none; color: var(--accent); font-weight: 700; }
+  body.raw blockquote { border-left-color: transparent; }
+  body.raw blockquote .bq-mark { display: inline; }
+
+  hr { border: none; border-top: 1px dashed var(--line); margin: 0 0 64px; }
+  body.raw hr { border-top: none; }
+  body.raw hr::after { content: "---"; color: var(--muted); font-weight: 700; }
+  .footer-note { color: var(--muted); font-size: 13px; }
+
+  @media (max-width: 720px) {
+    .exhibit { grid-template-columns: 1fr; }
+    .shot { transform: none; }
+    .topbar-inner { flex-wrap: wrap; gap: 10px; }
+    .mode { margin-left: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .cursor { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="file"><img src="../../public/beaver-head.webp" alt="" /> beaver.md <span class="dirty">· saved locally</span></span>
+    <div class="mode" role="group" aria-label="View mode">
+      <button type="button" id="btn-raw" aria-pressed="false">source</button>
+      <button type="button" id="btn-rendered" aria-pressed="true">rendered</button>
+    </div>
+    <a class="dl" href="https://github.com/thomasindrias/beaver/releases/latest">Download for Mac</a>
+  </div>
+</div>
+
+<main class="doc">
+
+  <div class="block hero">
+    <h1><span class="h-mark"># </span>Your screen,<br />as data.<span class="cursor" aria-hidden="true"></span></h1>
+    <p class="lede">
+      Beaver is a Mac menu-bar utility. Press <strong><span class="md-mark">**</span>Cmd+Shift+D<span class="md-mark">**</span></strong>,
+      drag a box around anything you can see, and get it back as clean Markdown.
+      Tables stay tables. Code stays code. This page is what that looks like.
+    </p>
+    <p class="muted">Try the toggle in the top bar. Structure survives either way. That's the point.</p>
+    <div class="cta-block">
+      <a class="cta primary" href="https://github.com/thomasindrias/beaver/releases/latest"><span class="link-mark">[</span>Download for Mac<span class="link-mark">]</span></a>
+      <a class="cta secondary" href="https://github.com/thomasindrias/beaver"><span class="link-mark">[</span>View on GitHub<span class="link-mark">]</span></a>
+    </div>
+    <p class="qualifier">Free and open source · macOS · Apple Silicon and Intel</p>
+  </div>
+
+  <hr />
+
+  <div class="block">
+    <h2><span class="h-mark">## </span>What a capture looks like</h2>
+    <p>
+      A pricing table in a PDF you can't copy from. One drag, and the exact
+      rows land on your clipboard.
+    </p>
+    <div class="exhibit">
+      <figure class="shot">
+        <div class="shot-label"><span>what you see</span><span>region: 412×188 px</span></div>
+        <div class="shot-img">
+          <div class="bar">plans.pdf · page 3 of 12 · read-only</div>
+          <table>
+            <thead><tr><th>Plan</th><th>Seats</th><th>Price</th></tr></thead>
+            <tbody>
+              <tr><td>Starter</td><td>1</td><td>$0</td></tr>
+              <tr><td>Team</td><td>10</td><td>$49/mo</td></tr>
+              <tr><td>Business</td><td>50</td><td>$189/mo</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </figure>
+      <div class="md-out">
+        <div class="out-label"><span>what you get</span><span class="copied">✓ copied</span></div>
+<pre>| Plan     | Seats | Price   |
+| -------- | ----- | ------- |
+| Starter  | 1     | $0      |
+| Team     | 10    | $49/mo  |
+| Business | 50    | $189/mo |</pre>
+      </div>
+    </div>
+    <p class="exhibit-cap">
+      Paste that into Excel, Notion, Obsidian, or a chat with your favorite
+      model. It is text now. It behaves.
+    </p>
+  </div>
+
+  <div class="block">
+    <h2><span class="h-mark">## </span>Where your current tricks fall down</h2>
+    <div class="only-rendered">
+      <table class="md">
+        <thead>
+          <tr><th>Method</th><th>Speed</th><th>Structure</th><th>Privacy</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Cmd+Shift+4</td><td class="win">instant</td><td class="lose">none, it's pixels</td><td class="win">stays local</td></tr>
+          <tr><td>Live Text / OCR apps</td><td class="win">fast</td><td class="lose">tables become word soup</td><td class="win">stays local</td></tr>
+          <tr><td>Screenshot into a chatbot</td><td class="lose">a whole conversation</td><td class="lose">downscaled, digits guessed</td><td class="lose">leaves your machine</td></tr>
+          <tr><td><strong>Beaver</strong></td><td class="win">a drag</td><td class="win">tables, lists, code intact</td><td class="win">on-device model</td></tr>
+        </tbody>
+      </table>
+    </div>
+<pre class="rawtable only-raw">| Method                    | Speed          | Structure               | Privacy          |
+| ------------------------- | -------------- | ----------------------- | ---------------- |
+| Cmd+Shift+4               | instant        | none, it's pixels       | stays local      |
+| Live Text / OCR apps      | fast           | tables become word soup | stays local      |
+| Screenshot into a chatbot | a conversation | downscaled, guessed     | leaves your Mac  |
+| Beaver                    | a drag         | tables, lists, code     | on-device model  |</pre>
+    <p class="muted">
+      Plain OCR is private but flattens everything. Cloud AI understands
+      everything but is slow, metered, and reads a shrunk copy of your
+      screenshot. Beaver sits in the gap: understanding at OCR speed, with
+      OCR privacy.
+    </p>
+  </div>
+
+  <div class="block">
+    <h2><span class="h-mark">## </span>If you feed an AI, read this part</h2>
+    <p>
+      Sending a screenshot to a model feels free. It isn't, and it's lossy in
+      ways you don't see:
+    </p>
+    <ul class="checks">
+      <li>Models bill images by pixel count. A full-window screenshot runs
+        roughly <strong><span class="md-mark">**</span>2,000 tokens<span class="md-mark">**</span></strong>. The table inside it, as
+        Markdown, is usually under 200.</li>
+      <li>Large screenshots get downscaled before the model reads them. Small
+        text drops below what the encoder can resolve.</li>
+      <li>The model doesn't say "I can't read this digit". It guesses, and a
+        guessed 7 looks exactly like a real 7. In one published benchmark,
+        GPT-4V got 35 of 50 table questions wrong.</li>
+    </ul>
+    <blockquote>
+      <span class="bq-mark">&gt; </span>Beaver crops the exact region you choose and reads it at full
+      resolution, on your Mac. Your model gets exact text at a tenth of the
+      tokens. Better input, better answers, smaller bill.
+    </blockquote>
+  </div>
+
+  <div class="block">
+    <h2><span class="h-mark">## </span>How it works</h2>
+    <ol class="steps">
+      <li>Press <span class="k">⌘⇧D</span>. A capture overlay appears over any app, video, or call.</li>
+      <li>Drag a box around the thing you need. Just the table, just the code.</li>
+      <li>A local vision model turns it into Markdown and copies it. History is saved to a SQLite file on your disk.</li>
+    </ol>
+  </div>
+
+  <div class="block">
+    <h2><span class="h-mark">## </span>Nothing leaves your Mac</h2>
+    <p>
+      The vision model runs on your machine: MLX on Apple Silicon, llama.cpp
+      on Intel. A capture has no network path, which means the privacy claim
+      is an architecture, not a policy. That matters for the documents you'd
+      never paste into a chatbot: invoices, contracts, patient notes, anything
+      under NDA.
+    </p>
+    <ul class="checks">
+      <li>Open source, MIT licensed. Read it, build it yourself.</li>
+      <li>The only network call is an optional update check against GitHub. One environment variable turns it off.</li>
+      <li>No account, no subscription, no meter. Works offline, works on a plane.</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h2><span class="h-mark">## </span>Install</h2>
+    <p>
+      Download the DMG, drag Beaver to Applications, grant screen recording
+      once. The model downloads on first launch, then everything runs offline.
+    </p>
+    <div class="cta-block">
+      <a class="cta primary" href="https://github.com/thomasindrias/beaver/releases/latest"><span class="link-mark">[</span>Download for Mac<span class="link-mark">]</span></a>
+      <a class="cta secondary" href="https://github.com/thomasindrias/beaver"><span class="link-mark">[</span>Build from source<span class="link-mark">]</span></a>
+    </div>
+    <p class="footer-note">© 2026 Beaver · MIT · <a href="https://github.com/thomasindrias/beaver/blob/main/SECURITY.md">Security</a> · <a href="https://github.com/thomasindrias/beaver/blob/main/docs/ROADMAP.md">Roadmap</a></p>
+  </div>
+
+</main>
+
+<div class="statusbar" role="status">
+  <span>beaver.md</span>
+  <span>Markdown</span>
+  <span>UTF-8</span>
+  <span class="ok">● network: idle</span>
+  <span class="ok">● model: on-device</span>
+</div>
+
+<script>
+  const btnRaw = document.getElementById("btn-raw");
+  const btnRen = document.getElementById("btn-rendered");
+  function setMode(raw) {
+    document.body.classList.toggle("raw", raw);
+    btnRaw.setAttribute("aria-pressed", String(raw));
+    btnRen.setAttribute("aria-pressed", String(!raw));
+  }
+  btnRaw.addEventListener("click", () => setMode(true));
+  btnRen.addEventListener("click", () => setMode(false));
+</script>
+</body>
+</html>
