@@ -189,4 +189,96 @@ describe("CaptureDemo", () => {
       );
     });
   });
+
+  describe("custom prompt", () => {
+    function openCustom() {
+      render(<CaptureDemo />);
+      enterView();
+      settle();
+      fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+    }
+
+    function runPrompt(text: string) {
+      fireEvent.change(screen.getByPlaceholderText(/e\.g\. just the totals/i), {
+        target: { value: text },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /run instruction/i }));
+    }
+
+    it("reveals a prompt input once picked, with a waiting placeholder in the output", () => {
+      openCustom();
+      expect(
+        screen.getByPlaceholderText(/e\.g\. just the totals/i),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId("exhibit-output").textContent).toMatch(
+        /type an instruction/i,
+      );
+    });
+
+    it("answers a recognized instruction deterministically", () => {
+      openCustom();
+      runPrompt("what's the total number of seats?");
+      expect(screen.getByTestId("exhibit-output").textContent).toMatch(
+        /total seats.*61/i,
+      );
+    });
+
+    it("answers differently for a different recognized instruction", () => {
+      openCustom();
+      runPrompt("which plan is cheapest");
+      expect(screen.getByTestId("exhibit-output").textContent).toMatch(
+        /Starter.*\$0/,
+      );
+    });
+
+    it("translates the table when asked to", () => {
+      openCustom();
+      runPrompt("translate to spanish");
+      expect(screen.getByTestId("exhibit-output").textContent).toMatch(
+        /Inicial|Equipo|Empresa/,
+      );
+    });
+
+    it("is honest about not recognizing an instruction, instead of guessing", () => {
+      openCustom();
+      runPrompt("write me a haiku about beavers");
+      const text = screen.getByTestId("exhibit-output").textContent ?? "";
+      expect(text).toMatch(/only knows a few instructions/i);
+    });
+
+    it("submits on Enter as well as on the run button", () => {
+      openCustom();
+      fireEvent.change(screen.getByPlaceholderText(/e\.g\. just the totals/i), {
+        target: { value: "cheapest" },
+      });
+      fireEvent.keyDown(screen.getByPlaceholderText(/e\.g\. just the totals/i), {
+        key: "Enter",
+      });
+      expect(screen.getByTestId("exhibit-output").textContent).toMatch(
+        /Starter.*\$0/,
+      );
+    });
+
+    it("switching back to a fixed format hides the prompt input and restores that format", () => {
+      openCustom();
+      runPrompt("total");
+      fireEvent.click(screen.getByRole("button", { name: "Markdown" }));
+      expect(
+        screen.queryByPlaceholderText(/e\.g\. just the totals/i),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("exhibit-output").textContent).toMatch(
+        /\| Plan/,
+      );
+    });
+
+    it("is available immediately when motion is reduced", () => {
+      stubMatchMedia(true);
+      render(<CaptureDemo />);
+      fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+      runPrompt("total");
+      expect(screen.getByTestId("exhibit-output").textContent).toMatch(
+        /total seats.*61/i,
+      );
+    });
+  });
 });
