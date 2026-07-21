@@ -1,87 +1,54 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
 import { Hero } from "../components/Hero";
-import { heroCopy } from "../constants";
-
-function stubMatchMedia(matches: boolean) {
-  vi.stubGlobal(
-    "matchMedia",
-    vi.fn().mockReturnValue({
-      matches,
-      media: "(prefers-reduced-motion: reduce)",
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }),
-  );
-}
+import { RELEASES_URL } from "../constants";
+import { stubMatchMedia } from "./helpers";
 
 describe("Hero", () => {
-  let playSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => stubMatchMedia(false));
+  afterEach(() => vi.unstubAllGlobals());
 
-  beforeEach(() => {
-    window.sessionStorage.clear();
-    playSpy = vi
-      .spyOn(window.HTMLMediaElement.prototype, "play")
-      .mockResolvedValue(undefined);
-  });
-
-  afterEach(() => {
-    playSpy.mockRestore();
-    window.sessionStorage.clear();
-    vi.unstubAllGlobals();
-  });
-
-  it("starts in the intro phase and does not show the headline yet", () => {
-    stubMatchMedia(false);
+  it("leads with the retyping headline", () => {
     render(<Hero />);
-    expect(screen.queryByText(heroCopy.headline)).not.toBeInTheDocument();
-  });
-
-  it("settles and shows the headline once the intro video ends", () => {
-    stubMatchMedia(false);
-    render(<Hero />);
-    const video = document.querySelector("video") as HTMLVideoElement;
-    fireEvent.ended(video);
-    expect(screen.getByText(heroCopy.headline)).toBeInTheDocument();
-  });
-
-  it("settles immediately when the visitor prefers reduced motion, without autoplaying", () => {
-    stubMatchMedia(true);
-    render(<Hero />);
-    expect(screen.getByText(heroCopy.headline)).toBeInTheDocument();
-    const video = document.querySelector("video") as HTMLVideoElement;
-    expect(video).not.toHaveAttribute("autoplay");
-  });
-
-  it("settles when autoplay is blocked", async () => {
-    stubMatchMedia(false);
-    playSpy.mockRejectedValueOnce(new Error("NotAllowedError"));
-    render(<Hero />);
-    await waitFor(() =>
-      expect(screen.getByText(heroCopy.headline)).toBeInTheDocument(),
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Stop retyping your screen.",
     );
   });
 
-  it("settles when the intro is clicked (skip)", () => {
-    stubMatchMedia(false);
+  it("promises clean Markdown on the clipboard without uploads", () => {
     render(<Hero />);
-    fireEvent.click(screen.getByTestId("intro-video"));
-    expect(screen.getByText(heroCopy.headline)).toBeInTheDocument();
+    expect(
+      screen.getByText(/clean Markdown on your clipboard/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/nothing uploaded/)).toBeInTheDocument();
   });
 
-  it("plays the intro only once per browser session", () => {
-    stubMatchMedia(false);
-    const { unmount } = render(<Hero />);
-    const video = document.querySelector("video") as HTMLVideoElement;
-    fireEvent.ended(video);
-
-    expect(window.sessionStorage.getItem("beaver:intro-seen")).toBe("true");
-
-    unmount();
+  it("links the primary CTA to the latest release", () => {
     render(<Hero />);
+    expect(
+      screen.getByRole("link", { name: "Download for Mac" }),
+    ).toHaveAttribute("href", RELEASES_URL);
+  });
 
-    expect(screen.getByText(heroCopy.headline)).toBeInTheDocument();
-    expect(screen.queryByTestId("intro-video")).not.toBeInTheDocument();
-    expect(playSpy).toHaveBeenCalledTimes(1);
+  it("scrolls the secondary CTA to the how-it-works section", () => {
+    render(<Hero />);
+    expect(
+      screen.getByRole("link", { name: "See how it works" }),
+    ).toHaveAttribute("href", "#how");
+  });
+
+  it("states the platform qualifier", () => {
+    render(<Hero />);
+    expect(
+      screen.getByText("Free and open source · macOS · Apple Silicon and Intel"),
+    ).toBeInTheDocument();
+  });
+
+  it("greets with the waving mascot", () => {
+    render(<Hero />);
+    expect(screen.getByAltText("Beaver waving hello")).toHaveAttribute(
+      "src",
+      "/beaver-animations/beaver-wave.webp",
+    );
   });
 });

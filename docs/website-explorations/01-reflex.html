@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Beaver · The missing Cmd+C</title>
+<style>
+  :root {
+    --paper: #eff0f6;
+    --card: #ffffff;
+    --ink: #211c16;
+    --ink-muted: #6b635a;
+    --accent: #dd6b27;
+    --accent-hover: #c85a1c;
+    --accent-soft: #fbe9dd;
+    --line: #dcdde6;
+    --code-bg: #26221d;
+    --code-ink: #f2ede6;
+    --radius: 12px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Menlo", "Cascadia Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.55;
+  }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+
+  /* ---------- nav ---------- */
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 0;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; text-decoration: none; }
+  .brand img { width: 30px; height: 30px; }
+  .nav-links { display: flex; align-items: center; gap: 22px; font-size: 14.5px; }
+  .nav-links a { text-decoration: none; color: var(--ink-muted); }
+  .nav-links a:hover { color: var(--ink); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent); color: #fff; border: none; cursor: pointer;
+    font: 600 15px/1 var(--font);
+    padding: 12px 20px; border-radius: 999px; text-decoration: none;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+  .btn.small { padding: 9px 16px; font-size: 14px; }
+  .btn.ghost {
+    background: transparent; color: var(--ink);
+    box-shadow: inset 0 0 0 1.5px var(--line);
+  }
+  .btn.ghost:hover { background: #fff; }
+
+  /* ---------- hero ---------- */
+  header.hero { padding-top: 56px; padding-bottom: 24px; text-align: center; }
+  .kbd-row { display: inline-flex; gap: 6px; align-items: center; margin-bottom: 22px; }
+  .kbd {
+    font: 600 13px/1 var(--mono);
+    background: #fff; border: 1px solid var(--line); border-bottom-width: 3px;
+    border-radius: 7px; padding: 7px 9px; color: var(--ink-muted);
+  }
+  .kbd-row .plus { color: var(--ink-muted); font-size: 13px; }
+  h1 {
+    font-size: clamp(40px, 6.4vw, 68px);
+    line-height: 1.02; letter-spacing: -0.03em; font-weight: 700;
+    margin-bottom: 18px;
+  }
+  h1 .cmd { color: var(--accent); font-family: var(--mono); font-weight: 700; letter-spacing: -0.01em; }
+  .sub {
+    font-size: 19px; color: var(--ink-muted); max-width: 620px; margin: 0 auto 30px;
+  }
+  .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .qualifier { margin-top: 14px; font-size: 13.5px; color: var(--ink-muted); }
+
+  /* ---------- demo ---------- */
+  .demo { margin: 48px auto 0; max-width: 940px; padding: 0 24px; }
+  .demo-stage {
+    display: grid; grid-template-columns: 1.25fr 1fr; gap: 18px; align-items: stretch;
+  }
+  .window {
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: 0 18px 50px rgba(33, 28, 22, 0.12), 0 2px 8px rgba(33, 28, 22, 0.06);
+    overflow: hidden; position: relative;
+  }
+  .titlebar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 11px 14px; border-bottom: 1px solid var(--line);
+    font-size: 12.5px; color: var(--ink-muted);
+  }
+  .dot { width: 11px; height: 11px; border-radius: 50%; background: #d9d9de; }
+  .dot.r { background: #ff5f57; } .dot.y { background: #febc2e; } .dot.g { background: #28c840; }
+  .titlebar .title { margin: 0 auto; transform: translateX(-24px); }
+  .doc { padding: 20px 22px 64px; font-size: 13px; }
+  .doc h3 { font-size: 15px; margin-bottom: 4px; }
+  .doc p.meta { color: var(--ink-muted); font-size: 12px; margin-bottom: 14px; }
+  table.fake {
+    width: 100%; border-collapse: collapse; font-size: 12.5px;
+  }
+  table.fake th, table.fake td {
+    text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line);
+  }
+  table.fake th { font-weight: 600; background: #f7f7fb; }
+  table.fake td.num, table.fake th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* selection box + ants */
+  .select-box {
+    position: absolute; pointer-events: none; opacity: 0;
+    border-radius: 4px;
+  }
+  .select-box svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .select-box rect {
+    fill: rgba(221, 107, 39, 0.07);
+    stroke: var(--accent); stroke-width: 2; stroke-dasharray: 7 5;
+    vector-effect: non-scaling-stroke;
+  }
+  .hud {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: -16px; opacity: 0;
+    background: var(--ink); color: #fff; font-size: 12.5px; font-weight: 600;
+    padding: 8px 14px; border-radius: 999px; white-space: nowrap;
+    box-shadow: 0 6px 18px rgba(33, 28, 22, 0.3);
+  }
+  .hud .check { color: #7fd88f; margin-right: 5px; }
+
+  .demo.playing .select-box { animation: draw-box 1.1s cubic-bezier(0.3, 0.9, 0.3, 1) 0.4s both; }
+  .demo.playing .select-box rect { animation: ants 0.7s linear infinite; }
+  .demo.playing .hud { animation: hud-pop 0.4s ease 1.9s both; }
+  @keyframes draw-box { from { opacity: 1; clip-path: inset(0 100% 100% 0); } to { opacity: 1; clip-path: inset(0 0 0 0); } }
+  @keyframes ants { to { stroke-dashoffset: -12; } }
+  @keyframes hud-pop { from { opacity: 0; transform: translateX(-50%) translateY(6px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+  .clip-panel {
+    background: var(--code-bg); color: var(--code-ink);
+    border-radius: var(--radius); padding: 16px 18px;
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.75;
+    display: flex; flex-direction: column;
+    box-shadow: 0 18px 50px rgba(33, 28, 22, 0.18);
+  }
+  .clip-panel .label {
+    font-family: var(--font); font-size: 11.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.09em; color: #a89f93;
+    margin-bottom: 10px; display: flex; align-items: center; gap: 7px;
+  }
+  .clip-panel .label .pulse {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+  }
+  .clip-panel pre { margin: 0; white-space: pre; overflow-x: auto; flex: 1; }
+  .clip-panel .caret { display: inline-block; width: 7px; height: 14px; background: var(--accent); vertical-align: -2px; }
+  .replay {
+    margin: 18px auto 0; display: flex; justify-content: center;
+  }
+  .replay button {
+    font: 500 13.5px var(--font); color: var(--ink-muted);
+    background: none; border: none; cursor: pointer; padding: 8px 12px; border-radius: 8px;
+  }
+  .replay button:hover { color: var(--ink); background: #fff; }
+
+  /* ---------- sections ---------- */
+  section { padding-top: 84px; padding-bottom: 84px; }
+  .eyebrow {
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 12px;
+  }
+  h2 { font-size: clamp(28px, 3.6vw, 40px); letter-spacing: -0.02em; line-height: 1.12; margin-bottom: 14px; }
+  .lede { font-size: 17px; color: var(--ink-muted); max-width: 560px; }
+
+  /* pains */
+  .pains { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 38px; }
+  .pain {
+    background: var(--card); border-radius: var(--radius); padding: 22px;
+    border: 1px solid var(--line);
+  }
+  .pain .glyph { font-size: 20px; margin-bottom: 10px; display: block; }
+  .pain h4 { font-size: 15.5px; margin-bottom: 6px; }
+  .pain p { font-size: 14px; color: var(--ink-muted); }
+
+  /* steps */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 38px; }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
+  .step .kbd { margin-bottom: 14px; display: inline-block; }
+  .step h4 { font-size: 16px; margin-bottom: 6px; }
+  .step p { font-size: 14px; color: var(--ink-muted); }
+  .steps-note { margin-top: 22px; font-size: 14.5px; color: var(--ink-muted); display: flex; align-items: center; gap: 8px; }
+  .steps-note .lock { color: var(--accent); }
+
+  /* comparison */
+  .compare { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); margin-top: 38px; background: var(--card); }
+  .compare-row { display: grid; grid-template-columns: 200px 1fr; border-bottom: 1px solid var(--line); }
+  .compare-row:last-child { border-bottom: none; }
+  .compare-row.hl { background: var(--accent-soft); }
+  .compare-row .tool { padding: 18px 22px; font-weight: 600; font-size: 14.5px; border-right: 1px solid var(--line); display:flex; align-items:center; }
+  .compare-row .result { padding: 18px 22px; font-size: 14.5px; color: var(--ink-muted); display:flex; align-items:center; }
+  .compare-row.hl .tool, .compare-row.hl .result { color: var(--ink); }
+  .compare-row.hl .result strong { color: var(--accent-hover); }
+
+  /* ai section */
+  .ai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; margin-top: 8px; }
+  .token-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 24px; font-family: var(--mono); font-size: 13.5px;
+  }
+  .token-line { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+  .token-line:last-of-type { border-bottom: none; }
+  .token-line .n { font-variant-numeric: tabular-nums; }
+  .token-line.bad .n { color: #b3402e; }
+  .token-line.good .n { color: #2e6b4f; font-weight: 700; }
+  .token-foot { font-family: var(--font); font-size: 12.5px; color: var(--ink-muted); margin-top: 12px; }
+  .ai-copy p { font-size: 15.5px; color: var(--ink-muted); margin-top: 12px; }
+  .ai-copy p strong { color: var(--ink); }
+
+  /* privacy strip */
+  .privacy { background: var(--ink); color: #f2ede6; border-radius: 18px; padding: 52px; }
+  .privacy .eyebrow { color: var(--accent); }
+  .privacy h2 { color: #fff; }
+  .privacy-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-top: 30px; }
+  .privacy-cols h4 { font-size: 15px; margin-bottom: 6px; color: #fff; }
+  .privacy-cols p { font-size: 13.5px; color: #b8b0a5; }
+
+  /* final cta */
+  .final { text-align: center; padding-top: 90px; padding-bottom: 100px; }
+  .final img { width: 76px; height: 76px; margin-bottom: 18px; }
+  .final h2 { margin-bottom: 10px; }
+  .final p { color: var(--ink-muted); margin-bottom: 28px; }
+  footer { border-top: 1px solid var(--line); padding: 26px 0 40px; font-size: 13px; color: var(--ink-muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  footer a { color: var(--ink-muted); }
+
+  @media (max-width: 800px) {
+    .nav-links a:not(.btn) { display: none; }
+    .demo-stage, .pains, .steps, .ai-grid, .privacy-cols { grid-template-columns: 1fr; }
+    .compare-row { grid-template-columns: 1fr; }
+    .compare-row .tool { border-right: none; border-bottom: 1px dashed var(--line); padding-bottom: 10px; }
+    .privacy { padding: 34px 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .demo.playing .select-box { animation: none; opacity: 1; }
+    .demo.playing .select-box rect { animation: none; }
+    .demo.playing .hud { animation: none; opacity: 1; }
+    .btn:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav>
+    <a class="brand" href="#"><img src="../../public/beaver-head.webp" alt="" /> Beaver</a>
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#compare">Why Beaver</a>
+      <a href="https://github.com/thomasindrias/beaver">GitHub</a>
+      <a class="btn small" href="https://github.com/thomasindrias/beaver/releases/latest">Download for Mac</a>
+    </div>
+  </nav>
+</div>
+
+<header class="hero wrap">
+  <div class="kbd-row" aria-hidden="true">
+    <span class="kbd">⌘</span><span class="plus">+</span><span class="kbd">⇧</span><span class="plus">+</span><span class="kbd">D</span>
+  </div>
+  <h1>The missing <span class="cmd">Cmd+C</span></h1>
+  <p class="sub">
+    Some things on screen can't be copied. Tables in PDFs, code in videos,
+    slides on a call. Beaver turns a drag into clean data on your clipboard,
+    and your screen never leaves your Mac.
+  </p>
+  <div class="cta-row">
+    <a class="btn" href="https://github.com/thomasindrias/beaver/releases/latest">Download for Mac</a>
+    <a class="btn ghost" href="#demo">Watch a capture</a>
+  </div>
+  <p class="qualifier">Free and open source · macOS · Apple Silicon and Intel</p>
+</header>
+
+<div class="demo playing" id="demo">
+  <div class="demo-stage">
+    <div class="window">
+      <div class="titlebar">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="title">Q2-report.pdf</span>
+      </div>
+      <div class="doc">
+        <h3>Regional revenue, Q2 2026</h3>
+        <p class="meta">Read-only · Exported from the finance dashboard</p>
+        <table class="fake" id="fake-table">
+          <thead>
+            <tr><th>Region</th><th class="num">Revenue</th><th class="num">Change</th><th class="num">Margin</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Nordics</td><td class="num">$1.24M</td><td class="num">+8.1%</td><td class="num">31%</td></tr>
+            <tr><td>DACH</td><td class="num">$2.87M</td><td class="num">+3.4%</td><td class="num">27%</td></tr>
+            <tr><td>Benelux</td><td class="num">$0.92M</td><td class="num">-1.2%</td><td class="num">24%</td></tr>
+            <tr><td>Iberia</td><td class="num">$1.05M</td><td class="num">+12.6%</td><td class="num">29%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="select-box" id="select-box">
+        <svg aria-hidden="true"><rect x="1" y="1" width="100%" height="100%" rx="4" style="width:calc(100% - 2px);height:calc(100% - 2px)"/></svg>
+        <div class="hud"><span class="check">✓</span> Copied as table</div>
+      </div>
+    </div>
+    <div class="clip-panel">
+      <div class="label"><span class="pulse"></span> On your clipboard</div>
+      <pre id="clip-out"></pre>
+    </div>
+  </div>
+  <div class="replay"><button id="replay-btn" type="button">↻ Replay capture</button></div>
+</div>
+
+<section class="wrap" id="pains">
+  <p class="eyebrow">You've done this by hand</p>
+  <h2>The data is right there.<br />And completely out of reach.</h2>
+  <p class="lede">
+    Every screen is full of information you can see but can't use. So you
+    retype it, cell by cell, bracket by bracket.
+  </p>
+  <div class="pains">
+    <div class="pain"><span class="glyph">📄</span><h4>Tables in PDFs and dashboards</h4><p>You need it in a spreadsheet. The PDF disagrees. Copy gives you word soup or nothing.</p></div>
+    <div class="pain"><span class="glyph">▶️</span><h4>Code in videos and screen shares</h4><p>Pause, type, rewind, type. You still miss a bracket and spend ten minutes finding it.</p></div>
+    <div class="pain"><span class="glyph">🖥️</span><h4>Slides on a call</h4><p>You ask for the deck. Nobody sends the deck. The numbers were on screen for eight seconds.</p></div>
+    <div class="pain"><span class="glyph">⚠️</span><h4>Dialogs you can't select</h4><p>Error messages, license keys, legacy apps with no copy button. Screenshots of text you'll retype later.</p></div>
+    <div class="pain"><span class="glyph">🧾</span><h4>Invoices and statements</h4><p>Numbers you need in your books, in documents you'd never paste into a chatbot.</p></div>
+    <div class="pain"><span class="glyph">🗂️</span><h4>The screenshots folder</h4><p>Hundreds of pictures of information. None of it searchable, none of it usable.</p></div>
+  </div>
+</section>
+
+<section class="wrap" id="how">
+  <p class="eyebrow">One shortcut, a few seconds</p>
+  <h2>Keystroke, drag, done.</h2>
+  <div class="steps">
+    <div class="step">
+      <span class="kbd">⌘ ⇧ D</span>
+      <h4>Press the shortcut</h4>
+      <p>A capture overlay appears over whatever you're looking at. Any app, any video, any call.</p>
+    </div>
+    <div class="step">
+      <span class="kbd">drag</span>
+      <h4>Box the thing you need</h4>
+      <p>Just the table, just the code. You choose the region, so the model reads exactly that at full resolution.</p>
+    </div>
+    <div class="step">
+      <span class="kbd">⌘ V</span>
+      <h4>Paste it where it belongs</h4>
+      <p>Clean Markdown is on your clipboard. Tables stay tables, code keeps its indentation. History is saved locally.</p>
+    </div>
+  </div>
+  <p class="steps-note"><span class="lock">🔒</span> The vision model runs on your Mac. Nothing uploads, nothing waits on a network.</p>
+</section>
+
+<section class="wrap" id="compare">
+  <p class="eyebrow">Why not the usual ways</p>
+  <h2>What you actually get back</h2>
+  <p class="lede">Same table on screen, four ways to grab it.</p>
+  <div class="compare">
+    <div class="compare-row">
+      <div class="tool">⌘⇧4 screenshot</div>
+      <div class="result">A picture of the data. You can look at it. You can't paste it, sort it, or search it.</div>
+    </div>
+    <div class="compare-row">
+      <div class="tool">Live Text</div>
+      <div class="result">The words, without the structure. Columns collapse into one line. Code loses its indentation.</div>
+    </div>
+    <div class="compare-row">
+      <div class="tool">Paste into a chatbot</div>
+      <div class="result">An answer, eventually. Attach, explain, wait, copy back. Your screen is now in a datacenter.</div>
+    </div>
+    <div class="compare-row hl">
+      <div class="tool">Beaver</div>
+      <div class="result"><strong>The data itself, on your clipboard,</strong>&nbsp;in the shape it had on screen. No upload, no chat, no meter.</div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" id="ai">
+  <p class="eyebrow">If you feed an AI</p>
+  <div class="ai-grid">
+    <div class="ai-copy">
+      <h2>Send your model text, not a photo of text.</h2>
+      <p>
+        Models bill images by their pixels. A full-window screenshot costs
+        around <strong>2,000 tokens</strong> before the model says a word, and big
+        images get downscaled before the model reads them. Small text turns
+        into guesswork, and a guessed digit looks exactly like a real one.
+      </p>
+      <p>
+        Beaver hands your model the same content as exact Markdown:
+        <strong>a fraction of the tokens, nothing lost in the pixels.</strong>
+        Better input, better answers, smaller bill.
+      </p>
+    </div>
+    <div class="token-card">
+      <div class="token-line bad"><span>screenshot.png (1440×900)</span><span class="n">~1,900 tokens</span></div>
+      <div class="token-line"><span>&nbsp;&nbsp;downscaled by the model</span><span class="n">yes</span></div>
+      <div class="token-line"><span>&nbsp;&nbsp;digits guessed if blurry</span><span class="n">silently</span></div>
+      <div class="token-line good"><span>same table via Beaver</span><span class="n">~180 tokens</span></div>
+      <div class="token-line"><span>&nbsp;&nbsp;structure</span><span class="n">intact</span></div>
+      <div class="token-foot">Token math varies by provider. The direction never does.</div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="privacy">
+    <p class="eyebrow">Private by architecture</p>
+    <h2>Captures have no network path.</h2>
+    <div class="privacy-cols">
+      <div>
+        <h4>On-device vision</h4>
+        <p>The model runs locally: MLX on Apple Silicon, llama.cpp on Intel. A capture is processed and forgotten by everything except your own history file.</p>
+      </div>
+      <div>
+        <h4>Open source, checkable</h4>
+        <p>MIT licensed. Read the code, build it yourself, watch the network do nothing. The only network call is an optional update check, and one flag turns it off.</p>
+      </div>
+      <div>
+        <h4>Safe for the sensitive stuff</h4>
+        <p>Invoices, contracts, patient notes, anything under NDA. Extract the data without it ever leaving the room.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="final wrap">
+  <img src="../../public/beaver-animations/beaver-happy.webp" alt="Beaver mascot" />
+  <h2>Stop retyping your screen.</h2>
+  <p>Free and open source. One shortcut away.</p>
+  <div class="cta-row">
+    <a class="btn" href="https://github.com/thomasindrias/beaver/releases/latest">Download for Mac</a>
+    <a class="btn ghost" href="https://github.com/thomasindrias/beaver">View on GitHub</a>
+  </div>
+</div>
+
+<div class="wrap">
+  <footer>
+    <span>© 2026 Beaver · MIT license</span>
+    <span><a href="https://github.com/thomasindrias/beaver">GitHub</a> · <a href="https://github.com/thomasindrias/beaver/blob/main/SECURITY.md">Security</a> · <a href="https://github.com/thomasindrias/beaver/blob/main/docs/ROADMAP.md">Roadmap</a></span>
+  </footer>
+</div>
+
+<script>
+  const MD = `| Region  | Revenue | Change | Margin |
+| ------- | ------- | ------ | ------ |
+| Nordics | $1.24M  | +8.1%  | 31%    |
+| DACH    | $2.87M  | +3.4%  | 27%    |
+| Benelux | $0.92M  | -1.2%  | 24%    |
+| Iberia  | $1.05M  | +12.6% | 29%    |`;
+
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const demo = document.getElementById("demo");
+  const out = document.getElementById("clip-out");
+  const box = document.getElementById("select-box");
+  const table = document.getElementById("fake-table");
+
+  function placeBox() {
+    const win = table.closest(".window").getBoundingClientRect();
+    const t = table.getBoundingClientRect();
+    box.style.left = (t.left - win.left - 8) + "px";
+    box.style.top = (t.top - win.top - 8) + "px";
+    box.style.width = (t.width + 16) + "px";
+    box.style.height = (t.height + 16) + "px";
+  }
+
+  let typeTimer = null;
+  function typeOut() {
+    clearInterval(typeTimer);
+    if (reduced) { out.textContent = MD; return; }
+    out.innerHTML = "";
+    let i = 0;
+    const caret = document.createElement("span");
+    caret.className = "caret";
+    const text = document.createTextNode("");
+    out.appendChild(text);
+    out.appendChild(caret);
+    typeTimer = setInterval(() => {
+      i += 7;
+      text.textContent = MD.slice(0, i);
+      if (i >= MD.length) { clearInterval(typeTimer); caret.remove(); }
+    }, 24);
+  }
+
+  function play() {
+    placeBox();
+    demo.classList.remove("playing");
+    void demo.offsetWidth;
+    demo.classList.add("playing");
+    out.textContent = "";
+    setTimeout(typeOut, reduced ? 0 : 2100);
+  }
+
+  window.addEventListener("resize", placeBox);
+  document.getElementById("replay-btn").addEventListener("click", play);
+  window.addEventListener("load", play);
+</script>
+</body>
+</html>
