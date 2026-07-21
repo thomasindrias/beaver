@@ -246,6 +246,20 @@ describe("CaptureDemo", () => {
       expect(text).toMatch(/only knows a few instructions/i);
     });
 
+    it("doesn't mistake an unrelated mention of 'free' for a pricing question", () => {
+      openCustom();
+      runPrompt("is this free software");
+      const text = screen.getByTestId("exhibit-output").textContent ?? "";
+      expect(text).toMatch(/only knows a few instructions/i);
+    });
+
+    it("doesn't mistake an unrelated mention of 'highest' for a pricing question", () => {
+      openCustom();
+      runPrompt("what's the highest quality option");
+      const text = screen.getByTestId("exhibit-output").textContent ?? "";
+      expect(text).toMatch(/only knows a few instructions/i);
+    });
+
     it("submits on Enter as well as on the run button", () => {
       openCustom();
       fireEvent.change(screen.getByPlaceholderText(/e\.g\. just the totals/i), {

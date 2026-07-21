@@ -45,9 +45,9 @@ function resolveCustomPrompt(raw: string): string {
   const prompt = raw.trim().toLowerCase();
   if (!prompt) return CUSTOM_PLACEHOLDER;
   if (/total|sum/.test(prompt)) return "Total seats across all plans: 61.";
-  if (/cheap|free|lowest/.test(prompt))
+  if (/cheapest|lowest price|which.*free|free plan/.test(prompt))
     return "Starter — $0. The only free plan.";
-  if (/expensive|priciest|highest/.test(prompt))
+  if (/expensive|priciest|highest (price|cost|plan)/.test(prompt))
     return "Business — $189/mo. The top plan.";
   if (/spanish|español/.test(prompt))
     return `Plan     Puestos  Precio
