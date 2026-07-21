@@ -1,29 +1,62 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useInView } from "../hooks/useInView";
 
-const MARKDOWN = `| Plan     | Seats | Price   |
+type FormatKey = "markdown" | "csv" | "json" | "plain";
+type Phase = "selecting" | "typing" | "done";
+
+const FORMATS: Array<{ key: FormatKey; label: string }> = [
+  { key: "markdown", label: "Markdown" },
+  { key: "csv", label: "CSV" },
+  { key: "json", label: "JSON" },
+  { key: "plain", label: "Plain" },
+];
+
+const OUTPUTS: Record<FormatKey, string> = {
+  markdown: `| Plan     | Seats | Price   |
 | -------- | ----- | ------- |
 | Starter  | 1     | $0      |
 | Team     | 10    | $49/mo  |
-| Business | 50    | $189/mo |`;
+| Business | 50    | $189/mo |`,
+  csv: `Plan,Seats,Price
+Starter,1,$0
+Team,10,$49/mo
+Business,50,$189/mo`,
+  json: `[
+  { "Plan": "Starter", "Seats": "1", "Price": "$0" },
+  { "Plan": "Team", "Seats": "10", "Price": "$49/mo" },
+  { "Plan": "Business", "Seats": "50", "Price": "$189/mo" }
+]`,
+  // Deliberately the odd one out: plain text has nowhere to put structure,
+  // so the table flattens into a sentence — the same "word soup" the rest
+  // of the page argues against.
+  plain:
+    "Starter — 1 seat, $0. Team — 10 seats, $49/mo. Business — 50 seats, $189/mo.",
+};
 
 const SELECT_DELAY_MS = 500;
 const TYPE_INTERVAL_MS = 24;
 const CHARS_PER_TICK = 6;
 
-type Phase = "selecting" | "typing" | "done";
-
 export function CaptureDemo() {
   const { ref: boxRef, inView, prefersReducedMotion } = useInView<HTMLDivElement>(0.4);
+  const [format, setFormat] = useState<FormatKey>("markdown");
   const [phase, setPhase] = useState<Phase>("selecting");
   const [typed, setTyped] = useState("");
   const [replayKey, setReplayKey] = useState(0);
+
+  // Effect below intentionally doesn't depend on `format` — switching
+  // format alone shouldn't redraw the selection box, only a fresh capture
+  // or an explicit replay should. This ref lets it read the latest pick.
+  const formatRef = useRef(format);
+  useEffect(() => {
+    formatRef.current = format;
+  }, [format]);
 
   // Run (or replay) the select-then-type sequence, once in view.
   useEffect(() => {
     if (prefersReducedMotion) {
       setPhase("done");
-      setTyped(MARKDOWN);
+      setTyped(OUTPUTS[formatRef.current]);
       return;
     }
     if (!inView) return;
@@ -34,11 +67,12 @@ export function CaptureDemo() {
     let typeTimer: ReturnType<typeof setInterval> | undefined;
     const selectTimer = setTimeout(() => {
       setPhase("typing");
+      const text = OUTPUTS[formatRef.current];
       let i = 0;
       typeTimer = setInterval(() => {
         i += CHARS_PER_TICK;
-        setTyped(MARKDOWN.slice(0, i));
-        if (i >= MARKDOWN.length) {
+        setTyped(text.slice(0, i));
+        if (i >= text.length) {
           clearInterval(typeTimer);
           setPhase("done");
         }
@@ -53,6 +87,12 @@ export function CaptureDemo() {
 
   const selecting =
     !prefersReducedMotion && (phase === "selecting" || phase === "typing");
+  const settled = phase === "done";
+
+  function pickFormat(next: FormatKey) {
+    setFormat(next);
+    setTyped(OUTPUTS[next]);
+  }
 
   return (
     <div className="mx-auto grid max-w-[880px] items-center gap-3.5 max-md:grid-cols-1 md:grid-cols-[1fr_56px_1fr]">
@@ -114,12 +154,39 @@ export function CaptureDemo() {
         →
       </div>
       <figure
-        data-testid="exhibit-markdown"
+        data-testid="exhibit-output"
         className="rotate-1 rounded-2xl border-[2.5px] border-bark bg-ink p-4 shadow-[var(--shadow-sticker-dark)] max-md:rotate-0"
       >
         <span className="mb-3 inline-block rounded-md bg-[#443428] px-2 py-0.5 text-xs font-extrabold tracking-wider text-sun uppercase">
           on your clipboard
         </span>
+        <div
+          role="group"
+          aria-label="Output format"
+          className="mb-2.5 flex flex-wrap gap-1.5"
+        >
+          {FORMATS.map((f) => {
+            const active = format === f.key;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                disabled={!settled}
+                aria-pressed={active}
+                onClick={() => pickFormat(f.key)}
+                className={[
+                  "rounded-full border px-2.5 py-1 text-2xs font-bold transition-colors",
+                  active
+                    ? "border-sun bg-sun/15 text-sun"
+                    : "border-[#5a4a3a] text-[#c9bda9]",
+                  settled ? "hover:text-sun" : "cursor-default opacity-40",
+                ].join(" ")}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
         <pre className="min-h-[8.6em] overflow-x-auto font-mono text-xs leading-[1.8] whitespace-pre text-[#f3e9db]">
           {typed}
           {phase !== "done" && !prefersReducedMotion && (

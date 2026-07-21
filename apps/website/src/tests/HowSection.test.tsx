@@ -40,7 +40,7 @@ describe("HowSection", () => {
     act(() => {
       vi.runAllTimers();
     });
-    const clipboard = screen.getByTestId("exhibit-markdown");
+    const clipboard = screen.getByTestId("exhibit-output");
     expect(within(clipboard).getByText(/\| Plan/)).toBeInTheDocument();
   });
 });
