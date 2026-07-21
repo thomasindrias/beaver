@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Sparkles } from "lucide-react";
 import { useInView } from "../hooks/useInView";
 
 type FormatKey = "markdown" | "csv" | "json" | "plain" | "custom";
@@ -225,7 +226,9 @@ export function CaptureDemo() {
                   settled ? "hover:text-sun" : "cursor-default opacity-40",
                 ].join(" ")}
               >
-                {f.key === "custom" && <span aria-hidden>✨ </span>}
+                {f.key === "custom" && (
+                  <Sparkles aria-hidden className="mr-1 inline-block h-3 w-3 align-[-1px]" />
+                )}
                 {f.label}
               </button>
             );
@@ -249,13 +252,13 @@ export function CaptureDemo() {
               onClick={runCustomPrompt}
               disabled={!settled}
               aria-label="Run instruction"
-              className="rounded-md border border-sun bg-sun/15 px-2.5 text-sm text-sun disabled:opacity-40"
+              className="flex items-center justify-center rounded-md border border-sun bg-sun/15 px-2.5 text-sun disabled:opacity-40"
             >
-              ✨
+              <Sparkles aria-hidden className="h-3.5 w-3.5" />
             </button>
           </div>
         )}
-        <pre className="h-[9em] overflow-auto font-mono text-xs leading-[1.8] whitespace-pre-wrap text-[#f3e9db]">
+        <pre className="scrollbar-ink h-[9em] overflow-auto font-mono text-xs leading-[1.8] whitespace-pre-wrap text-[#f3e9db]">
           {typed}
           {phase !== "done" && !prefersReducedMotion && (
             <span

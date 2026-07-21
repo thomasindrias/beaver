@@ -148,6 +148,27 @@
   .capture-caret {
     animation: caret-blink 1s step-end infinite;
   }
+
+  /* Themed scrollbar for the dark clipboard panel, instead of the browser
+     default: a thin, muted-brown thumb that warms to amber on hover. */
+  .scrollbar-ink {
+    scrollbar-width: thin;
+    scrollbar-color: #5a4a3a transparent;
+  }
+  .scrollbar-ink::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+  }
+  .scrollbar-ink::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-ink::-webkit-scrollbar-thumb {
+    background: #5a4a3a;
+    border-radius: 999px;
+  }
+  .scrollbar-ink::-webkit-scrollbar-thumb:hover {
+    background: var(--color-sun);
+  }
 }
 
 @keyframes select-draw {
