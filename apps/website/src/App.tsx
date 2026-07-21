@@ -15,15 +15,15 @@ export default function App() {
     <main>
       <Nav />
       <Hero />
-      <WaveDivider />
+      <WaveDivider behind="cream" wave="river" />
       <PainSection />
-      <WaveDivider flip />
+      <WaveDivider behind="cream" wave="river" flip />
       <HowSection />
       <ArgumentSection />
       <SourcesSection />
-      <WaveDivider color="bark" />
+      <WaveDivider behind="cream-deep" wave="bark" />
       <PrivacySection />
-      <WaveDivider color="bark" flip />
+      <WaveDivider behind="cream" wave="bark" flip />
       <UsesSection />
       <FinalCta />
       <Footer />
