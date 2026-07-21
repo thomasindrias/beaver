@@ -1,45 +1,105 @@
 @import "tailwindcss";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/fraunces";
+@import "@fontsource-variable/nunito-sans";
 
-:root {
-  --color-page-background: #eff0f6;
-  --color-ink: #211c16;
-  --color-ink-muted: #6b635a;
-  --color-accent: #dd6b27;
-  --color-accent-hover: #c85a1c;
-}
-
-@theme inline {
-  --font-sans: "Geist Variable", ui-sans-serif, -apple-system,
-    BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+@theme {
+  --color-cream: #fdf6ec;
+  --color-cream-deep: #f7ecd9;
+  --color-bark: #3b2a1d;
+  --color-bark-soft: #5a4432;
+  --color-ink: #2b2019;
+  --color-muted: #7d6c58;
+  --color-orange: #dd6b27;
+  --color-orange-deep: #c2571a;
+  --color-river: #2e7d74;
+  --color-river-deep: #1f5c55;
+  --color-sun: #f4a83c;
+  --color-burn: #b3402e;
+  --color-paper: #fffdf9;
+  --color-line: #e8dfd0;
+  --font-display: "Fraunces Variable", Georgia, serif;
+  --font-sans: "Nunito Sans Variable", system-ui, sans-serif;
 }
 
 @layer base {
-  html,
-  body,
-  #root {
-    height: 100%;
+  html {
+    scroll-behavior: smooth;
   }
   body {
     margin: 0;
-    background: var(--color-page-background);
+    background: var(--color-cream);
     color: var(--color-ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-river);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
 }
 
-@keyframes beaver-rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
+@layer components {
+  /* Chunky outlined button with a pressed-down hover, shared by every CTA. */
+  .btn-push {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    font-weight: 800;
+    border-radius: 999px;
+    border: 2.5px solid var(--color-ink);
+    box-shadow: 0 4px 0 var(--color-ink);
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.12s ease;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  .btn-push:hover {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 var(--color-ink);
   }
-}
-.animate-rise {
-  animation: beaver-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  @media (prefers-reduced-motion: reduce) {
+    .btn-push:hover {
+      transform: none;
+      box-shadow: 0 4px 0 var(--color-ink);
+    }
+  }
+
+  /* Thick-outline card with a hard drop shadow, the site's sticker look. */
+  .card-sticker {
+    background: var(--color-paper);
+    border: 2.5px solid var(--color-ink);
+    border-radius: 16px;
+    box-shadow: 0 4px 0 var(--color-ink);
+  }
+
+  /* Speech-bubble tail for the hero mascot. */
+  .bubble-tail::after {
+    content: "";
+    position: absolute;
+    bottom: -12px;
+    left: 28px;
+    border: 6px solid transparent;
+    border-top-color: var(--color-ink);
+  }
+
+  /* Amber checkmarks for lists on the dark privacy band. */
+  .moon-list li {
+    position: relative;
+    padding-left: 30px;
+  }
+  .moon-list li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: var(--color-sun);
+    font-weight: 800;
+  }
 }

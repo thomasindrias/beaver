@@ -1,52 +1,49 @@
-import { useCallback, useState } from "react";
-import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
-import { BrandMark } from "./BrandMark";
-import { IntroVideo } from "./IntroVideo";
-import { SettledHero } from "./SettledHero";
-
-type Phase = "intro" | "settled";
-const INTRO_SEEN_KEY = "beaver:intro-seen";
-
-function hasSeenIntro() {
-  try {
-    return window.sessionStorage.getItem(INTRO_SEEN_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function markIntroSeen() {
-  try {
-    window.sessionStorage.setItem(INTRO_SEEN_KEY, "true");
-  } catch {
-    // If sessionStorage is unavailable, keep the intro behavior unchanged.
-  }
-}
+import { Mascot } from "./Mascot";
+import { QUALIFIER, RELEASES_URL } from "../constants";
 
 export function Hero() {
-  const prefersReducedMotion = usePrefersReducedMotion();
-  const [skipIntro] = useState(hasSeenIntro);
-  const [phase, setPhase] = useState<Phase>(
-    prefersReducedMotion || skipIntro ? "settled" : "intro",
-  );
-  // Stable reference: IntroVideo's mount effect depends on this, and we
-  // don't want it re-firing play() on the settle re-render.
-  const settle = useCallback(() => {
-    markIntroSeen();
-    setPhase("settled");
-  }, []);
-
   return (
-    <main className="relative flex min-h-dvh w-full items-center justify-center overflow-hidden bg-[var(--color-page-background)]">
-      <BrandMark size={32} decorative className="absolute left-6 top-6 z-10" />
-      {!prefersReducedMotion && !skipIntro && (
-        <IntroVideo isSettled={phase === "settled"} onSettle={settle} />
-      )}
-      {phase === "settled" && (
-        <div className="animate-rise">
-          <SettledHero autoPlayVideo={!prefersReducedMotion} />
+    <header className="mx-auto grid max-w-[1040px] items-center gap-8 px-6 pt-12 max-md:grid-cols-1 md:grid-cols-[1.15fr_0.85fr]">
+      <div>
+        <h1 className="mb-5 font-display text-[clamp(44px,6.6vw,76px)] leading-[0.98] font-[850] tracking-tight">
+          Stop <em className="font-semibold text-orange">retyping</em> your
+          screen.
+        </h1>
+        <p className="mb-7 max-w-[480px] text-[18.5px] text-bark-soft">
+          Tables in PDFs. Code in videos. Slides on calls. You can see the
+          data, you just can't copy it.{" "}
+          <strong className="text-ink">Beaver can.</strong> One drag, and it's
+          clean Markdown on your clipboard. All on your Mac, nothing uploaded.
+        </p>
+        <div className="flex flex-wrap items-center gap-3.5">
+          <a
+            href={RELEASES_URL}
+            className="btn-push bg-orange px-6.5 py-3.5 text-white"
+          >
+            Download for Mac
+          </a>
+          <a href="#how" className="btn-push bg-paper px-6.5 py-3.5 text-ink">
+            See how it works
+          </a>
         </div>
-      )}
-    </main>
+        <p className="mt-3.5 text-[13.5px] font-semibold text-muted">
+          {QUALIFIER}
+        </p>
+      </div>
+      <div className="relative text-center max-md:order-first">
+        <span
+          aria-hidden
+          className="bubble-tail absolute top-[-12px] right-[4%] rotate-3 rounded-2xl border-[2.5px] border-ink bg-paper px-4 py-2.5 text-[14.5px] font-extrabold shadow-[0_4px_0_var(--color-ink)]"
+        >
+          Point me at it.
+        </span>
+        <Mascot
+          mood="wave"
+          alt="Beaver waving hello"
+          eager
+          className="inline-block w-[min(320px,80%)] max-md:w-[min(220px,60%)]"
+        />
+      </div>
+    </header>
   );
 }
