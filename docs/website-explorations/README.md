@@ -1,8 +1,12 @@
 # Website design explorations
 
-Five distinct landing page directions for Beaver, each a self-contained HTML
-file with full copy and CTAs. They all draw from the same copy platform
+Six landing page directions for Beaver, each a self-contained HTML file with
+full copy and CTAs. They all draw from the same copy platform
 ([MESSAGING.md](MESSAGING.md)) but argue the case differently.
+
+Status: the Lodge (03) and the Receipts (05) were picked as top candidates
+and expanded; 06 is a hybrid of the two and the current lead for
+implementation.
 
 **To view:** serve the repo root and open each page (assets load from
 `public/` via relative paths):
@@ -42,6 +46,10 @@ sleeping through the privacy section, heart-eyed at the CTA. Headline:
 "Stop retyping your screen." Best for broad consumer appeal and
 memorability; closest to indie-Mac-app tradition.
 
+Expanded after the first review round with a "You boxed this. You pasted
+this." before/after exhibit and a "Four ways to grab the same table"
+comparison strip, so the product and the why are both shown, not just told.
+
 ### 4. Airgap — `04-airgap.html`
 
 The trust document. Dark pine and amber, Archivo wide headers, JetBrains
@@ -60,7 +68,24 @@ token receipt (1,928 tk vs 184 tk), a downscaling demo (what you attached vs
 what the model reads), the 35-of-50 table benchmark stat, and cited sources
 as footnotes. Best for the AI-workflow audience and as shareable content.
 
-## Shared decisions across all five
+Expanded after the first review round with a fifth argument section (some
+screens should never leave the room), a three-step how-it-works strip in the
+fix band, and a "Do the math for your workflow" slider that turns
+captures-per-day into tokens and dollars saved, with honest caveats.
+
+### 6. The Hybrid (Lodge × Receipts) — `06-hybrid.html`
+
+The current lead. Lodge's visual language (cream and river teal, Fraunces,
+sticker cards, wavy dividers, mood mascots) carrying Receipts' argumentative
+spine. Flow: hero and busywork stickers set the human pain, "One drag. Dam,
+done." plus the boxed-this-pasted-this exhibit show the product, then the
+"Can't I just paste it into ChatGPT?" section stages the token receipt
+(taped up like a note) beside three numbered reasons and the 35-of-50 stat,
+with cited sources kept at the bottom for credibility. Privacy night
+section, use cases, and the "Give your Mac a beaver." close remain from
+Lodge.
+
+## Shared decisions across all pages
 
 - Primary CTA is always **Download for Mac** (GitHub latest release);
   secondary is **View on GitHub** or a scroll-to-proof link.
@@ -75,8 +100,6 @@ as footnotes. Best for the AI-workflow audience and as shareable content.
 
 ## Next step
 
-Pick a direction (or a hybrid, e.g. Reflex structure with the Lodge's
-mascot moments and the Receipts' token math as a section), then implement it
-in `apps/website` (React + Tailwind) test-first, replacing these static
-mockups. These files are throwaway exploration artifacts, not production
-code.
+Confirm 06 (or name tweaks to it), then implement it in `apps/website`
+(React + Tailwind) test-first, replacing these static mockups. These files
+are throwaway exploration artifacts, not production code.

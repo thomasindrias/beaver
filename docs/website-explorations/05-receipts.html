@@ -135,6 +135,29 @@
   .fix-card h4 { font-size: 17px; margin: 8px 0 6px; font-weight: 700; }
   .fix-card p { font-size: 14px; color: #b5ae9d; }
   .fix .privacy-line { margin-top: 30px; font: 500 13px var(--mono); color: #8fd4a8; }
+  .fix-steps { display: flex; gap: 26px; flex-wrap: wrap; margin: 0 0 34px; }
+  .fix-steps .st { display: flex; gap: 10px; align-items: baseline; font-size: 15px; color: #b5ae9d; }
+  .fix-steps .st b { color: #fff; font-weight: 700; }
+  .fix-steps .st .kn { font: 700 13px var(--mono); color: var(--accent); }
+
+  /* calculator */
+  .calc {
+    margin-top: 40px; background: #fffefb; color: var(--ink); border-radius: 12px;
+    padding: 26px 28px; max-width: 640px;
+  }
+  .calc h3 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .calc .calc-sub { font-size: 13.5px; color: var(--muted); margin-bottom: 20px; }
+  .calc label { display: block; font: 700 12px var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .calc .cap-row { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
+  .calc input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .calc .cap-val { font: 700 17px var(--mono); min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+  .calc-out { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .calc-cell { border: 1.5px dashed var(--line); border-radius: 10px; padding: 14px 16px; }
+  .calc-cell .v { font: 700 22px var(--mono); font-variant-numeric: tabular-nums; }
+  .calc-cell.tok .v { color: var(--calm); }
+  .calc-cell.usd .v { color: var(--burn); }
+  .calc-cell .l { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .calc-note { font-size: 12px; color: var(--muted); margin-top: 16px; }
 
   /* footnotes */
   .footnotes { padding-top: 64px; padding-bottom: 30px; }
@@ -157,7 +180,8 @@
 
   @media (max-width: 700px) {
     .nav-right a:not(.btn) { display: none; }
-    .degrade, .fix-grid { grid-template-columns: 1fr; }
+    .degrade, .fix-grid, .calc-out { grid-template-columns: 1fr; }
+    .fix-steps { flex-direction: column; gap: 12px; }
     .receipt { transform: none; }
   }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
@@ -295,9 +319,23 @@
     customer's data or a contract under NDA, now lives in someone else's
     infrastructure.
   </p>
+  <h2><span class="n">5</span>And some screens should never leave the room</h2>
+  <p>
+    The cost argument assumes you're allowed to upload the screenshot at all.
+    Often you're not. Invoices, bank statements, patient notes, contracts
+    under NDA, a customer's data in your admin panel. The moment any of it
+    lands in a chat window, it sits in someone else's infrastructure, under
+    someone else's retention policy, forever outside your control.
+  </p>
+  <p>
+    That's not a knock on any provider's ethics. It's just what uploading
+    means. For those screens the question isn't "is a screenshot cheaper",
+    it's "why is this leaving the building at all".
+  </p>
   <p class="aside">
     None of this means vision models are bad. It means an image is the wrong
-    container for text you could have sent exactly.
+    container for text you could have sent exactly, and the wrong trip for
+    data that should have stayed home.
   </p>
 </article>
 
@@ -311,6 +349,11 @@
       resolution and puts clean Markdown on your clipboard. Paste it into
       Claude, a prompt, a pipeline, a spreadsheet.
     </p>
+    <div class="fix-steps">
+      <span class="st"><span class="kn">1</span><span><b>Press ⌘⇧D.</b> An overlay appears over any app or video.</span></span>
+      <span class="st"><span class="kn">2</span><span><b>Drag a box.</b> Just the table, just the code.</span></span>
+      <span class="st"><span class="kn">3</span><span><b>Paste.</b> Clean Markdown, already on your clipboard.</span></span>
+    </div>
     <div class="fix-grid">
       <div class="fix-card">
         <span class="k">exact</span>
@@ -329,6 +372,31 @@
       </div>
     </div>
     <p class="privacy-line">$ network activity during capture: none</p>
+
+    <div class="calc">
+      <h3>Do the math for your workflow</h3>
+      <p class="calc-sub">Rough numbers: 1,928 tokens per screenshot against 184 as Markdown, 21 workdays a month.</p>
+      <label for="calc-range">Screenshots you send to a model per day</label>
+      <div class="cap-row">
+        <input type="range" id="calc-range" min="1" max="100" value="10" />
+        <span class="cap-val" id="calc-val">10</span>
+      </div>
+      <div class="calc-out">
+        <div class="calc-cell tok">
+          <div class="v" id="calc-tokens">366k</div>
+          <div class="l">tokens saved per month</div>
+        </div>
+        <div class="calc-cell usd">
+          <div class="v" id="calc-usd">$1.10</div>
+          <div class="l">off the bill, at $3 per million input tokens</div>
+        </div>
+      </div>
+      <p class="calc-note">
+        Looks small? That's one person, one read per image. Teams, agent loops
+        that re-read the conversation each turn, and pricier models multiply
+        it. The accuracy problem doesn't show up on the bill at all.
+      </p>
+    </div>
   </div>
 </div>
 
@@ -356,5 +424,25 @@
   <span><a href="https://github.com/thomasindrias/beaver">github</a> · <a href="https://github.com/thomasindrias/beaver/blob/main/SECURITY.md">security</a> · <a href="https://github.com/thomasindrias/beaver/blob/main/docs/ROADMAP.md">roadmap</a></span>
 </footer>
 
+<script>
+  const range = document.getElementById("calc-range");
+  const val = document.getElementById("calc-val");
+  const tokOut = document.getElementById("calc-tokens");
+  const usdOut = document.getElementById("calc-usd");
+  const PER_SHOT = 1928 - 184;   // tokens saved per capture
+  const WORKDAYS = 21;
+  const USD_PER_M = 3;
+  function update() {
+    const n = Number(range.value);
+    val.textContent = n;
+    const tokens = n * PER_SHOT * WORKDAYS;
+    tokOut.textContent = tokens >= 1e6
+      ? (tokens / 1e6).toFixed(1) + "M"
+      : Math.round(tokens / 1e3) + "k";
+    usdOut.textContent = "$" + ((tokens / 1e6) * USD_PER_M).toFixed(2);
+  }
+  range.addEventListener("input", update);
+  update();
+</script>
 </body>
 </html>
