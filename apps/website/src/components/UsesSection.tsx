@@ -15,7 +15,7 @@ const USES = [
   {
     icon: "🤖",
     title: "Clean input for your AI",
-    body: "Screenshot to exact Markdown, straight into Claude, Obsidian, or Notion. A tenth of the tokens of an image.",
+    body: "Screenshot to exact Markdown, straight into Claude, Sheets, or Notion. A tenth of the tokens of an image.",
   },
   {
     icon: "🧾",

@@ -43,11 +43,11 @@ describe("App", () => {
     }
   });
 
-  it("cites its three sources with real links", () => {
+  it("cites its sources with real, directly-linked references", () => {
     render(<App />);
     const sources = screen.getByTestId("sources");
     const links = sources.querySelectorAll("a[href^='https://']");
-    expect(links).toHaveLength(3);
+    expect(links).toHaveLength(2);
   });
 
   it("links to the repo, security policy, and roadmap in the footer", () => {

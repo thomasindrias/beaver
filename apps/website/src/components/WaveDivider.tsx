@@ -1,8 +1,9 @@
 interface WaveDividerProps {
   flip?: boolean;
+  color?: "river" | "bark";
 }
 
-export function WaveDivider({ flip = false }: WaveDividerProps) {
+export function WaveDivider({ flip = false, color = "river" }: WaveDividerProps) {
   return (
     <svg
       className={["block h-[60px] w-full", flip ? "-scale-y-100" : ""]
@@ -14,7 +15,7 @@ export function WaveDivider({ flip = false }: WaveDividerProps) {
     >
       <path
         d="M0,30 C240,60 480,0 720,30 C960,60 1200,0 1440,30 L1440,60 L0,60 Z"
-        fill="var(--color-river)"
+        fill={color === "bark" ? "var(--color-bark)" : "var(--color-river)"}
       />
     </svg>
   );

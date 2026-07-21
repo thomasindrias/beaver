@@ -20,9 +20,11 @@ export default function App() {
       <WaveDivider flip />
       <HowSection />
       <ArgumentSection />
-      <PrivacySection />
-      <UsesSection />
       <SourcesSection />
+      <WaveDivider color="bark" />
+      <PrivacySection />
+      <WaveDivider color="bark" flip />
+      <UsesSection />
       <FinalCta />
       <Footer />
     </main>

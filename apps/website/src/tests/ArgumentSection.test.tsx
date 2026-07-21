@@ -30,9 +30,11 @@ describe("ArgumentSection", () => {
     expect(screen.getByText("It guesses, confidently")).toBeInTheDocument();
   });
 
-  it("cites the 35-of-50 table benchmark", () => {
+  it("makes the guessing point vivid without an unverifiable stat", () => {
     render(<ArgumentSection />);
-    expect(screen.getByText(/35 of 50/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/hallucinated digit prints in the exact same font/),
+    ).toBeInTheDocument();
   });
 
   it("closes with the tenth-of-the-tokens claim", () => {

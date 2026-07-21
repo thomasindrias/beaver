@@ -35,7 +35,7 @@ export function Hero() {
           aria-hidden
           className="bubble-tail absolute top-[-12px] right-[4%] rotate-3 rounded-2xl border-[2.5px] border-ink bg-paper px-4 py-2.5 text-[14.5px] font-extrabold shadow-[0_4px_0_var(--color-ink)]"
         >
-          Point me at it.
+          Drag a box around anything.
         </span>
         <Mascot
           mood="wave"

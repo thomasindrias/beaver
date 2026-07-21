@@ -55,10 +55,10 @@ const RECEIPT_ROWS: Array<{
   { text: "· illegible digits guessed", amount: "incl.", kind: "fine" },
   { text: "· uploaded to a datacenter", amount: "incl.", kind: "fine" },
   { text: "SAME TABLE, VIA BEAVER", amount: "", kind: "head-calm" },
-  { text: "1× markdown table, exact", amount: "184 tk", kind: "calm" },
+  { text: "1× markdown table, this size", amount: "184 tk", kind: "calm" },
   { text: "· structure intact", amount: "incl.", kind: "fine" },
   { text: "· never left your mac", amount: "incl.", kind: "fine" },
-  { text: "YOU SAVE", amount: "90%+ · every time", kind: "total" },
+  { text: "YOU SAVE", amount: "usually 90%+", kind: "total" },
 ];
 
 const ROW_STYLES: Record<string, string> = {
@@ -112,7 +112,7 @@ export function ArgumentSection() {
             <div
               role="img"
               aria-label="Receipt comparing the token cost of a screenshot against Beaver's Markdown output"
-              className="lift-on-hover -rotate-[1.4deg] border-[2.5px] border-ink bg-paper px-6 py-7 pb-5 font-mono text-[13px] leading-[1.9] font-semibold shadow-[0_6px_0_var(--color-ink)]"
+              className="lift-on-hover -rotate-[1.4deg] border-[2.5px] border-ink bg-paper px-6 py-7 pb-5 font-mono text-[13px] leading-[1.9] font-semibold shadow-[var(--shadow-sticker-lg)]"
             >
               <p className="text-center text-sm font-bold tracking-wider">
                 *** YOUR TOKEN RECEIPT ***
@@ -164,16 +164,8 @@ export function ArgumentSection() {
             ))}
             <Reveal index={POINTS.length + 1}>
               <p className="border-l-4 border-burn py-1.5 pl-4.5 font-display text-[clamp(19px,2.4vw,24px)] leading-[1.4] font-bold italic">
-                In one published evaluation, GPT-4V answered{" "}
-                <span className="font-mono text-[0.85em] not-italic">
-                  35 of 50
-                </span>{" "}
-                table questions incorrectly.
-                <sup>
-                  <a href="#src3" className="text-burn no-underline">
-                    3
-                  </a>
-                </sup>
+                A hallucinated digit prints in the exact same font as a real
+                one. Nothing in the output tells you which is which.
               </p>
             </Reveal>
           </div>
@@ -181,9 +173,10 @@ export function ArgumentSection() {
 
         <p className="mt-11 text-center text-[16.5px] text-bark-soft">
           Beaver reads the exact region you box, at full resolution, on your
-          Mac.{" "}
+          Mac. The exact savings depend on the table, but the direction
+          never flips:{" "}
           <strong className="text-ink">
-            Your model gets exact text at a tenth of the tokens.
+            your model gets exact text at a tenth of the tokens.
           </strong>{" "}
           Better input, better answers, smaller bill.
         </p>

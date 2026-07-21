@@ -4,7 +4,7 @@
 
 @theme {
   --color-cream: #fdf6ec;
-  --color-cream-deep: #f7ecd9;
+  --color-cream-deep: #f2e4c8;
   --color-bark: #3b2a1d;
   --color-bark-soft: #5a4432;
   --color-ink: #2b2019;
@@ -19,6 +19,13 @@
   --color-line: #e8dfd0;
   --font-display: "Fraunces Variable", Georgia, serif;
   --font-sans: "Nunito Sans Variable", system-ui, sans-serif;
+
+  /* One shadow system for every "sticker" card. Only three depths exist:
+     normal, the one deliberately emphasized element (the receipt), and
+     the variant for cards sitting on a dark background. */
+  --shadow-sticker: 0 5px 0 var(--color-ink);
+  --shadow-sticker-lg: 0 7px 0 var(--color-ink);
+  --shadow-sticker-dark: 0 5px 0 rgba(0, 0, 0, 0.4);
 }
 
 @layer base {
@@ -77,7 +84,7 @@
     background: var(--color-paper);
     border: 2.5px solid var(--color-ink);
     border-radius: 16px;
-    box-shadow: 0 4px 0 var(--color-ink);
+    box-shadow: var(--shadow-sticker);
   }
 
   /* Speech-bubble tail for the hero mascot. */

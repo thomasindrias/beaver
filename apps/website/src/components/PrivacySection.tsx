@@ -25,7 +25,10 @@ export function PrivacySection() {
             built. That matters for invoices, contracts, patient notes, and
             anything under NDA.
           </p>
-          <ul className="moon-list mt-4.5 list-none space-y-3 p-0 text-[15px] text-[#e6d9c7]">
+          <p className="mb-4 text-[15px] font-bold text-cream">
+            Plain version: nothing about your capture goes online, ever.
+          </p>
+          <ul className="moon-list list-none space-y-3 p-0 text-[15px] text-[#e6d9c7]">
             <li>On-device model: MLX on Apple Silicon, llama.cpp on Intel</li>
             <li>Open source (MIT), build it from source if you like</li>
             <li>History is a local SQLite file, yours to keep or delete</li>

@@ -34,7 +34,7 @@ export function PainSection() {
             <h2 className="font-display text-[clamp(30px,4vw,46px)] leading-[1.05] font-extrabold">
               The busywork nobody signed up for
             </h2>
-            <p className="max-w-[480px] text-[16.5px] text-[#c4e8e0]">
+            <p className="max-w-[480px] text-[16.5px] text-[#dff3ee]">
               Information you can see but can't use, so you type it out again.
               Sound familiar?
             </p>
@@ -47,7 +47,7 @@ export function PainSection() {
               index={i}
               testId="pain-sticker"
               className={[
-                "lift-on-hover rounded-2xl border-[2.5px] border-ink bg-paper p-5 text-ink shadow-[0_5px_0_rgba(31,41,38,0.55)]",
+                "lift-on-hover rounded-2xl border-[2.5px] border-ink bg-paper p-5 text-ink shadow-[var(--shadow-sticker)]",
                 i % 2 === 0 ? "-rotate-1" : "rotate-1",
               ].join(" ")}
             >

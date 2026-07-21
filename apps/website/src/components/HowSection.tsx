@@ -66,8 +66,9 @@ export function HowSection() {
 
       <CaptureDemo />
       <p className="mt-5 text-center text-sm text-muted">
-        Paste it into Excel, Notion, Obsidian, or a chat with your favorite
-        model. It's text now. It behaves.
+        That's Markdown, not code — the pipes and dashes disappear into real
+        columns the moment you paste into Excel or Sheets. Paste into Notion
+        or a chat with your favorite model and it stays exact text.
       </p>
     </section>
   );

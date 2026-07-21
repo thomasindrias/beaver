@@ -1,9 +1,11 @@
 const SOURCES = [
   {
     id: "src1",
-    text: "Anthropic vision docs; see also Roboflow, ",
+    text: "",
     linkText: '"What does it cost to process an image with a vision model?"',
     href: "https://blog.roboflow.com/image-token-cost-vlm/",
+    suffix:
+      ", Roboflow — works Claude's and GPT-4o's published image-token formulas against real screenshots.",
   },
   {
     id: "src2",
@@ -11,14 +13,6 @@ const SOURCES = [
     linkText: '"Breaking the resolution curse of vision-language models"',
     href: "https://huggingface.co/blog/visheratin/vlm-resolution-curse",
     suffix: ", Hugging Face.",
-  },
-  {
-    id: "src3",
-    text: "",
-    linkText:
-      '"Are Large Vision Language Models up to the Challenge of Chart Comprehension and Reasoning?"',
-    href: "https://arxiv.org/pdf/2406.00257",
-    suffix: ", arXiv:2406.00257.",
   },
 ];
 

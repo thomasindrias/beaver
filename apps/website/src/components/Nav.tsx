@@ -19,7 +19,7 @@ export function Nav() {
           <BrandMark size={34} decorative />
           Beaver
         </a>
-        <div className="flex items-center gap-5 text-[15px] font-semibold">
+        <div className="flex flex-wrap items-center justify-end gap-3 text-[14px] font-semibold sm:gap-5 sm:text-[15px]">
           <a href="#how" className="hidden text-bark-soft hover:text-ink sm:block">
             How it works
           </a>
@@ -29,15 +29,12 @@ export function Nav() {
           >
             Why not a chatbot
           </a>
-          <a
-            href={GITHUB_URL}
-            className="hidden text-bark-soft hover:text-ink sm:block"
-          >
+          <a href={GITHUB_URL} className="text-bark-soft hover:text-ink">
             GitHub
           </a>
           <a
             href={RELEASES_URL}
-            className="btn-push bg-orange px-4.5 py-2.5 text-sm text-white"
+            className="btn-push bg-orange px-4 py-2 text-sm text-white sm:px-4.5 sm:py-2.5"
           >
             Download for Mac
           </a>

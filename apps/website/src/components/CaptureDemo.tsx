@@ -81,7 +81,7 @@ export function CaptureDemo() {
     <div className="mx-auto grid max-w-[880px] items-center gap-3.5 max-md:grid-cols-1 md:grid-cols-[1fr_56px_1fr]">
       <figure
         ref={boxRef}
-        className="card-sticker -rotate-1 p-4 shadow-[0_5px_0_var(--color-ink)] max-md:rotate-0"
+        className="card-sticker -rotate-1 p-4 max-md:rotate-0"
       >
         <span className="mb-3 inline-block rounded-md bg-[#fdeadd] px-2 py-0.5 text-xs font-extrabold tracking-wider text-orange-deep uppercase">
           on your screen
@@ -138,7 +138,7 @@ export function CaptureDemo() {
       </div>
       <figure
         data-testid="exhibit-markdown"
-        className="rotate-1 rounded-2xl border-[2.5px] border-bark bg-ink p-4 shadow-[0_5px_0_rgba(43,32,25,0.45)] max-md:rotate-0"
+        className="rotate-1 rounded-2xl border-[2.5px] border-bark bg-ink p-4 shadow-[var(--shadow-sticker-dark)] max-md:rotate-0"
       >
         <span className="mb-3 inline-block rounded-md bg-[#443428] px-2 py-0.5 text-xs font-extrabold tracking-wider text-sun uppercase">
           on your clipboard
