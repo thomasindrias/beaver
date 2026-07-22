@@ -120,7 +120,7 @@ export function SettingsPanel() {
             🔒 Local (on-device)
           </Button>
           <Button size="sm" variant="outline" disabled>
-            ☁️ Cloud — coming soon
+            ☁️ Cloud (coming soon)
           </Button>
         </div>
       </Row>

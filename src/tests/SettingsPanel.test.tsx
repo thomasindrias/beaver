@@ -98,6 +98,6 @@ describe("SettingsPanel", () => {
     render(<SettingsPanel />);
     await screen.findByText("CmdOrCtrl+Shift+D");
     expect(screen.getByRole("button", { name: /Local \(on-device\)/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Cloud — coming soon/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Cloud \(coming soon\)/ })).toBeDisabled();
   });
 });
