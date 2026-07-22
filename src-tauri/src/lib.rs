@@ -20,7 +20,6 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager,
 };
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 pub(crate) fn is_truthy(val: Option<String>) -> bool {
     !matches!(val.as_deref().map(str::trim), None | Some("") | Some("0") | Some("false") | Some("no"))
@@ -78,7 +77,10 @@ pub fn run() {
             // only way out. A custom item firing `app.exit(0)` is used instead of
             // the predefined Quit, whose OS-level terminate would be swallowed by
             // that same guard.
-            let tray_menu = MenuBuilder::new(app).text("quit", "Quit Beaver").build()?;
+            let tray_menu = MenuBuilder::new(app)
+                .text("settings", "Settings…")
+                .text("quit", "Quit Beaver")
+                .build()?;
 
             let _tray = TrayIconBuilder::new()
                 // Dedicated menu-bar glyph generated from the same beaver head
@@ -91,10 +93,10 @@ pub fn run() {
                 // Keep left-click for toggling the popover; the menu opens on
                 // right-click only.
                 .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| {
-                    if event.id().as_ref() == "quit" {
-                        app.exit(0);
-                    }
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "settings" => windows::show_settings(app),
+                    "quit" => app.exit(0),
+                    _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
                     // Click fires for both press and release — only act on the
@@ -112,12 +114,10 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            let sc: Shortcut = shortcut::CAPTURE_SHORTCUT.parse().expect("invalid shortcut");
-            app.global_shortcut().on_shortcut(sc, |app, _sc, event| {
-                if event.state == ShortcutState::Pressed {
-                    windows::show_capture_overlay(app);
-                }
-            })?;
+            let initial_shortcut = settings::load(app.handle()).shortcut;
+            if let Err(e) = shortcut::apply(app.handle(), &initial_shortcut, None) {
+                log::error!("failed to register shortcut '{initial_shortcut}': {e}");
+            }
 
             // Pick a free localhost port and register server state up front so
             // commands can read it immediately.
@@ -153,7 +153,10 @@ pub fn run() {
             commands::open_screen_recording_settings,
             commands::relaunch_app,
             commands::check_for_update,
-            commands::open_external
+            commands::open_external,
+            commands::get_settings,
+            commands::update_settings,
+            commands::open_settings
         ])
         .build(tauri::generate_context!())
         .expect("error while building Beaver")
