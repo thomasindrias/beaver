@@ -6,6 +6,13 @@ import type { ExtractFormat } from "../types";
 // and payload shapes live in exactly one place on each side of the IPC
 // boundary.
 
+export interface Settings {
+  default_format: ExtractFormat;
+  shortcut: string;
+  history_retention_days: number | null;
+  update_check_enabled: boolean;
+}
+
 export interface CaptureRegion {
   x: number;
   y: number;
@@ -66,3 +73,10 @@ export const checkForUpdate = () => invoke<UpdateInfo | null>("check_for_update"
 
 /** Open a URL externally; the backend allowlists our own GitHub pages only. */
 export const openExternal = (url: string) => invoke<void>("open_external", { url });
+
+export const getSettings = () => invoke<Settings>("get_settings");
+
+export const updateSettings = (next: Settings) =>
+  invoke<Settings>("update_settings", { next });
+
+export const openSettings = () => invoke<void>("open_settings");

@@ -59,6 +59,31 @@ describe("api", () => {
     });
   });
 
+  it("getSettings queries the backend", async () => {
+    const settings = {
+      default_format: "markdown" as const,
+      shortcut: "CmdOrCtrl+Shift+D",
+      history_retention_days: null,
+      update_check_enabled: true,
+    };
+    invokeMock.mockResolvedValue(settings);
+    const result = await api.getSettings();
+    expect(invokeMock).toHaveBeenCalledWith("get_settings");
+    expect(result).toEqual(settings);
+  });
+
+  it("updateSettings sends the full settings object", async () => {
+    const next = {
+      default_format: "json" as const,
+      shortcut: "CmdOrCtrl+Shift+X",
+      history_retention_days: 30,
+      update_check_enabled: false,
+    };
+    invokeMock.mockResolvedValue(next);
+    await api.updateSettings(next);
+    expect(invokeMock).toHaveBeenCalledWith("update_settings", { next });
+  });
+
   it.each([
     ["retrySetup", "retry_setup"],
     ["finishOnboarding", "finish_onboarding"],
@@ -67,6 +92,7 @@ describe("api", () => {
     ["openScreenRecordingSettings", "open_screen_recording_settings"],
     ["relaunchApp", "relaunch_app"],
     ["checkForUpdate", "check_for_update"],
+    ["openSettings", "open_settings"],
   ] as const)("%s invokes %s with no payload", async (fn, command) => {
     await api[fn]();
     expect(invokeMock).toHaveBeenCalledWith(command);
