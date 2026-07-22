@@ -4,7 +4,7 @@ import { dark, font } from "../../theme";
 import { ep, easeInOutCubic, easeOutCubic, mix, progress } from "../../lib/ease";
 import { DarkScene } from "../../components/scene";
 import { Camera, Glow, pulse } from "../../components/ui";
-import { CSV_LINES, IconFinale, JSON_LINES, MD_LINES } from "../../components/cards";
+import { IconFinale, MD_LINES } from "../../components/cards";
 import { Rise } from "../../components/text";
 import { Particles, useImagePoints } from "../../components/particles";
 
@@ -28,7 +28,7 @@ const Wall: React.FC<{ lines: string[]; tint?: string; opacity?: number }> = ({
         justifyContent: "center",
         fontFamily: font.mono,
         fontSize: 19.5,
-        lineHeight: 1.75,
+        lineHeight: 2.05,
         color: tint,
         whiteSpace: "pre",
         opacity,
@@ -49,8 +49,6 @@ export const RasterToVector: React.FC = () => {
   const SWEEP = { from: 64, to: 210 };
   const LINE1 = 150;
   const LINE2 = 196;
-  const MORPH_CSV = 300;
-  const MORPH_JSON = 372;
   const LINES_OUT = 300;
   const DISSOLVE = 452;
   const FINALE = 500;
@@ -59,7 +57,10 @@ export const RasterToVector: React.FC = () => {
   const sweepX = mix(-80, 2000, sweep);
   const wallFade = 1 - ep(frame, DISSOLVE, DISSOLVE + 26, easeInOutCubic);
 
-  const wallLines = frame < MORPH_CSV ? MD_LINES : frame < MORPH_JSON ? CSV_LINES : JSON_LINES;
+  // One texture only: the Markdown table. Swapping the wall to CSV/JSON
+  // mid-film read as clutter, not meaning; the morph story belongs to the
+  // other variants.
+  const wallLines = MD_LINES;
 
   const ICON = { x: 690, y: 396, size: 200 };
   const iconPts = useImagePoints("beaver-icon.png", { x: ICON.x, y: ICON.y, w: ICON.size, h: ICON.size }, 5);
@@ -68,8 +69,8 @@ export const RasterToVector: React.FC = () => {
     <DarkScene>
       <Audio src={staticFile("audio/RasterToVector.wav")} />
       <Camera
-        zoom={mix(1.12, 1.0, ep(frame, 0, SWEEP.to, easeInOutCubic)) * mix(1, 1.07, ep(frame, MORPH_CSV - 30, DISSOLVE, easeInOutCubic))}
-        rotY={mix(0, -3.2, ep(frame, MORPH_CSV - 30, DISSOLVE, easeInOutCubic))}
+        zoom={mix(1.12, 1.0, ep(frame, 0, SWEEP.to, easeInOutCubic)) * mix(1, 1.07, ep(frame, LINES_OUT - 30, DISSOLVE, easeInOutCubic))}
+        rotY={mix(0, -3.2, ep(frame, LINES_OUT - 30, DISSOLVE, easeInOutCubic))}
       >
         <AbsoluteFill style={{ opacity: wallFade }}>
           {/* raster state: soft, dim, unselectable */}
@@ -78,7 +79,7 @@ export const RasterToVector: React.FC = () => {
               position: "absolute",
               inset: 0,
               filter: "blur(3.4px) saturate(0.75)",
-              opacity: 0.5,
+              opacity: 0.38,
               clipPath: `inset(0 0 0 ${Math.max(0, (sweepX / 1920) * 100)}%)`,
             }}
           >
@@ -92,7 +93,7 @@ export const RasterToVector: React.FC = () => {
               clipPath: `inset(0 ${Math.max(0, 100 - (sweepX / 1920) * 100)}% 0 0)`,
             }}
           >
-            <Wall lines={wallLines} tint={dark.fg} opacity={0.92} />
+            <Wall lines={wallLines} tint={dark.fg} opacity={0.82} />
           </div>
           {/* the scanline */}
           {sweep > 0 && sweep < 1 && (

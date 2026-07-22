@@ -146,8 +146,10 @@ export const Reflex: React.FC = () => {
 
   // One continuous pan across the canvas; eases between stations on bar lines.
   const panT = ep(frame, 40, 420, easeInOutCubic);
+  const zoom = mix(1.3, 1.16, ep(frame, 0, 120, easeInOutCubic)) * mix(1, 1.07, ep(frame, 300, 430, easeInOutCubic));
+  // scale(z) translate(p) resolves translate first, then scales around
+  // center, so world-pixel pans need no zoom compensation.
   const panX = mix(0, -2180, panT);
-  const zoom = mix(1.06, 1.0, ep(frame, 0, 120, easeInOutCubic)) * mix(1, 1.04, ep(frame, 300, 430, easeInOutCubic));
   const worldFade = 1 - ep(frame, LINE_AT - 26, LINE_AT - 4, easeInOutCubic);
 
   const ICON = { x: 690, y: 402, size: 200 };

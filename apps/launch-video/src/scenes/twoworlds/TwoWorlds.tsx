@@ -48,7 +48,7 @@ export const TwoWorlds: React.FC = () => {
   const PROOF = 575;
   const FINALE = 645;
 
-  const darkT = ep(frame, DIM_AT, DIM_AT + 26, easeInOutCubic);
+  const darkT = ep(frame, DIM_AT, DIM_AT + 14, easeInOutCubic);
 
   // One continuous camera: gentle push through paper world, slight recenter
   // on the drop, slow drift outward for the finale.
@@ -269,7 +269,7 @@ export const TwoWorlds: React.FC = () => {
                   opacity: 1 - ep(frame, FINALE - 24, FINALE - 6, easeInOutCubic),
                 }}
               >
-                <NetworkMeter appear={ep(frame, PROOF + 8, PROOF + 20, easeOutCubic)} sweep={ep(frame, PROOF + 14, FINALE - 26, easeInOutCubic)} />
+                <NetworkMeter width={380} appear={ep(frame, PROOF + 8, PROOF + 20, easeOutCubic)} sweep={ep(frame, PROOF + 14, FINALE - 26, easeInOutCubic)} />
               </div>
             </>
           )}
@@ -305,7 +305,7 @@ export const TwoWorlds: React.FC = () => {
       <AbsoluteFill
         style={{
           background: dark.amberDim(60),
-          opacity: pulse(frame, DIM_AT, 18) * 0.35,
+          opacity: pulse(frame, DIM_AT, 24) * 0.55,
           pointerEvents: "none",
         }}
       />
