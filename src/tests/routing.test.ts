@@ -21,4 +21,8 @@ describe("selectView", () => {
   it("defaults unknown windows to the popover", () => {
     expect(selectView("/", "main")).toBe("popover");
   });
+
+  it("the settings window always shows settings", () => {
+    expect(selectView("/", "settings")).toBe("settings");
+  });
 });

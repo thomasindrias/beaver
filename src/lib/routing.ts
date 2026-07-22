@@ -1,4 +1,4 @@
-export type View = "capture" | "onboarding" | "popover";
+export type View = "capture" | "onboarding" | "popover" | "settings";
 
 // Picks what a window renders from its route and Tauri window label. Keeping
 // this independent of any "setup complete" flag is deliberate: the onboarding
@@ -6,5 +6,7 @@ export type View = "capture" | "onboarding" | "popover";
 // can flip mid-load on a warm-cache first run.
 export function selectView(route: string, windowLabel: string): View {
   if (route === "/capture") return "capture";
-  return windowLabel === "onboarding" ? "onboarding" : "popover";
+  if (windowLabel === "onboarding") return "onboarding";
+  if (windowLabel === "settings") return "settings";
+  return "popover";
 }
