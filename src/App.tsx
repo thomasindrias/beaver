@@ -16,6 +16,9 @@ const TrayPopover = lazy(() =>
 const Onboarding = lazy(() =>
   import("./components/Onboarding").then(m => ({ default: m.Onboarding }))
 );
+const SettingsPanel = lazy(() =>
+  import("./components/SettingsPanel").then(m => ({ default: m.SettingsPanel }))
+);
 
 export default function App() {
   const route = window.location.pathname;
@@ -101,7 +104,9 @@ export default function App() {
 
   return (
     <Suspense fallback={null}>
-      {view === "onboarding" ? <Onboarding /> : <TrayPopover />}
+      {view === "onboarding" && <Onboarding />}
+      {view === "settings" && <SettingsPanel />}
+      {view === "popover" && <TrayPopover />}
     </Suspense>
   );
 }

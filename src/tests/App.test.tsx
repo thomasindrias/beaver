@@ -70,6 +70,9 @@ vi.mock("../components/TrayPopover", () => ({
 vi.mock("../components/Onboarding", () => ({
   Onboarding: () => <div>onboarding-view</div>,
 }));
+vi.mock("../components/SettingsPanel", () => ({
+  SettingsPanel: () => <div>settings-view</div>,
+}));
 
 import App from "../App";
 
@@ -90,6 +93,13 @@ describe("App window routing", () => {
     render(<App />);
     expect(await screen.findByText("tray-popover")).toBeInTheDocument();
     expect(screen.queryByText("onboarding-view")).not.toBeInTheDocument();
+  });
+
+  it("renders settings in the settings window", async () => {
+    windowLabel.value = "settings";
+    render(<App />);
+    expect(await screen.findByText("settings-view")).toBeInTheDocument();
+    expect(screen.queryByText("tray-popover")).not.toBeInTheDocument();
   });
 
   // The original bug: the onboarding window briefly asked the backend
