@@ -1,5 +1,6 @@
 packages:
   - apps/website
+  - apps/launch-video
 
 allowBuilds:
   esbuild: true
