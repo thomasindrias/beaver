@@ -10,6 +10,7 @@ mod engine;
 mod permission;
 mod prompts;
 mod server;
+mod settings;
 mod shortcut;
 mod update;
 mod windows;

@@ -4,7 +4,7 @@ pub const EXTRACTION_PROMPT: &str =
      code in fenced code blocks with language hints. \
      Output only the extracted content — no commentary or explanation.";
 
-#[derive(serde::Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum ExtractFormat {
     Markdown,
