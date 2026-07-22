@@ -1,19 +1,30 @@
 import { useState, useEffect, useCallback } from "react";
 import Database from "@tauri-apps/plugin-sql";
+import { retentionCutoff } from "../lib/retention";
 import type { Capture } from "../types";
 
-// `autoLoad` controls whether history is fetched. The capture overlay only
-// needs to INSERT, so it passes false to skip the SELECT-500 on mount.
-export function useCaptures({ autoLoad = true }: { autoLoad?: boolean } = {}) {
+interface UseCapturesOptions {
+  /** `autoLoad` controls whether history is fetched. The capture overlay only
+   * needs to INSERT, so it passes false to skip the SELECT-500 on mount. */
+  autoLoad?: boolean;
+  /** Prune captures older than this many days before every refresh. `null`
+   * (or omitted) keeps everything — no pruning. */
+  retentionDays?: number | null;
+}
+
+export function useCaptures({ autoLoad = true, retentionDays = null }: UseCapturesOptions = {}) {
   const [captures, setCaptures] = useState<Capture[]>([]);
 
   const refresh = useCallback(async () => {
     const db = await Database.load("sqlite:beaver.db");
+    if (retentionDays != null) {
+      await db.execute("DELETE FROM captures WHERE created_at < ?", [retentionCutoff(retentionDays)]);
+    }
     const rows = await db.select<Capture[]>(
       "SELECT * FROM captures ORDER BY created_at DESC LIMIT 500"
     );
     setCaptures(rows);
-  }, []);
+  }, [retentionDays]);
 
   const saveCapture = useCallback(
     async (capture: Omit<Capture, "id" | "created_at">) => {

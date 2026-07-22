@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Settings } from "lucide-react";
-import { openSettings } from "../lib/api";
+import { getSettings, openSettings } from "../lib/api";
 import { useCaptures } from "../hooks/useCaptures";
 import { HistoryList } from "./HistoryList";
 import { Logo } from "./Logo";
@@ -10,7 +10,14 @@ import { StatusBanner } from "./StatusBanner";
 import { UpdatePill } from "./UpdatePill";
 
 export function TrayPopover() {
-  const { captures, refresh } = useCaptures();
+  const [retentionDays, setRetentionDays] = useState<number | null>(null);
+  const { captures, refresh } = useCaptures({ retentionDays });
+
+  useEffect(() => {
+    getSettings()
+      .then(s => setRetentionDays(s.history_retention_days))
+      .catch(console.error);
+  }, []);
 
   // Captures are written by a separate overlay window into the shared SQLite
   // DB, so this window's state goes stale while it's hidden. The popover gains
