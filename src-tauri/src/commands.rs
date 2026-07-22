@@ -4,7 +4,7 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
 use tauri::Manager;
 
-use crate::{capture, engine, is_truthy, permission, prompts, server, update, windows};
+use crate::{capture, engine, is_truthy, permission, prompts, server, settings, shortcut, update, windows};
 
 /// The most recent capture's PNG bytes, kept so the HUD can re-extract with a
 /// different format or hint without re-shooting the screen (which may have
@@ -17,6 +17,7 @@ pub struct LastCapture(pub std::sync::Mutex<Option<Vec<u8>>>);
 // the frontend and back across the IPC boundary as a giant string.
 #[tauri::command]
 pub async fn capture_and_extract(
+    app: tauri::AppHandle,
     region: capture::CaptureRegion,
     format: Option<prompts::ExtractFormat>,
     state: tauri::State<'_, server::EngineState>,
@@ -29,7 +30,8 @@ pub async fn capture_and_extract(
     let bytes = capture::capture_region(&region).map_err(|e| e.to_string())?;
     let image_base64 = STANDARD.encode(&bytes);
     *last.0.lock().unwrap() = Some(bytes);
-    let prompt = prompts::prompt_for(format.unwrap_or(prompts::ExtractFormat::Markdown), None);
+    let default_format = settings::load(&app).default_format;
+    let prompt = prompts::prompt_for(format.unwrap_or(default_format), None);
     engine::local::extract_from_image(port, &image_base64, &prompt).await
 }
 
@@ -156,6 +158,9 @@ pub async fn check_for_update(app: tauri::AppHandle) -> Option<update::UpdateInf
     if is_truthy(std::env::var("BEAVER_DISABLE_UPDATE_CHECK").ok()) {
         return None;
     }
+    if !settings::load(&app).update_check_enabled {
+        return None;
+    }
     let current = app.package_info().version.to_string();
     let cache_path = server::update_cache_path(&app);
     let now = std::time::SystemTime::now()
@@ -204,6 +209,38 @@ pub fn open_external(url: String) -> Result<(), String> {
         .spawn()
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_settings(app: tauri::AppHandle) -> settings::Settings {
+    settings::load(&app)
+}
+
+// Saves before touching the live shortcut registration, and rolls the save
+// back if the registration then fails. Either order has a failure window;
+// this one fails closed on the cheap, rarely-failing operation (a local
+// file write) so the only real risk (an OS-level shortcut conflict) is
+// caught with the disk write already rolled back — persisted state and the
+// live registration can never disagree, whichever step fails.
+#[tauri::command]
+pub fn update_settings(
+    app: tauri::AppHandle,
+    next: settings::Settings,
+) -> Result<settings::Settings, String> {
+    let current = settings::load(&app);
+    settings::save(&app, &next).map_err(|e| e.to_string())?;
+    if next.shortcut != current.shortcut {
+        if let Err(e) = shortcut::apply(&app, &next.shortcut, Some(&current.shortcut)) {
+            let _ = settings::save(&app, &current);
+            return Err(e);
+        }
+    }
+    Ok(next)
+}
+
+#[tauri::command]
+pub fn open_settings(app: tauri::AppHandle) {
+    windows::show_settings(&app);
 }
 
 #[cfg(test)]
