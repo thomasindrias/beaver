@@ -15,6 +15,16 @@ vi.mock("@tauri-apps/api/window", () => ({
   }),
 }));
 
+const { selectMock, executeMock } = vi.hoisted(() => ({
+  selectMock: vi.fn().mockResolvedValue([]),
+  executeMock: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("@tauri-apps/plugin-sql", () => ({
+  default: {
+    load: vi.fn().mockResolvedValue({ select: selectMock, execute: executeMock }),
+  },
+}));
+
 import { TrayPopover } from "../components/TrayPopover";
 
 describe("TrayPopover", () => {
