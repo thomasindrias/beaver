@@ -25,3 +25,19 @@ export function toAccelerator(e: AcceleratorInput): string | null {
   parts.push(e.key.length === 1 ? e.key.toUpperCase() : e.key);
   return parts.join("+");
 }
+
+const GLYPHS: Record<string, string> = {
+  CmdOrCtrl: "⌘",
+  Alt: "⌥",
+  Shift: "⇧",
+};
+
+/**
+ * Renders a Tauri accelerator string ("CmdOrCtrl+Shift+D") back into the
+ * display glyphs the UI shows in <Kbd> elements. The inverse of
+ * `toAccelerator`: modifiers map to their symbol, anything else (a literal
+ * key like "D" or a named key like "F5") passes through unchanged.
+ */
+export function acceleratorToGlyphs(accelerator: string): string[] {
+  return accelerator.split("+").map(token => GLYPHS[token] ?? token);
+}

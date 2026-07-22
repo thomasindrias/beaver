@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Settings } from "lucide-react";
 import { getSettings, openSettings } from "../lib/api";
+import { acceleratorToGlyphs } from "../lib/accelerator";
 import { useCaptures } from "../hooks/useCaptures";
 import { HistoryList } from "./HistoryList";
 import { Logo } from "./Logo";
@@ -11,11 +12,18 @@ import { UpdatePill } from "./UpdatePill";
 
 export function TrayPopover() {
   const [retentionDays, setRetentionDays] = useState<number | null>(null);
+  // Matches the Rust-side default in src-tauri/src/shortcut.rs's
+  // CAPTURE_SHORTCUT constant, so the footer shows something sensible before
+  // the async settings fetch below resolves.
+  const [shortcut, setShortcut] = useState("CmdOrCtrl+Shift+D");
   const { captures, refresh } = useCaptures({ retentionDays });
 
   useEffect(() => {
     getSettings()
-      .then(s => setRetentionDays(s.history_retention_days))
+      .then(s => {
+        setRetentionDays(s.history_retention_days);
+        setShortcut(s.shortcut);
+      })
       .catch(console.error);
   }, []);
 
@@ -64,9 +72,9 @@ export function TrayPopover() {
 
       {/* Footer */}
       <footer className="flex items-center justify-center gap-1.5 border-t border-border px-4 py-2.5 text-[11px] text-muted-foreground">
-        <Kbd>⌘</Kbd>
-        <Kbd>⇧</Kbd>
-        <Kbd>D</Kbd>
+        {acceleratorToGlyphs(shortcut).map((glyph, i) => (
+          <Kbd key={i}>{glyph}</Kbd>
+        ))}
         <span className="ml-1">to capture anywhere</span>
       </footer>
     </div>
