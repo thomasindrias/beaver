@@ -231,7 +231,9 @@ pub fn update_settings(
     settings::save(&app, &next).map_err(|e| e.to_string())?;
     if next.shortcut != current.shortcut {
         if let Err(e) = shortcut::apply(&app, &next.shortcut, Some(&current.shortcut)) {
-            let _ = settings::save(&app, &current);
+            if let Err(rollback_err) = settings::save(&app, &current) {
+                log::error!("failed to roll back settings after shortcut apply failure: {rollback_err}");
+            }
             return Err(e);
         }
     }
