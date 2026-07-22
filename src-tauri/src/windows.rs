@@ -234,3 +234,32 @@ pub fn build_onboarding(app: &tauri::AppHandle) {
         log::error!("failed to create onboarding window: {e}");
     }
 }
+
+// Show the Settings window, creating it if needed. A plain, resizable-off
+// utility window with a standard title bar — unlike onboarding's branded
+// borderless chrome, Settings doesn't need a first-run "moment."
+pub fn show_settings(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("settings") {
+        if let Err(e) = w.show() { log::error!("failed to show settings window: {e}"); }
+        if let Err(e) = w.set_focus() { log::error!("failed to focus settings window: {e}"); }
+        return;
+    }
+    build_settings(app);
+}
+
+fn build_settings(app: &tauri::AppHandle) {
+    let result = tauri::WebviewWindowBuilder::new(
+        app,
+        "settings",
+        tauri::WebviewUrl::App("/".into()),
+    )
+    .title("Beaver Settings")
+    .inner_size(480.0, 420.0)
+    .resizable(false)
+    .center()
+    .build();
+
+    if let Err(e) = result {
+        log::error!("failed to create settings window: {e}");
+    }
+}
