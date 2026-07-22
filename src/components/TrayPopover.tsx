@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Settings } from "lucide-react";
+import { openSettings } from "../lib/api";
 import { useCaptures } from "../hooks/useCaptures";
 import { HistoryList } from "./HistoryList";
 import { Logo } from "./Logo";
@@ -34,6 +36,14 @@ export function TrayPopover() {
           <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
             {captures.length} {captures.length === 1 ? "capture" : "captures"}
           </span>
+          <button
+            type="button"
+            aria-label="Settings"
+            onClick={() => openSettings().catch(console.error)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Settings className="size-3.5" />
+          </button>
         </div>
       </header>
 
