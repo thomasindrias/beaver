@@ -73,6 +73,42 @@ export const LetterReveal: React.FC<{
   );
 };
 
+/** Word-by-word rise with a soft blur settle; for headline moments. */
+export const WordRise: React.FC<{
+  text: string;
+  start: number;
+  perWord?: number;
+  duration?: number;
+  out?: number;
+  style?: React.CSSProperties;
+}> = ({ text, start, perWord = 5, duration = 16, out, style }) => {
+  const frame = useCurrentFrame();
+  const gone = out === undefined ? 0 : progress(frame, out, out + 12);
+  return (
+    <div style={{ opacity: 1 - gone, transform: `translateY(${-gone * 8}px)`, ...style }}>
+      {text.split(" ").map((w, i) => {
+        const s = start + i * perWord;
+        const t = ep(frame, s, s + duration, easeOutCubic);
+        return (
+          <span
+            key={i}
+            style={{
+              display: "inline-block",
+              whiteSpace: "pre",
+              opacity: t,
+              transform: `translateY(${(1 - t) * 18}px)`,
+              filter: `blur(${(1 - t) * 7}px)`,
+            }}
+          >
+            {w}
+            {i < text.split(" ").length - 1 ? " " : ""}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
 /** Fade+rise for a whole block; the workhorse entrance. */
 export const Rise: React.FC<{
   start: number;

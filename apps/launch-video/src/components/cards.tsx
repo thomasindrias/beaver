@@ -3,7 +3,59 @@ import { Img, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { dark, font, paper } from "../theme";
 import { charsAt } from "../lib/typeon";
 import { ep, easeOutCubic } from "../lib/ease";
-import { LetterReveal, Rise } from "./text";
+import { LetterReveal, Rise, WordRise } from "./text";
+
+/** macOS-style window chrome: traffic lights + title bar. Wrapping a
+ * source in this reads instantly as "a thing on your screen". */
+export const Window: React.FC<{
+  title: string;
+  width?: number;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}> = ({ title, width, children, style }) => (
+  <div
+    style={{
+      width,
+      borderRadius: 14,
+      overflow: "hidden",
+      border: `1.5px solid ${dark.whiteDim(11)}`,
+      background: dark.card,
+      boxShadow: "0 34px 80px rgba(0,0,0,0.55)",
+      ...style,
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "11px 16px",
+        background: "rgba(255,255,255,0.045)",
+        borderBottom: `1.5px solid ${dark.whiteDim(8)}`,
+      }}
+    >
+      {["#ff5f57", "#febc2e", "#28c840"].map((c) => (
+        <span
+          key={c}
+          style={{ width: 12, height: 12, borderRadius: 99, background: c, opacity: 0.75 }}
+        />
+      ))}
+      <span
+        style={{
+          flex: 1,
+          textAlign: "center",
+          marginRight: 56,
+          fontFamily: font.sans,
+          fontSize: 15.5,
+          color: dark.mutedFg,
+        }}
+      >
+        {title}
+      </span>
+    </div>
+    {children}
+  </div>
+);
 
 /** The invoice used across variants. Concrete, a little beaver-flavored,
  * never a lorem placeholder. */
@@ -259,8 +311,10 @@ export const IconFinale: React.FC<{
         </div>
       )}
       {tagline ? (
-        <Rise
+        <WordRise
+          text={tagline}
           start={start + 34}
+          perWord={4}
           style={{
             position: "absolute",
             left: 0,
@@ -272,9 +326,7 @@ export const IconFinale: React.FC<{
             fontWeight: 500,
             color: dark.fg,
           }}
-        >
-          {tagline}
-        </Rise>
+        />
       ) : null}
       {subline ? (
         <Rise

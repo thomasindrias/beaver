@@ -1,29 +1,20 @@
 import React from "react";
 import { AbsoluteFill, Audio, staticFile, useCurrentFrame } from "remotion";
 import { dark, font, paper } from "../../theme";
-import { ep, easeInOutCubic, easeOutCubic, mix, progress } from "../../lib/ease";
+import { ep, easeInOutCubic, easeOutBack, easeOutCubic, easeOutQuint, mix, progress } from "../../lib/ease";
 import { DarkScene } from "../../components/scene";
-import { Camera, Glow, HudPill, SelectionBox, pulse, useSpinner } from "../../components/ui";
-import { IconFinale, InvoiceDoc } from "../../components/cards";
-import { Rise } from "../../components/text";
+import { Camera, Glow, HudPill, Keycap, SelectionBox, pulse, useSpinner } from "../../components/ui";
+import { IconFinale, InvoiceDoc, Window } from "../../components/cards";
+import { WordRise } from "../../components/text";
+import { Sfx } from "../../components/sfx";
 import { Particles, useImagePoints } from "../../components/particles";
 
 export const REFLEX_DURATION = 620;
 
-/** A paused video player holding code. */
+/** Code inside a paused video player; bare, for wrapping in Window. */
 const VideoCode: React.FC<{ width?: number }> = ({ width = 640 }) => (
-  <div
-    style={{
-      width,
-      borderRadius: 14,
-      overflow: "hidden",
-      border: `1.5px solid ${dark.border}`,
-      background: "#0d0d10",
-      boxShadow: "0 30px 70px rgba(0,0,0,0.5)",
-      fontFamily: font.mono,
-    }}
-  >
-    <div style={{ padding: "26px 30px", fontSize: 19, lineHeight: 1.7, color: "#c9c9d1" }}>
+  <div style={{ width, background: "#0d0d10", fontFamily: font.mono }}>
+    <div style={{ padding: "24px 30px", fontSize: 19, lineHeight: 1.7, color: "#c9c9d1" }}>
       <div><span style={{ color: dark.amber }}>def</span> retention_cutoff(days):</div>
       <div>&nbsp;&nbsp;<span style={{ color: dark.amber }}>if</span> days <span style={{ color: dark.amber }}>is</span> None:</div>
       <div>&nbsp;&nbsp;&nbsp;&nbsp;<span style={{ color: dark.amber }}>return</span> None</div>
@@ -40,25 +31,15 @@ const VideoCode: React.FC<{ width?: number }> = ({ width = 640 }) => (
   </div>
 );
 
-/** A light slide with a bar chart. */
+/** A light slide with a bar chart; bare, for wrapping in Window. */
 const ChartSlide: React.FC<{ width?: number }> = ({ width = 640 }) => {
   const bars = [42, 78, 56, 96, 70];
   return (
-    <div
-      style={{
-        width,
-        borderRadius: 14,
-        background: "#f6f4ef",
-        border: "1.5px solid rgba(0,0,0,0.08)",
-        boxShadow: "0 30px 70px rgba(0,0,0,0.45)",
-        padding: "30px 36px 26px",
-        fontFamily: font.sans,
-      }}
-    >
-      <div style={{ fontSize: 24, fontWeight: 600, color: "#2c2a26", marginBottom: 20 }}>
+    <div style={{ width, background: "#f6f4ef", padding: "28px 36px 24px", fontFamily: font.sans }}>
+      <div style={{ fontSize: 24, fontWeight: 600, color: "#2c2a26", marginBottom: 18 }}>
         Q2 captures per week
       </div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 22, height: 190 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 22, height: 180 }}>
         {bars.map((b, i) => (
           <div key={i} style={{ flex: 1, height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
             <div
@@ -77,7 +58,7 @@ const ChartSlide: React.FC<{ width?: number }> = ({ width = 640 }) => {
   );
 };
 
-/** A macOS-flavored error dialog. */
+/** A macOS-flavored error dialog (alerts carry no title bar). */
 const ErrorDialog: React.FC<{ width?: number }> = ({ width = 520 }) => (
   <div
     style={{
@@ -111,31 +92,64 @@ const ErrorDialog: React.FC<{ width?: number }> = ({ width = 520 }) => (
   </div>
 );
 
-/** Small mono result card that snaps into the rail. */
-const RailCard: React.FC<{ label: string; body: string; appear: number }> = ({ label, body, appear }) => (
-  <div
-    style={{
-      width: 380,
-      borderRadius: 12,
-      background: dark.card,
-      border: `1.5px solid ${dark.border}`,
-      padding: "14px 18px",
-      opacity: appear,
-      transform: `translateY(${(1 - easeOutCubic(appear)) * 26}px) scale(${mix(0.94, 1, easeOutCubic(appear))})`,
-      boxShadow: `0 18px 44px rgba(0,0,0,0.45), 0 0 24px ${dark.amberDim(6)}`,
-    }}
-  >
-    <div style={{ fontFamily: font.sans, fontSize: 14, color: dark.amber, marginBottom: 6 }}>{label}</div>
-    <div style={{ fontFamily: font.mono, fontSize: 14.5, lineHeight: 1.55, color: dark.fg, whiteSpace: "pre" }}>{body}</div>
-  </div>
-);
+/** Result card that pops into the rail. */
+const RailCard: React.FC<{ label: string; file: string; body: string; appear: number }> = ({
+  label,
+  file,
+  body,
+  appear,
+}) => {
+  const e = easeOutBack(appear);
+  return (
+    <div
+      style={{
+        width: 400,
+        borderRadius: 14,
+        background: dark.card,
+        border: `1.5px solid ${dark.border}`,
+        overflow: "hidden",
+        opacity: appear,
+        transform: `translateY(${(1 - e) * 34}px) scale(${mix(0.92, 1, e)})`,
+        boxShadow: `0 18px 44px rgba(0,0,0,0.45), 0 0 24px ${dark.amberDim(6)}`,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 9,
+          padding: "10px 16px",
+          borderBottom: `1.5px solid ${dark.border}`,
+          fontFamily: font.sans,
+          fontSize: 14.5,
+        }}
+      >
+        <span style={{ color: dark.amber, fontWeight: 600 }}>✓</span>
+        <span style={{ color: dark.fg, fontWeight: 500 }}>{file}</span>
+        <span style={{ marginLeft: "auto", color: dark.mutedFg }}>{label}</span>
+      </div>
+      <div
+        style={{
+          padding: "12px 16px",
+          fontFamily: font.mono,
+          fontSize: 14.5,
+          lineHeight: 1.6,
+          color: dark.fg,
+          whiteSpace: "pre",
+        }}
+      >
+        {body}
+      </div>
+    </div>
+  );
+};
 
-// The four stations along the panning canvas.
+// The four stations along the panning canvas. `h` includes window chrome.
 const STATIONS = [
-  { x: 240, y: 240, w: 620, h: 420, at: 70, out: "| Date | Description | Amount |\n| 2026-06-03 | Oak planks | $384.00 |", label: "table" },
-  { x: 1130, y: 200, w: 640, h: 380, at: 170, out: "def retention_cutoff(days):\n  if days is None: return None", label: "code" },
-  { x: 2000, y: 260, w: 640, h: 360, at: 270, out: "Week,Captures\nW4,96", label: "table" },
-  { x: 2880, y: 300, w: 520, h: 260, at: 370, out: '{ "error": "missing column",\n  "at": "export/csv.rs:214" }', label: "text" },
+  { x: 240, y: 216, w: 620, h: 470, at: 70, file: "capture.md", out: "| Date | Description | Amount |\n| 2026-06-03 | Oak planks | $384.00 |", label: "table", title: "invoice-2041.pdf" },
+  { x: 1130, y: 190, w: 640, h: 430, at: 170, file: "capture.md", out: "def retention_cutoff(days):\n  if days is None: return None", label: "code", title: "refactor-stream.mp4" },
+  { x: 2000, y: 236, w: 640, h: 420, at: 270, file: "capture.csv", out: "Week,Captures\nW4,96", label: "table", title: "q2-review.key" },
+  { x: 2880, y: 300, w: 520, h: 260, at: 370, file: "capture.json", out: '{ "error": "missing column",\n  "at": "export/csv.rs:214" }', label: "text", title: null },
 ] as const;
 
 export const Reflex: React.FC = () => {
@@ -143,6 +157,10 @@ export const Reflex: React.FC = () => {
   const spin = useSpinner();
   const LINE_AT = 440;
   const FINALE = 500;
+
+  // Cold open: the chord that starts the reflex.
+  const chordPress = ep(frame, 42, 50, easeOutQuint);
+  const chordGone = ep(frame, 54, 66, easeInOutCubic);
 
   // One continuous pan across the canvas; eases between stations on bar lines.
   const panT = ep(frame, 40, 420, easeInOutCubic);
@@ -158,6 +176,25 @@ export const Reflex: React.FC = () => {
   return (
     <DarkScene>
       <Audio src={staticFile("audio/Reflex.wav")} />
+      {/* sfx: the chord, then each capture's click/shutter/rail-pop */}
+      <Sfx name="key" at={16} volume={0.55} />
+      <Sfx name="key" at={24} volume={0.55} />
+      <Sfx name="key" at={32} volume={0.6} />
+      <Sfx name="key" at={42} volume={0.9} />
+      <Sfx name="whoosh" at={44} volume={0.55} />
+      {STATIONS.map((s, i) => (
+        <React.Fragment key={`sfx-${i}`}>
+          <Sfx name="click" at={s.at} volume={0.7} />
+          <Sfx name="shutter" at={s.at + 34} volume={0.8} />
+          <Sfx name="pop" at={s.at + 40} volume={0.55} />
+          <Sfx name="pop" at={s.at + 64} volume={0.7} />
+        </React.Fragment>
+      ))}
+      <Sfx name="whoosh" at={140} volume={0.32} />
+      <Sfx name="whoosh" at={240} volume={0.32} />
+      <Sfx name="whoosh" at={340} volume={0.32} />
+      <Sfx name="whoosh" at={LINE_AT - 6} volume={0.45} />
+
       <AbsoluteFill style={{ opacity: worldFade }}>
         <Camera zoom={zoom} x={panX}>
           {/* faint dot grid so the pan always has ground under it */}
@@ -168,19 +205,25 @@ export const Reflex: React.FC = () => {
               top: -300,
               width: 4600,
               height: 1700,
-              backgroundImage: `radial-gradient(circle, ${dark.whiteDim(7)} 1.5px, transparent 1.5px)`,
+              backgroundImage: `radial-gradient(circle, ${dark.whiteDim(9)} 1.5px, transparent 1.5px)`,
               backgroundSize: "56px 56px",
             }}
           />
           {/* stations */}
           <div style={{ position: "absolute", left: STATIONS[0].x, top: STATIONS[0].y }}>
-            <InvoiceDoc width={620} mode="dark" />
+            <Window title="invoice-2041.pdf" width={620}>
+              <InvoiceDoc width={620} mode="dark" style={{ border: "none", borderRadius: 0, boxShadow: "none" }} />
+            </Window>
           </div>
           <div style={{ position: "absolute", left: STATIONS[1].x, top: STATIONS[1].y }}>
-            <VideoCode />
+            <Window title="refactor-stream.mp4" width={640}>
+              <VideoCode width={640} />
+            </Window>
           </div>
           <div style={{ position: "absolute", left: STATIONS[2].x, top: STATIONS[2].y }}>
-            <ChartSlide />
+            <Window title="q2-review.key" width={640}>
+              <ChartSlide width={640} />
+            </Window>
           </div>
           <div style={{ position: "absolute", left: STATIONS[3].x, top: STATIONS[3].y }}>
             <ErrorDialog />
@@ -224,13 +267,33 @@ export const Reflex: React.FC = () => {
           })}
         </Camera>
 
+        {/* cold open: the chord, screen space */}
+        {frame < 70 && (
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: 470,
+              display: "flex",
+              justifyContent: "center",
+              gap: 18,
+              opacity: 1 - chordGone,
+            }}
+          >
+            <Keycap label="⌘" appear={ep(frame, 14, 26, easeOutCubic)} press={chordPress} />
+            <Keycap label="⇧" appear={ep(frame, 22, 34, easeOutCubic)} press={chordPress} />
+            <Keycap label="D" appear={ep(frame, 30, 42, easeOutCubic)} press={ep(frame, 44, 52, easeOutQuint)} />
+          </div>
+        )}
+
         {/* the rail: results accumulate at the bottom, in screen space */}
         <div
           style={{
             position: "absolute",
             left: 0,
             right: 0,
-            bottom: 64,
+            bottom: 56,
             display: "flex",
             justifyContent: "center",
             gap: 26,
@@ -239,16 +302,18 @@ export const Reflex: React.FC = () => {
           {STATIONS.map((s, i) => (
             <RailCard
               key={i}
-              label={`✓ ${s.label}`}
+              file={s.file}
+              label={s.label}
               body={s.out}
-              appear={ep(frame, s.at + 62, s.at + 76, easeOutCubic)}
+              appear={ep(frame, s.at + 62, s.at + 78, easeOutCubic)}
             />
           ))}
         </div>
       </AbsoluteFill>
 
       {/* the one line */}
-      <Rise
+      <WordRise
+        text="It doesn't care where it came from."
         start={LINE_AT}
         out={FINALE - 18}
         style={{
@@ -263,9 +328,7 @@ export const Reflex: React.FC = () => {
           letterSpacing: "-0.01em",
           color: dark.fg,
         }}
-      >
-        It doesn't care where it came from.
-      </Rise>
+      />
 
       {/* finale */}
       {frame >= FINALE - 6 && iconPts && (

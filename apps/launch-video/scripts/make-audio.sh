@@ -86,3 +86,42 @@ make_variant Reflex      20.67  3.47      1.6  17.5    3.47 6.8 10.13 13.47
 make_variant Receipt     22.0   3.6       1.8  18.4    3.6 10.0 15.27
 make_variant LightsOut   20.67  1.93      1.2  17.9    1.93 8.6 15.07
 make_variant RasterToVector 20.67 7.0     3.0  17.5    7.0 15.07
+
+# ---- SFX library: placed frame-exact by Remotion <Sequence> wrappers ----
+SFX=$OUT/sfx
+mkdir -p "$SFX"
+
+# UI click: a bright 30ms transient.
+ffmpeg -hide_banner -loglevel error -y -f lavfi -i "anoisesrc=color=white:r=$R:d=0.05" \
+  -af "highpass=f=2400,afade=t=out:st=0.005:d=0.045,volume=0.75" "$SFX/click.wav"
+
+# Typing tick: the click's little sibling.
+ffmpeg -hide_banner -loglevel error -y -f lavfi -i "anoisesrc=color=white:r=$R:d=0.025" \
+  -af "highpass=f=4200,afade=t=out:st=0.003:d=0.022,volume=0.4" "$SFX/tick.wav"
+
+# Keypress: soft thock, noise body over a low knock.
+ffmpeg -hide_banner -loglevel error -y \
+  -f lavfi -i "anoisesrc=color=pink:r=$R:d=0.07" \
+  -f lavfi -i "aevalsrc='sin(2*PI*170*t)*exp(-38*t)*0.8':s=$R:d=0.12" \
+  -filter_complex "[0:a]lowpass=f=1100,afade=t=out:st=0.01:d=0.06[n];[n][1:a]amix=inputs=2:normalize=0,volume=0.9" \
+  "$SFX/key.wav"
+
+# Capture shutter: two ticks framing a low thud.
+ffmpeg -hide_banner -loglevel error -y \
+  -f lavfi -i "anoisesrc=color=white:r=$R:d=0.03" \
+  -f lavfi -i "anoisesrc=color=white:r=$R:d=0.03" \
+  -f lavfi -i "aevalsrc='sin(2*PI*120*t)*exp(-30*t)':s=$R:d=0.25" \
+  -filter_complex "[0:a]highpass=f=2000,afade=t=out:st=0.004:d=0.026[a];[1:a]highpass=f=1600,afade=t=out:st=0.004:d=0.026,adelay=70|70[b];[2:a]lowpass=f=300[c];[a][b][c]amix=inputs=3:normalize=0,volume=0.85" \
+  "$SFX/shutter.wav"
+
+# Pill pop: a warm rising blip.
+ffmpeg -hide_banner -loglevel error -y -f lavfi \
+  -i "aevalsrc='sin(2*PI*(430+260*t)*t)*exp(-16*t)*0.7':s=$R:d=0.3" \
+  -af "lowpass=f=2400,volume=0.8" "$SFX/pop.wav"
+
+# Whoosh: broadband air for camera moves.
+ffmpeg -hide_banner -loglevel error -y -f lavfi -i "anoisesrc=color=pink:r=$R:d=0.7" \
+  -af "highpass=f=280,lowpass=f=1100,afade=t=in:st=0:d=0.3,afade=t=out:st=0.3:d=0.4,volume=0.5" \
+  "$SFX/whoosh.wav"
+
+echo "made sfx"

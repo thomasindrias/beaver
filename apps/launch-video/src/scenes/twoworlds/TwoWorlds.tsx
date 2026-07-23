@@ -4,8 +4,9 @@ import { dark, font, paper } from "../../theme";
 import { ep, easeInOutCubic, easeOutCubic, easeOutQuint, mix, progress } from "../../lib/ease";
 import { DarkScene, EnsureFonts } from "../../components/scene";
 import { Camera, Crosshair, Glow, HudPill, Keycap, NetworkMeter, SelectionBox, pulse, useSpinner } from "../../components/ui";
-import { DocCard, IconFinale, InvoiceDoc, CSV_LINES, JSON_LINES, MD_LINES } from "../../components/cards";
+import { DocCard, IconFinale, InvoiceDoc, Window, CSV_LINES, JSON_LINES, MD_LINES } from "../../components/cards";
 import { TypeOn } from "../../components/text";
+import { Sfx, TickTrack } from "../../components/sfx";
 import { Particles, useImagePoints } from "../../components/particles";
 
 export const TWOWORLDS_DURATION = 780;
@@ -29,7 +30,9 @@ const Cursor: React.FC<{ x: number; y: number; opacity?: number }> = ({ x, y, op
 
 // Layout constants (1920x1080 world).
 const DOC = { x: 560, y: 250, w: 800 };
-const SEL = { x: DOC.x + 42, y: DOC.y + 128, w: DOC.w - 84, h: 380 };
+// The dark-world doc wears window chrome (+44px header), so the selection
+// region sits lower than in the paper world.
+const SEL = { x: DOC.x + 42, y: DOC.y + 172, w: DOC.w - 84, h: 380 };
 
 export const TwoWorlds: React.FC = () => {
   const frame = useCurrentFrame();
@@ -76,6 +79,24 @@ export const TwoWorlds: React.FC = () => {
     <AbsoluteFill style={{ background: paper.cream }}>
       <EnsureFonts />
       <Audio src={staticFile("audio/TwoWorlds.wav")} />
+      {/* sfx: keycap taps, the chord, capture, pill, chips, typing */}
+      <Sfx name="key" at={163} volume={0.4} />
+      <Sfx name="key" at={173} volume={0.4} />
+      <Sfx name="key" at={183} volume={0.45} />
+      <Sfx name="key" at={200} volume={1} />
+      <Sfx name="whoosh" at={DIM_AT} volume={0.7} />
+      <Sfx name="click" at={SELECT.from} volume={0.7} />
+      <Sfx name="shutter" at={SELECT.to} volume={0.85} />
+      <Sfx name="pop" at={PILL_IN} volume={0.55} />
+      <Sfx name="pop" at={COPIED} volume={0.7} />
+      <TickTrack from={CARD_IN + 4} to={CHIPS - 6} every={6} volume={0.26} />
+      <Sfx name="pop" at={CHIPS} volume={0.5} />
+      <Sfx name="key" at={CSV_AT} volume={0.7} />
+      <TickTrack from={CSV_AT + 2} to={CSV_AT + 26} every={5} volume={0.2} />
+      <Sfx name="key" at={JSON_AT} volume={0.7} />
+      <TickTrack from={JSON_AT + 2} to={JSON_AT + 26} every={5} volume={0.2} />
+      <TickTrack from={PROOF} to={PROOF + 28} every={5} volume={0.24} />
+      <Sfx name="pop" at={FINALE + 26} volume={0.6} />
       {/* ---------- paper world ---------- */}
       <AbsoluteFill style={{ opacity: 1 - darkT }}>
         <AbsoluteFill
@@ -159,7 +180,9 @@ export const TwoWorlds: React.FC = () => {
                 filter: `brightness(${mix(0.75, 0.95, ep(frame, SELECT.from, SELECT.to, easeInOutCubic))})`,
               }}
             >
-              <InvoiceDoc width={DOC.w} mode="dark" />
+              <Window title="invoice-2041.pdf" width={DOC.w}>
+                <InvoiceDoc width={DOC.w} mode="dark" style={{ border: "none", borderRadius: 0, boxShadow: "none" }} />
+              </Window>
             </div>
 
             {/* crosshair, then the selection */}
