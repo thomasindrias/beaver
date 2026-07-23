@@ -10,9 +10,7 @@ captures never leave your machine.
 > Silicon, or [llama.cpp](https://github.com/ggml-org/llama.cpp) on Intel Macs
 > — same install, same privacy guarantee, either way.
 
-<!-- Demo assets: record with the capture flow + popover, save to docs/media/demo.gif, then uncomment.
 ![Beaver turning a screenshot region into Markdown](docs/media/demo.gif)
--->
 
 ## Install (macOS)
 

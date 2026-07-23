@@ -82,7 +82,7 @@ make_variant() {
 
 #            name        dur    riser_end len  chord   hits...
 make_variant TwoWorlds   26.0   7.0       2.6  22.4    7.0 10.17 12.93 16.0 19.17
-make_variant Reflex      20.67  3.47      1.6  17.5    3.47 6.8 10.13 13.47
+make_variant Reflex      23.33  3.47      1.6  20.0    3.47 6.8 10.13 13.47 16.67
 make_variant Receipt     22.0   3.6       1.8  18.4    3.6 10.0 15.27
 make_variant LightsOut   20.67  1.93      1.2  17.9    1.93 8.6 15.07
 make_variant RasterToVector 20.67 7.0     3.0  17.5    7.0 15.07

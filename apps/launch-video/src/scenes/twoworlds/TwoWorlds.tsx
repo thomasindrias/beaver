@@ -29,10 +29,10 @@ const Cursor: React.FC<{ x: number; y: number; opacity?: number }> = ({ x, y, op
 );
 
 // Layout constants (1920x1080 world).
-const DOC = { x: 560, y: 250, w: 800 };
+const DOC = { x: 560, y: 238, w: 800 };
 // The dark-world doc wears window chrome (+44px header), so the selection
 // region sits lower than in the paper world.
-const SEL = { x: DOC.x + 42, y: DOC.y + 172, w: DOC.w - 84, h: 380 };
+const SEL = { x: DOC.x + 42, y: DOC.y + 150, w: DOC.w - 84, h: 470 };
 
 export const TwoWorlds: React.FC = () => {
   const frame = useCurrentFrame();
@@ -123,7 +123,7 @@ export const TwoWorlds: React.FC = () => {
             position: "absolute",
             left: 0,
             right: 0,
-            top: 108,
+            top: 78,
             textAlign: "center",
             fontFamily: font.display,
             fontSize: 52,
@@ -138,7 +138,7 @@ export const TwoWorlds: React.FC = () => {
             position: "absolute",
             left: 0,
             right: 0,
-            top: 176,
+            top: 146,
             textAlign: "center",
             fontFamily: font.display,
             fontSize: 52,
@@ -154,7 +154,7 @@ export const TwoWorlds: React.FC = () => {
             position: "absolute",
             left: 0,
             right: 0,
-            top: 850,
+            top: 884,
             display: "flex",
             justifyContent: "center",
             gap: 18,
@@ -253,8 +253,9 @@ export const TwoWorlds: React.FC = () => {
                   title={frame < CSV_AT ? "capture.md" : frame < JSON_AT ? "capture.csv" : "capture.json"}
                   lines={frame < CSV_AT ? MD_LINES : frame < JSON_AT ? CSV_LINES : JSON_LINES}
                   start={frame < CSV_AT ? CARD_IN + 4 : frame < JSON_AT ? CSV_AT + 2 : JSON_AT + 2}
-                  cps={frame < CSV_AT ? 95 : 260}
+                  cps={frame < CSV_AT ? 170 : 420}
                   width={940}
+                  fontSize={18.5}
                   appear={ep(frame, CARD_IN, CARD_IN + 14, easeOutCubic)}
                 />
               </div>

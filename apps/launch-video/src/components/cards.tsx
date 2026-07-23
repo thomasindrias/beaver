@@ -61,33 +61,55 @@ export const Window: React.FC<{
  * never a lorem placeholder. */
 export const INVOICE_ROWS = [
   ["2026-06-03", "Oak planks", "12", "$384.00"],
+  ["2026-06-07", "Willow branches", "8", "$156.00"],
   ["2026-06-11", "River stone, bulk", "2", "$210.50"],
+  ["2026-06-14", "Birch dowels", "24", "$72.80"],
   ["2026-06-19", "Mud sealant", "5", "$97.25"],
+  ["2026-06-24", "Site delivery", "1", "$45.00"],
 ] as const;
-export const INVOICE_TOTAL = "$691.75";
+export const INVOICE_META = "Issued 2026-06-28 · Due 2026-07-28 · PO 88112";
+export const INVOICE_TOTALS = [
+  ["Subtotal", "$965.55"],
+  ["VAT 25%", "$241.39"],
+  ["Total", "$1,206.94"],
+] as const;
+export const INVOICE_TOTAL = "$1,206.94";
 
 export const MD_LINES = [
-  "| Date       | Description       | Qty | Amount  |",
-  "|------------|-------------------|-----|---------|",
-  "| 2026-06-03 | Oak planks        | 12  | $384.00 |",
-  "| 2026-06-11 | River stone, bulk | 2   | $210.50 |",
-  "| 2026-06-19 | Mud sealant       | 5   | $97.25  |",
-  "| **Total**  |                   |     | $691.75 |",
+  "| Date       | Description       | Qty | Amount    |",
+  "|------------|-------------------|-----|-----------|",
+  "| 2026-06-03 | Oak planks        | 12  | $384.00   |",
+  "| 2026-06-07 | Willow branches   | 8   | $156.00   |",
+  "| 2026-06-11 | River stone, bulk | 2   | $210.50   |",
+  "| 2026-06-14 | Birch dowels      | 24  | $72.80    |",
+  "| 2026-06-19 | Mud sealant       | 5   | $97.25    |",
+  "| 2026-06-24 | Site delivery     | 1   | $45.00    |",
+  "| Subtotal   |                   |     | $965.55   |",
+  "| VAT 25%    |                   |     | $241.39   |",
+  "| **Total**  |                   |     | $1,206.94 |",
 ];
 
 export const CSV_LINES = [
   "Date,Description,Qty,Amount",
   "2026-06-03,Oak planks,12,384.00",
+  "2026-06-07,Willow branches,8,156.00",
   '2026-06-11,"River stone, bulk",2,210.50',
+  "2026-06-14,Birch dowels,24,72.80",
   "2026-06-19,Mud sealant,5,97.25",
-  "Total,,,691.75",
+  "2026-06-24,Site delivery,1,45.00",
+  "Subtotal,,,965.55",
+  "VAT 25%,,,241.39",
+  "Total,,,1206.94",
 ];
 
 export const JSON_LINES = [
   "[",
   '  { "date": "2026-06-03", "item": "Oak planks",        "amount": 384.00 },',
+  '  { "date": "2026-06-07", "item": "Willow branches",   "amount": 156.00 },',
   '  { "date": "2026-06-11", "item": "River stone, bulk", "amount": 210.50 },',
-  '  { "date": "2026-06-19", "item": "Mud sealant",       "amount": 97.25 }',
+  '  { "date": "2026-06-14", "item": "Birch dowels",      "amount": 72.80 },',
+  '  { "date": "2026-06-19", "item": "Mud sealant",       "amount": 97.25 },',
+  '  { "date": "2026-06-24", "item": "Site delivery",     "amount": 45.00 }',
   "]",
 ];
 
@@ -96,12 +118,15 @@ export const JSON_LINES = [
 export const InvoiceDoc: React.FC<{
   width?: number;
   mode?: "paper" | "dark";
+  compact?: boolean;
   style?: React.CSSProperties;
-}> = ({ width = 760, mode = "paper", style }) => {
+}> = ({ width = 760, mode = "paper", compact = false, style }) => {
   const onPaper = mode === "paper";
   const ink = onPaper ? paper.ink : dark.fg;
   const mut = onPaper ? paper.muted : dark.mutedFg;
   const line = onPaper ? paper.line : "rgba(255,255,255,0.09)";
+  const cell = compact ? "7px 4px" : "10px 4px";
+  const fs = compact ? 16.5 : 19;
   return (
     <div
       style={{
@@ -112,20 +137,21 @@ export const InvoiceDoc: React.FC<{
         boxShadow: onPaper
           ? "0 22px 60px rgba(43,32,25,0.18)"
           : "0 30px 70px rgba(0,0,0,0.5)",
-        padding: "40px 46px",
+        padding: compact ? "26px 32px" : "34px 44px",
         fontFamily: font.sans,
         color: ink,
         ...style,
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <div style={{ fontFamily: onPaper ? font.display : font.sans, fontSize: 30, fontWeight: 600 }}>
+        <div style={{ fontFamily: onPaper ? font.display : font.sans, fontSize: compact ? 24 : 29, fontWeight: 600 }}>
           Invoice #2041
         </div>
-        <div style={{ fontSize: 18, color: mut }}>Lodge &amp; Timber Co.</div>
+        <div style={{ fontSize: compact ? 15 : 18, color: mut }}>Lodge &amp; Timber Co.</div>
       </div>
-      <div style={{ height: 2, background: line, margin: "22px 0 6px" }} />
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 20 }}>
+      <div style={{ fontSize: compact ? 13.5 : 16, color: mut, marginTop: 6 }}>{INVOICE_META}</div>
+      <div style={{ height: 2, background: line, margin: compact ? "14px 0 2px" : "20px 0 4px" }} />
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: fs }}>
         <thead>
           <tr>
             {["Date", "Description", "Qty", "Amount"].map((h, i) => (
@@ -135,7 +161,7 @@ export const InvoiceDoc: React.FC<{
                   textAlign: i >= 2 ? "right" : "left",
                   color: mut,
                   fontWeight: 500,
-                  padding: "12px 4px",
+                  padding: cell,
                   borderBottom: `2px solid ${line}`,
                 }}
               >
@@ -147,36 +173,44 @@ export const InvoiceDoc: React.FC<{
         <tbody>
           {INVOICE_ROWS.map((r) => (
             <tr key={r[0]}>
-              {r.map((cell, i) => (
+              {r.map((c, i) => (
                 <td
                   key={i}
                   style={{
-                    padding: "12px 4px",
+                    padding: cell,
                     textAlign: i >= 2 ? "right" : "left",
                     borderBottom: `1.5px solid ${line}`,
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
-                  {cell}
+                  {c}
                 </td>
               ))}
             </tr>
           ))}
-          <tr>
-            <td style={{ padding: "14px 4px", fontWeight: 600 }}>Total</td>
-            <td />
-            <td />
-            <td
-              style={{
-                padding: "14px 4px",
-                textAlign: "right",
-                fontWeight: 600,
-                fontVariantNumeric: "tabular-nums",
-              }}
-            >
-              {INVOICE_TOTAL}
-            </td>
-          </tr>
+          {INVOICE_TOTALS.map(([label, value], i) => {
+            const last = i === INVOICE_TOTALS.length - 1;
+            return (
+              <tr key={label}>
+                <td style={{ padding: cell, fontWeight: last ? 600 : 400, color: last ? ink : mut }}>
+                  {label}
+                </td>
+                <td />
+                <td />
+                <td
+                  style={{
+                    padding: cell,
+                    textAlign: "right",
+                    fontWeight: last ? 600 : 400,
+                    color: last ? (onPaper ? ink : dark.amber) : mut,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {value}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
