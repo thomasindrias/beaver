@@ -77,6 +77,24 @@ find_built_app() {
   printf '%s\n' "$app"
 }
 
+quit_running_app() {
+  # Failure is the normal case on a first install (nothing to quit), so this
+  # never propagates an error.
+  osascript -e 'quit app "Beaver"' >/dev/null 2>&1 || true
+}
+
+# Reads BEAVER_INSTALL_DIR at call time rather than caching it at source
+# time, so tests can redirect the destination per test.
+install_app() {
+  local built_app="$1"
+  local dest_dir="${BEAVER_INSTALL_DIR:-/Applications}"
+  local dest="$dest_dir/Beaver.app"
+  mkdir -p "$dest_dir"
+  rm -rf "$dest"
+  cp -R "$built_app" "$dest"
+  printf '%s\n' "$dest"
+}
+
 main() {
   cd "$ROOT"
   check_prereqs
@@ -87,7 +105,10 @@ main() {
     echo "  This is a bug in install.sh, not a problem with your machine." >&2
     return 1
   fi
-  echo "==> Built $app"
+  quit_running_app
+  local dest
+  dest="$(install_app "$app")"
+  echo "==> Installed $dest"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

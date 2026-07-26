@@ -185,3 +185,41 @@ all_prereqs_present() {
   [ "$status" -eq 1 ]
   [ -z "$output" ]
 }
+
+@test "quit_running_app asks Beaver to quit" {
+  stub osascript "printf '%s\n' \"\$*\" > '$BATS_TEST_TMPDIR/osascript-args'"
+  only_stubs
+  run quit_running_app
+  [ "$status" -eq 0 ]
+  [[ "$(< "$BATS_TEST_TMPDIR/osascript-args")" == *'quit app "Beaver"'* ]]
+}
+
+@test "quit_running_app succeeds even when no Beaver is running" {
+  stub osascript 'exit 1'
+  only_stubs
+  run quit_running_app
+  [ "$status" -eq 0 ]
+}
+
+@test "install_app copies the built bundle into the install directory" {
+  mkdir -p "$BATS_TEST_TMPDIR/build/Beaver.app/Contents"
+  echo "fresh" > "$BATS_TEST_TMPDIR/build/Beaver.app/Contents/marker"
+  export BEAVER_INSTALL_DIR="$BATS_TEST_TMPDIR/Applications"
+  run install_app "$BATS_TEST_TMPDIR/build/Beaver.app"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$BEAVER_INSTALL_DIR/Beaver.app" ]
+  [ "$(< "$BEAVER_INSTALL_DIR/Beaver.app/Contents/marker")" = "fresh" ]
+}
+
+@test "install_app replaces an existing install rather than merging into it" {
+  export BEAVER_INSTALL_DIR="$BATS_TEST_TMPDIR/Applications"
+  mkdir -p "$BEAVER_INSTALL_DIR/Beaver.app/Contents"
+  echo "stale" > "$BEAVER_INSTALL_DIR/Beaver.app/Contents/marker"
+  touch "$BEAVER_INSTALL_DIR/Beaver.app/Contents/leftover-from-old-build"
+  mkdir -p "$BATS_TEST_TMPDIR/build/Beaver.app/Contents"
+  echo "fresh" > "$BATS_TEST_TMPDIR/build/Beaver.app/Contents/marker"
+  run install_app "$BATS_TEST_TMPDIR/build/Beaver.app"
+  [ "$status" -eq 0 ]
+  [ "$(< "$BEAVER_INSTALL_DIR/Beaver.app/Contents/marker")" = "fresh" ]
+  [ ! -e "$BEAVER_INSTALL_DIR/Beaver.app/Contents/leftover-from-old-build" ]
+}
