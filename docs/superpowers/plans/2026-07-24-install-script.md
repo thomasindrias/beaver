@@ -17,6 +17,7 @@
 - `set -euo pipefail` at the top of `install.sh`, matching `scripts/release-macos.sh`'s existing style.
 - **Version checks are presence-only** (`command -v`). A present-but-broken toolchain is deliberately not distinguished from a missing one: `pnpm tauri build` will fail with a far better diagnostic than this script could produce. This resolves the spec's open question.
 - **No em-dashes in user-facing copy** added to `README.md` and `docs/ROADMAP.md` (project copy-style rule). Plan/spec prose is unaffected.
+- **Verify with unfiltered output.** Always run `bats install.bats 2>&1` and read all of it. Never pipe the suite through `grep`/`head` to summarize results: a real run of this plan did exactly that and hid both a PATH leak into bats' teardown and a harness bug that made every assertion vacuous. A passing `ok` line is not evidence on its own; the run must also be free of `BW01` warnings and `command not found` noise.
 - TDD throughout: write the failing test, run it and watch it fail, implement the minimum to pass, run again, commit. Where something is genuinely untestable at the unit level (`run_build`, which shells out to a multi-minute real build, and `main`, which orchestrates it), this plan says so explicitly rather than silently skipping it — those are covered by the manual smoke test in Task 5.
 
 ---
@@ -58,21 +59,30 @@ Create `install.bats`:
 
 setup() {
   source "${BATS_TEST_DIRNAME}/install.sh"
-  # install.sh sets `-euo pipefail` for its own execution. Decouple the test
-  # shell from those options so bats' internals aren't run under `set -u`;
-  # the real entrypoint (main, via the source guard) still runs under them.
-  set +eu
   STUB_BIN="$BATS_TEST_TMPDIR/bin"
   mkdir -p "$STUB_BIN"
+  ORIG_PATH="$PATH"
+}
+
+# only_stubs strips PATH down to the stub dir; bats runs its own per-test
+# cleanup (which shells out to `rm`) in this same process afterwards, so
+# PATH has to come back before that.
+teardown() {
+  PATH="$ORIG_PATH"
 }
 
 # Writes an executable stub named $1 into the stub bin dir. Remaining args
 # form the stub's body (default: succeed silently).
+#
+# The shebang must be an absolute interpreter path: only_stubs leaves no
+# `bash` on PATH, so a `#!/usr/bin/env bash` stub would die with
+# "env: bash: No such file or directory" and every stubbed command would
+# return 127 instead of running.
 stub() {
   local name="$1"
   shift
   local body="${*:-exit 0}"
-  printf '#!/usr/bin/env bash\n%s\n' "$body" > "$STUB_BIN/$name"
+  printf '#!/bin/bash\n%s\n' "$body" > "$STUB_BIN/$name"
   chmod +x "$STUB_BIN/$name"
 }
 
