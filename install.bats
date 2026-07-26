@@ -176,10 +176,12 @@ all_prereqs_present() {
 @test "find_built_app fails when the build directory holds no .app" {
   mkdir -p "$BATS_TEST_TMPDIR/bundle"
   run find_built_app "$BATS_TEST_TMPDIR/bundle"
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
 }
 
 @test "find_built_app fails when the build directory does not exist" {
   run find_built_app "$BATS_TEST_TMPDIR/never-built"
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
 }
