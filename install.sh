@@ -13,6 +13,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# `pnpm tauri build` is run with no --target, so cargo does NOT nest output
+# under a target-triple directory the way scripts/release-macos.sh's output is.
+BUNDLE_SUBPATH="src-tauri/target/release/bundle/macos"
+
 is_macos() {
   [[ "$(uname -s)" == "Darwin" ]]
 }
@@ -54,9 +58,36 @@ check_prereqs() {
   fi
 }
 
+run_build() {
+  echo "==> Installing frontend dependencies"
+  pnpm install
+  echo "==> Building Beaver (this takes a few minutes)"
+  pnpm tauri build
+}
+
+# Absolute `/usr/bin/find` so this keeps working under a restricted PATH,
+# mirroring scripts/release-macos.sh's own bundle lookup.
+find_built_app() {
+  local bundle_dir="$1"
+  local app
+  app="$(/usr/bin/find "$bundle_dir" -maxdepth 1 -name '*.app' 2>/dev/null | head -1)"
+  if [[ -z "$app" ]]; then
+    return 1
+  fi
+  printf '%s\n' "$app"
+}
+
 main() {
   cd "$ROOT"
   check_prereqs
+  run_build
+  local app
+  if ! app="$(find_built_app "$ROOT/$BUNDLE_SUBPATH")"; then
+    echo "error: the build finished but no .app was found under $BUNDLE_SUBPATH" >&2
+    echo "  This is a bug in install.sh, not a problem with your machine." >&2
+    return 1
+  fi
+  echo "==> Built $app"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

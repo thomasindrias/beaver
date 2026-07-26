@@ -165,3 +165,21 @@ all_prereqs_present() {
   [[ "$output" == *"nodejs.org"* ]]
   [[ "$output" == *"pnpm.io"* ]]
 }
+
+@test "find_built_app prints the .app bundle in the build directory" {
+  mkdir -p "$BATS_TEST_TMPDIR/bundle/Beaver.app/Contents"
+  run find_built_app "$BATS_TEST_TMPDIR/bundle"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$BATS_TEST_TMPDIR/bundle/Beaver.app" ]
+}
+
+@test "find_built_app fails when the build directory holds no .app" {
+  mkdir -p "$BATS_TEST_TMPDIR/bundle"
+  run find_built_app "$BATS_TEST_TMPDIR/bundle"
+  [ "$status" -ne 0 ]
+}
+
+@test "find_built_app fails when the build directory does not exist" {
+  run find_built_app "$BATS_TEST_TMPDIR/never-built"
+  [ "$status" -ne 0 ]
+}
