@@ -95,6 +95,25 @@ install_app() {
   printf '%s\n' "$dest"
 }
 
+# The bundle was just built from source on this machine, so clearing the
+# quarantine flag only spares the user Gatekeeper's right-click dance for a
+# binary their own toolchain produced. A failure here is cosmetic, so it
+# warns rather than aborting an otherwise complete install.
+clear_quarantine() {
+  local app="$1"
+  if ! xattr -cr "$app" 2>/dev/null; then
+    echo "note: could not clear the quarantine flag. The first launch may need right-click > Open." >&2
+  fi
+}
+
+print_success() {
+  local dest="$1"
+  echo
+  echo "==> Beaver is installed at $dest"
+  echo "    Launch it from Applications. Grant Screen Recording permission when asked."
+  echo "    On first launch Beaver downloads its vision model. Extraction runs offline after that."
+}
+
 main() {
   cd "$ROOT"
   check_prereqs
@@ -108,7 +127,8 @@ main() {
   quit_running_app
   local dest
   dest="$(install_app "$app")"
-  echo "==> Installed $dest"
+  clear_quarantine "$dest"
+  print_success "$dest"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

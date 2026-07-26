@@ -223,3 +223,27 @@ all_prereqs_present() {
   [ "$(< "$BEAVER_INSTALL_DIR/Beaver.app/Contents/marker")" = "fresh" ]
   [ ! -e "$BEAVER_INSTALL_DIR/Beaver.app/Contents/leftover-from-old-build" ]
 }
+
+@test "clear_quarantine clears the flag recursively on the installed bundle" {
+  stub xattr "printf '%s\n' \"\$*\" > '$BATS_TEST_TMPDIR/xattr-args'"
+  only_stubs
+  run clear_quarantine "/Applications/Beaver.app"
+  [ "$status" -eq 0 ]
+  [ "$(< "$BATS_TEST_TMPDIR/xattr-args")" = "-cr /Applications/Beaver.app" ]
+  [ -z "$output" ]
+}
+
+@test "clear_quarantine warns instead of failing when xattr errors" {
+  stub xattr 'exit 1'
+  only_stubs
+  run clear_quarantine "/Applications/Beaver.app"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"right-click"* ]]
+}
+
+@test "print_success names the install location and the permission prompt" {
+  run print_success "/Applications/Beaver.app"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"/Applications/Beaver.app"* ]]
+  [[ "$output" == *"Screen Recording"* ]]
+}
