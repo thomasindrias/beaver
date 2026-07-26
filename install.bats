@@ -9,8 +9,13 @@ setup() {
   # shell from those options so bats' internals aren't run under `set -u`;
   # the real entrypoint (main, via the source guard) still runs under them.
   set +eu
+  ORIG_PATH="$PATH"
   STUB_BIN="$BATS_TEST_TMPDIR/bin"
   mkdir -p "$STUB_BIN"
+}
+
+teardown() {
+  PATH="$ORIG_PATH"
 }
 
 # Writes an executable stub named $1 into the stub bin dir. Remaining args
