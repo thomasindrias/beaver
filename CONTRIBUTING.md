@@ -40,9 +40,12 @@ pnpm website:typecheck
 pnpm website:test
 pnpm build
 pnpm website:build
+bats install.bats
 cd src-tauri && cargo test
 cd resources && uv run --no-project --with fastapi --with uvicorn --with pydantic --with tqdm python test_mlx_server.py
 ```
+
+`bats install.bats` covers `install.sh`; install the runner with `brew install bats-core`.
 
 For release changes, also run:
 

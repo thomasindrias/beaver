@@ -37,6 +37,9 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
 
+      - name: Set up bats
+        run: brew install bats-core
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -68,3 +71,6 @@ jobs:
         run: |
           uv venv /tmp/beaver-lock-check --python 3.12
           uv pip install --python /tmp/beaver-lock-check/bin/python --dry-run -r requirements.lock
+
+      - name: Run install script tests
+        run: bats install.bats

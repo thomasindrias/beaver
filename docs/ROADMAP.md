@@ -183,8 +183,9 @@ Make the hero use case undeniable.
 - **Anchored HUD** (per the decided UX above) replacing/evolving the current
   cursor toast.
 - History search in the popover.
-- Distribution: demo GIF in README, Homebrew cask, signed/notarized default
-  builds, HN/Product Hunt launch with the table demo.
+- Distribution: demo GIF in README, `install.sh` for a build-from-source
+  install, signed/notarized default builds, HN/Product Hunt launch with the
+  table demo.
 
 ### Phase 2 — Settings & engines (v0.6 → v0.8)
 
