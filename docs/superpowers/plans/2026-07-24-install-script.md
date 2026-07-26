@@ -377,13 +377,20 @@ Append to `install.bats`:
 @test "find_built_app fails when the build directory holds no .app" {
   mkdir -p "$BATS_TEST_TMPDIR/bundle"
   run find_built_app "$BATS_TEST_TMPDIR/bundle"
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
 }
 
 @test "find_built_app fails when the build directory does not exist" {
   run find_built_app "$BATS_TEST_TMPDIR/never-built"
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
 }
+```
+
+Assert the exact failure code, not merely `-ne 0`: a bare `-ne 0` is satisfied by exit 127, so a test written that way passes even when the function does not exist yet, which makes its RED phase meaningless. `-z "$output"` pins that a failed lookup prints nothing, which matters because `main` captures this function's stdout.
+
+```bash
 ```
 
 - [ ] **Step 2: Run the tests to verify the new ones fail**
