@@ -48,6 +48,8 @@ all_prereqs_present() {
   stub rustc
   stub node
   stub pnpm
+  mkdir -p "$BATS_TEST_TMPDIR/Applications"
+  export BEAVER_INSTALL_DIR="$BATS_TEST_TMPDIR/Applications"
 }
 
 @test "is_macos is true when uname reports Darwin" {
@@ -122,11 +124,34 @@ all_prereqs_present() {
   [ "$status" -ne 0 ]
 }
 
+@test "has_writable_install_dir is true for an existing writable directory" {
+  mkdir -p "$BATS_TEST_TMPDIR/Applications"
+  export BEAVER_INSTALL_DIR="$BATS_TEST_TMPDIR/Applications"
+  run has_writable_install_dir
+  [ "$status" -eq 0 ]
+}
+
+@test "has_writable_install_dir is false for an existing non-writable directory" {
+  mkdir -p "$BATS_TEST_TMPDIR/Applications"
+  chmod 500 "$BATS_TEST_TMPDIR/Applications"
+  export BEAVER_INSTALL_DIR="$BATS_TEST_TMPDIR/Applications"
+  run has_writable_install_dir
+  chmod 700 "$BATS_TEST_TMPDIR/Applications"
+  [ "$status" -ne 0 ]
+}
+
+@test "has_writable_install_dir is true for a directory that does not exist yet" {
+  export BEAVER_INSTALL_DIR="$BATS_TEST_TMPDIR/Applications"
+  run has_writable_install_dir
+  [ "$status" -eq 0 ]
+}
+
 @test "check_prereqs succeeds when every prerequisite is present" {
   all_prereqs_present
   only_stubs
   run check_prereqs
   [ "$status" -eq 0 ]
+  [ -z "$output" ]
 }
 
 @test "check_prereqs rejects a non-macOS host before checking anything else" {
@@ -166,6 +191,17 @@ all_prereqs_present() {
   [[ "$output" == *"pnpm.io"* ]]
 }
 
+@test "check_prereqs rejects a non-writable install destination" {
+  all_prereqs_present
+  chmod 500 "$BEAVER_INSTALL_DIR"
+  only_stubs
+  run check_prereqs
+  PATH="$ORIG_PATH"
+  chmod 700 "$BEAVER_INSTALL_DIR"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"is not writable"* ]]
+}
+
 @test "find_built_app prints the .app bundle in the build directory" {
   mkdir -p "$BATS_TEST_TMPDIR/bundle/Beaver.app/Contents"
   run find_built_app "$BATS_TEST_TMPDIR/bundle"
@@ -199,6 +235,24 @@ all_prereqs_present() {
   only_stubs
   run quit_running_app
   [ "$status" -eq 0 ]
+}
+
+@test "quit_running_app reports when the app is still running after a refused quit" {
+  stub osascript 'exit 1'
+  stub pgrep 'exit 0'
+  only_stubs
+  run quit_running_app
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"still running"* ]]
+}
+
+@test "quit_running_app is silent when the app is no longer running" {
+  stub osascript 'exit 0'
+  stub pgrep 'exit 1'
+  only_stubs
+  run quit_running_app
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
 }
 
 @test "install_app copies the built bundle into the install directory" {

@@ -33,6 +33,14 @@ has_node_and_pnpm() {
   command -v node >/dev/null 2>&1 && command -v pnpm >/dev/null 2>&1
 }
 
+# /Applications exists on every Mac. A custom BEAVER_INSTALL_DIR may not exist
+# yet, in which case install_app's `mkdir -p` is what will create it, so a
+# missing directory is not a failure here.
+has_writable_install_dir() {
+  local dir="${BEAVER_INSTALL_DIR:-/Applications}"
+  [[ ! -e "$dir" ]] || [[ -w "$dir" ]]
+}
+
 check_prereqs() {
   if ! is_macos; then
     echo "error: Beaver only builds on macOS." >&2
@@ -47,13 +55,22 @@ check_prereqs() {
   if ! has_rust; then
     echo "error: Rust not found." >&2
     echo "  Install it from https://rustup.rs" >&2
+    echo "  If you just installed it, open a new terminal first." >&2
     echo "  Then re-run this script." >&2
     return 1
   fi
   if ! has_node_and_pnpm; then
     echo "error: Node.js and pnpm are required." >&2
     echo "  Install Node.js from https://nodejs.org and pnpm from https://pnpm.io" >&2
+    echo "  If you just installed it, open a new terminal first." >&2
     echo "  Then re-run this script." >&2
+    return 1
+  fi
+  if ! has_writable_install_dir; then
+    echo "error: ${BEAVER_INSTALL_DIR:-/Applications} is not writable." >&2
+    echo "  Install to your home folder instead:" >&2
+    echo "    BEAVER_INSTALL_DIR=\"\$HOME/Applications\" ./install.sh" >&2
+    echo "  Or re-run from an account with admin rights." >&2
     return 1
   fi
 }
@@ -78,9 +95,14 @@ find_built_app() {
 }
 
 quit_running_app() {
-  # Failure is the normal case on a first install (nothing to quit), so this
-  # never propagates an error.
+  # A failure here is the normal case on a first install (nothing to quit), so
+  # it never propagates. But a quit can also be refused (Automation permission
+  # not granted, or no GUI session over SSH), which is worth reporting: the
+  # bundle gets replaced under a live process and the old build keeps running.
   osascript -e 'quit app "Beaver"' >/dev/null 2>&1 || true
+  if pgrep -x Beaver >/dev/null 2>&1; then
+    echo "note: Beaver is still running. Quit it and relaunch from Applications to get the new build." >&2
+  fi
 }
 
 # Reads BEAVER_INSTALL_DIR at call time rather than caching it at source
