@@ -5,26 +5,30 @@
 
 setup() {
   source "${BATS_TEST_DIRNAME}/install.sh"
-  # install.sh sets `-euo pipefail` for its own execution. Decouple the test
-  # shell from those options so bats' internals aren't run under `set -u`;
-  # the real entrypoint (main, via the source guard) still runs under them.
-  set +eu
-  ORIG_PATH="$PATH"
   STUB_BIN="$BATS_TEST_TMPDIR/bin"
   mkdir -p "$STUB_BIN"
+  ORIG_PATH="$PATH"
 }
 
+# only_stubs strips PATH down to the stub dir; bats runs its own per-test
+# cleanup (which shells out to `rm`) in this same process afterwards, so
+# PATH has to come back before that.
 teardown() {
   PATH="$ORIG_PATH"
 }
 
 # Writes an executable stub named $1 into the stub bin dir. Remaining args
 # form the stub's body (default: succeed silently).
+#
+# The shebang must be an absolute interpreter path: only_stubs leaves no
+# `bash` on PATH, so a `#!/usr/bin/env bash` stub would die with
+# "env: bash: No such file or directory" and every stubbed command would
+# return 127 instead of running.
 stub() {
   local name="$1"
   shift
   local body="${*:-exit 0}"
-  printf '#!/usr/bin/env bash\n%s\n' "$body" > "$STUB_BIN/$name"
+  printf '#!/bin/bash\n%s\n' "$body" > "$STUB_BIN/$name"
   chmod +x "$STUB_BIN/$name"
 }
 
