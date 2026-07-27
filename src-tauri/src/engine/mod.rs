@@ -82,7 +82,7 @@ pub fn select(settings: &Settings, key: Option<String>, port: u16) -> Engine {
     Engine::Cloud(cloud::Config {
         base_url: base_url.to_string(),
         model: model.to_string(),
-        api_key: key,
+        api_key: key.trim().to_string(),
     })
 }
 
@@ -240,6 +240,17 @@ mod tests {
                 assert_eq!(cfg.base_url, "https://api.openai.com/v1");
                 assert_eq!(cfg.model, "gpt-4o-mini");
             }
+            Engine::Local { .. } => panic!("expected the cloud engine"),
+        }
+    }
+
+    #[test]
+    fn select_trims_whitespace_from_the_api_key() {
+        // A pasted key commonly carries a trailing newline. Left untrimmed it
+        // becomes an invalid Authorization header value, which surfaces as a
+        // misleading "Couldn't reach the provider" instead of a key problem.
+        match select(&cloud_settings(), Some("  sk-abc\n".to_string()), 11500) {
+            Engine::Cloud(cfg) => assert_eq!(cfg.api_key, "sk-abc"),
             Engine::Local { .. } => panic!("expected the cloud engine"),
         }
     }
