@@ -22,6 +22,7 @@ describe("SettingsPanel", () => {
     invokeMock.mockImplementation(async (cmd: string) => {
       if (cmd === "get_settings") return BASE_SETTINGS;
       if (cmd === "update_settings") return BASE_SETTINGS;
+      if (cmd === "has_cloud_api_key") return false;
       return undefined;
     });
   });
@@ -97,10 +98,99 @@ describe("SettingsPanel", () => {
     expect(screen.getByText("CmdOrCtrl+Shift+D")).toBeInTheDocument();
   });
 
-  it("the engine row is static and non-interactive", async () => {
+  const CLOUD_SETTINGS = {
+    ...BASE_SETTINGS,
+    engine: "cloud" as const,
+    cloud_base_url: "https://api.openai.com/v1",
+    cloud_model: "gpt-4o-mini",
+  };
+
+  it("offers both engines with local selected by default", async () => {
     render(<SettingsPanel />);
-    await screen.findByText("CmdOrCtrl+Shift+D");
-    expect(screen.getByRole("button", { name: /Local \(on-device\)/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Cloud \(coming soon\)/ })).toBeDisabled();
+    expect(
+      await screen.findByRole("button", { name: "🔒 Local (on-device)" })
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "☁️ Cloud" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+  });
+
+  it("hides the cloud fields while local is selected", async () => {
+    render(<SettingsPanel />);
+    await screen.findByRole("button", { name: "🔒 Local (on-device)" });
+    expect(screen.queryByLabelText("Base URL")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Model")).not.toBeInTheDocument();
+  });
+
+  it("reveals the cloud fields once cloud is selected", async () => {
+    render(<SettingsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "☁️ Cloud" }));
+    expect(await screen.findByLabelText("Base URL")).toBeInTheDocument();
+    expect(screen.getByLabelText("Model")).toBeInTheDocument();
+    expect(screen.getByLabelText("API key")).toBeInTheDocument();
+  });
+
+  it("a provider preset prefills the base URL and model", async () => {
+    render(<SettingsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "☁️ Cloud" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Anthropic" }));
+    expect(await screen.findByLabelText("Base URL")).toHaveValue(
+      "https://api.anthropic.com/v1"
+    );
+    expect(screen.getByLabelText("Model")).toHaveValue("claude-haiku-4-5-20251001");
+  });
+
+  it("saving a key calls set_cloud_api_key and never renders it back", async () => {
+    render(<SettingsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "☁️ Cloud" }));
+    const field = await screen.findByLabelText("API key");
+    fireEvent.change(field, { target: { value: "sk-secret-123" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save key" }));
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("set_cloud_api_key", {
+        key: "sk-secret-123",
+      })
+    );
+    expect(await screen.findByText("Key stored")).toBeInTheDocument();
+    expect(screen.getByLabelText("API key")).toHaveValue("");
+  });
+
+  it("the API key field masks its input", async () => {
+    render(<SettingsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "☁️ Cloud" }));
+    expect(await screen.findByLabelText("API key")).toHaveAttribute("type", "password");
+  });
+
+  it("surfaces a rejected cloud configuration and stays on local", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_settings") return BASE_SETTINGS;
+      if (cmd === "has_cloud_api_key") return false;
+      if (cmd === "update_settings") throw new Error("Cloud engine needs an API key. Save one first.");
+      return undefined;
+    });
+    render(<SettingsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "☁️ Cloud" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use cloud engine" }));
+    expect(
+      await screen.findByText(/Cloud engine needs an API key/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "🔒 Local (on-device)" })
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("removing a stored key calls delete_cloud_api_key", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_settings") return CLOUD_SETTINGS;
+      if (cmd === "has_cloud_api_key") return true;
+      if (cmd === "update_settings") return CLOUD_SETTINGS;
+      return undefined;
+    });
+    render(<SettingsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remove key" }));
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("delete_cloud_api_key")
+    );
   });
 });
