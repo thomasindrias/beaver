@@ -1018,9 +1018,35 @@ pub fn has_cloud_api_key() -> bool {
     keychain::api_key().ok().flatten().is_some()
 }
 
+/// Removing the key makes a stored `engine: Cloud` unrunnable, so the engine is
+/// reset to Local. Pure so the rule is unit-testable; returns `None` when
+/// nothing needs saving.
+fn settings_after_key_removal(current: &settings::Settings) -> Option<settings::Settings> {
+    if current.engine != engine::EngineKind::Cloud {
+        return None;
+    }
+    Some(settings::Settings {
+        engine: engine::EngineKind::Local,
+        ..current.clone()
+    })
+}
+
+/// Deletes the stored key. Also resets a stored `engine: Cloud` back to Local,
+/// because a cloud engine with no key cannot run and `settings.json` must not
+/// claim an engine it cannot honor. Returns the settings as they now stand, so
+/// the caller re-renders from the response rather than guessing. Doing this in
+/// the backend rather than the UI keeps the invariant true for every caller.
 #[tauri::command]
-pub fn delete_cloud_api_key() -> Result<(), String> {
-    keychain::delete_api_key()
+pub fn delete_cloud_api_key(app: tauri::AppHandle) -> Result<settings::Settings, String> {
+    keychain::delete_api_key()?;
+    let current = settings::load(&app);
+    match settings_after_key_removal(&current) {
+        Some(next) => {
+            settings::save(&app, &next).map_err(|e| e.to_string())?;
+            Ok(next)
+        }
+        None => Ok(current),
+    }
 }
 
 /// Refuse to persist a cloud engine that could not actually run. Pure so the
@@ -1246,7 +1272,9 @@ export const setCloudApiKey = (key: string) =>
 /** Whether a key is stored. The key itself never crosses the IPC boundary. */
 export const hasCloudApiKey = () => invoke<boolean>("has_cloud_api_key");
 
-export const deleteCloudApiKey = () => invoke<void>("delete_cloud_api_key");
+/** Deletes the stored key. Also resets a stored cloud engine back to local,
+ *  since a cloud engine with no key cannot run. Resolves to the updated settings. */
+export const deleteCloudApiKey = () => invoke<Settings>("delete_cloud_api_key");
 ```
 
 In `src/hooks/useBeaver.ts`, adapt the two call sites to the new shape. Line 92 becomes:
@@ -1722,9 +1750,14 @@ Add `const [cloudOpen, setCloudOpen] = useState(false);` next to the other state
     }
   }, [keyDraft]);
 
+  // `deleteCloudApiKey` also resets a stored cloud engine back to local in the
+  // backend, since a cloud engine with no key cannot run. Re-render from its
+  // response rather than assuming settings are unchanged, or the picker would
+  // keep showing Cloud selected after the key that made it valid is gone.
   const removeKey = useCallback(async () => {
     try {
-      await deleteCloudApiKey();
+      const updated = await deleteCloudApiKey();
+      setSettings(updated);
       setHasKey(false);
     } catch (e) {
       setShortcutError(e instanceof Error ? e.message : String(e));
