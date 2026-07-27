@@ -1821,7 +1821,18 @@ Add `const [cloudOpen, setCloudOpen] = useState(false);` next to the other state
   }, [settings, draft, apply]);
 ```
 
-Rename the `shortcutError` state to `error` throughout the file, since it now carries cloud validation failures too, and render it once beneath the engine block rather than only inside the shortcut row. Keep the shortcut row's existing inline rendering behavior by reading the same `error` value.
+**Keep two independent error states, one per surface** — do not merge them into a single shared `error`:
+
+```tsx
+  const [shortcutError, setShortcutError] = useState<string | null>(null);
+  const [cloudError, setCloudError] = useState<string | null>(null);
+```
+
+`apply()` throws rather than self-catching, and each caller routes its own failure: the shortcut-recording effect writes `setShortcutError`, while `saveKey`, `removeKey`, and `enableCloud` write `setCloudError`. The shortcut row renders `shortcutError` unconditionally, exactly as it does today; the cloud panel renders `cloudError`.
+
+A single shared `error` was tried first and is wrong. Two unrelated producers write it, so it can only be rendered by guessing *where the user is looking* rather than *what failed* — and a shortcut conflict then renders inside the cloud configuration block while the shortcut row shows nothing. Routing by provenance removes the guess entirely.
+
+Also make the Local button close the cloud panel (`setCloudOpen(false)`) alongside switching the engine. Otherwise `cloudOpen` is one-way — nothing ever sets it false — so the panel stays mounted for the rest of the session after a single curious click, which is what made the misrouting above the common case rather than an edge case.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
