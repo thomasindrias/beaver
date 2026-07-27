@@ -7,6 +7,7 @@ mod capture;
 mod commands;
 mod db;
 mod engine;
+mod keychain;
 mod permission;
 mod prompts;
 mod server;
@@ -156,6 +157,9 @@ pub fn run() {
             commands::open_external,
             commands::get_settings,
             commands::update_settings,
+            commands::save_cloud_config,
+            commands::has_cloud_api_key,
+            commands::delete_cloud_api_key,
             commands::open_settings
         ])
         .build(tauri::generate_context!())

@@ -11,8 +11,10 @@ const noop = () => {};
 const baseProps = {
   state: "success" as const,
   errorKind: "generic" as const,
+  errorMessage: null as string | null,
   contentType: "table" as const,
   format: "markdown" as const,
+  engine: "local" as const,
   anchor: { x: 20, y: 200 },
   onFormatChange: noop,
   onCustomSubmit: noop,
@@ -94,6 +96,41 @@ describe("CaptureHud rendering", () => {
     vi.useRealTimers();
   });
 
+  it("shows the cloud error message in place of the generic copy when one is present", () => {
+    render(
+      <CaptureHud
+        {...baseProps}
+        state="error"
+        errorKind="cloud"
+        errorMessage="Provider rejected the API key"
+      />
+    );
+    expect(screen.getByText("Provider rejected the API key")).toBeInTheDocument();
+    expect(screen.queryByText("Dam — couldn't read that")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the generic copy for a cloud error with no message", () => {
+    render(
+      <CaptureHud {...baseProps} state="error" errorKind="cloud" errorMessage={null} />
+    );
+    expect(screen.getByText("Dam — couldn't read that")).toBeInTheDocument();
+  });
+
+  it("cloud errors offer a retry action, same as generic errors", () => {
+    const onRetry = vi.fn();
+    render(
+      <CaptureHud
+        {...baseProps}
+        state="error"
+        errorKind="cloud"
+        errorMessage="Provider rejected the API key"
+        onRetry={onRetry}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
   it("permission errors offer to open System Settings", () => {
     const onOpenSettings = vi.fn();
     render(
@@ -107,6 +144,32 @@ describe("CaptureHud rendering", () => {
     expect(screen.getByText("Needs Screen Recording access")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
     expect(onOpenSettings).toHaveBeenCalled();
+  });
+
+  it("shows the on-device indicator in the expanded state", () => {
+    render(<CaptureHud {...baseProps} engine="local" />);
+    fireEvent.mouseEnter(screen.getByTestId("hud"));
+    expect(screen.getByTestId("engine-indicator")).toHaveAccessibleName(
+      "On-device engine"
+    );
+  });
+
+  it("shows the cloud indicator in the expanded state", () => {
+    render(<CaptureHud {...baseProps} engine="cloud" />);
+    fireEvent.mouseEnter(screen.getByTestId("hud"));
+    expect(screen.getByTestId("engine-indicator")).toHaveAccessibleName("Cloud engine");
+  });
+
+  it("keeps the indicator out of the collapsed pill", () => {
+    render(<CaptureHud {...baseProps} engine="cloud" />);
+    expect(screen.getByText("Copied as table")).toBeInTheDocument();
+    expect(screen.queryByTestId("engine-indicator")).not.toBeInTheDocument();
+  });
+
+  it("omits the indicator when no engine is known", () => {
+    render(<CaptureHud {...baseProps} engine={null} />);
+    fireEvent.mouseEnter(screen.getByTestId("hud"));
+    expect(screen.queryByTestId("engine-indicator")).not.toBeInTheDocument();
   });
 });
 

@@ -65,6 +65,9 @@ describe("api", () => {
       shortcut: "CmdOrCtrl+Shift+D",
       history_retention_days: null,
       update_check_enabled: true,
+      engine: "local" as const,
+      cloud_base_url: "",
+      cloud_model: "",
     };
     invokeMock.mockResolvedValue(settings);
     const result = await api.getSettings();
@@ -78,10 +81,79 @@ describe("api", () => {
       shortcut: "CmdOrCtrl+Shift+X",
       history_retention_days: 30,
       update_check_enabled: false,
+      engine: "cloud" as const,
+      cloud_base_url: "https://api.openai.com/v1",
+      cloud_model: "gpt-4o-mini",
     };
     invokeMock.mockResolvedValue(next);
     await api.updateSettings(next);
     expect(invokeMock).toHaveBeenCalledWith("update_settings", { next });
+  });
+
+  it("captureAndExtract resolves to the text and the engine that ran", async () => {
+    invokeMock.mockResolvedValue({ text: "| a | b |", engine: "cloud" });
+    const result = await api.captureAndExtract(
+      { x: 0, y: 0, width: 10, height: 10 },
+      "markdown"
+    );
+    expect(result).toEqual({ text: "| a | b |", engine: "cloud" });
+  });
+
+  it("saveCloudConfig sends the settings and the key together and resolves to the saved settings", async () => {
+    const next = {
+      default_format: "markdown" as const,
+      shortcut: "CmdOrCtrl+Shift+D",
+      history_retention_days: null,
+      update_check_enabled: true,
+      engine: "cloud" as const,
+      cloud_base_url: "https://api.anthropic.com/v1",
+      cloud_model: "claude-haiku-4-5-20251001",
+    };
+    invokeMock.mockResolvedValue(next);
+    await expect(api.saveCloudConfig(next, "sk-abc")).resolves.toEqual(next);
+    expect(invokeMock).toHaveBeenCalledWith("save_cloud_config", {
+      next,
+      apiKey: "sk-abc",
+    });
+  });
+
+  it("saveCloudConfig sends a null key when the config is saved without one", async () => {
+    const next = {
+      default_format: "markdown" as const,
+      shortcut: "CmdOrCtrl+Shift+D",
+      history_retention_days: null,
+      update_check_enabled: true,
+      engine: "cloud" as const,
+      cloud_base_url: "https://api.anthropic.com/v1",
+      cloud_model: "claude-haiku-4-5-20251001",
+    };
+    invokeMock.mockResolvedValue(next);
+    await api.saveCloudConfig(next, null);
+    expect(invokeMock).toHaveBeenCalledWith("save_cloud_config", {
+      next,
+      apiKey: null,
+    });
+  });
+
+  it("deleteCloudApiKey takes no payload and resolves to the updated settings", async () => {
+    const updated = {
+      default_format: "markdown" as const,
+      shortcut: "CmdOrCtrl+Shift+D",
+      history_retention_days: null,
+      update_check_enabled: true,
+      engine: "local" as const,
+      cloud_base_url: "https://api.openai.com/v1",
+      cloud_model: "gpt-4o-mini",
+    };
+    invokeMock.mockResolvedValue(updated);
+    await expect(api.deleteCloudApiKey()).resolves.toEqual(updated);
+    expect(invokeMock).toHaveBeenCalledWith("delete_cloud_api_key");
+  });
+
+  it("hasCloudApiKey returns whether a key is stored, never the key", async () => {
+    invokeMock.mockResolvedValue(true);
+    await expect(api.hasCloudApiKey()).resolves.toBe(true);
+    expect(invokeMock).toHaveBeenCalledWith("has_cloud_api_key");
   });
 
   it.each([

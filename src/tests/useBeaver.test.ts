@@ -8,9 +8,14 @@ import { useBeaver, SUCCESS_DWELL_MS, ERROR_DWELL_MS } from "../hooks/useBeaver"
 
 const region = { x: 0, y: 0, width: 10, height: 10 };
 
+// capture_and_extract / re_extract resolve to an ExtractionResult, not a bare
+// string. The engine defaults to local since these tests are about the capture
+// lifecycle, not engine selection.
+const extraction = (text: string, engine: "local" | "cloud" = "local") => ({ text, engine });
+
 describe("useBeaver", () => {
   beforeEach(() => {
-    invokeMock.mockReset().mockResolvedValue("## Extracted content");
+    invokeMock.mockReset().mockResolvedValue(extraction("## Extracted content"));
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -38,7 +43,7 @@ describe("useBeaver", () => {
   });
 
   it("detects the content type for the copied pill label", async () => {
-    invokeMock.mockResolvedValue("| a | b |\n|---|---|\n| 1 | 2 |");
+    invokeMock.mockResolvedValue(extraction("| a | b |\n|---|---|\n| 1 | 2 |"));
     const { result } = renderHook(() => useBeaver());
     await act(async () => {
       await result.current.runCapture(region);
@@ -80,7 +85,7 @@ describe("useBeaver", () => {
     await act(async () => {
       await result.current.runCapture(region);
     });
-    invokeMock.mockClear().mockResolvedValue("a,b\n1,2");
+    invokeMock.mockClear().mockResolvedValue(extraction("a,b\n1,2"));
     await act(async () => {
       await result.current.reExtract("csv");
     });
@@ -137,6 +142,51 @@ describe("useBeaver", () => {
     expect(result.current.errorKind).toBe("generic");
   });
 
+  it("never surfaces the internal local-engine diagnostic as a message", async () => {
+    invokeMock.mockRejectedValue("MLX request failed: boom");
+    const { result } = renderHook(() => useBeaver());
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    expect(result.current.errorMessage).toBeNull();
+  });
+
+  it("flags cloud errors and strips the sentinel prefix into a user-facing message", async () => {
+    invokeMock.mockRejectedValue("cloud-error:Provider rejected the API key");
+    const { result } = renderHook(() => useBeaver());
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    expect(result.current.state).toBe("error");
+    expect(result.current.errorKind).toBe("cloud");
+    expect(result.current.errorMessage).toBe("Provider rejected the API key");
+  });
+
+  it("does not treat a sentinel merely embedded mid-string as a cloud error", async () => {
+    // The Rust contract emits the sentinel only at position 0 (cloud.rs uses
+    // strip_prefix). A local-engine diagnostic that happens to contain the
+    // same substring further in must stay generic and hidden — that's the
+    // internal-diagnostic leak the sentinel exists to prevent.
+    invokeMock.mockRejectedValue("MLX request failed: cloud-error:leaked internal detail");
+    const { result } = renderHook(() => useBeaver());
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    expect(result.current.state).toBe("error");
+    expect(result.current.errorKind).toBe("generic");
+    expect(result.current.errorMessage).toBeNull();
+  });
+
+  it("keeps errorMessage null for permission errors", async () => {
+    invokeMock.mockRejectedValue("screen-permission-missing");
+    const { result } = renderHook(() => useBeaver());
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    expect(result.current.errorKind).toBe("permission");
+    expect(result.current.errorMessage).toBeNull();
+  });
+
   it("errors auto-dismiss after the error dwell when not engaged", async () => {
     vi.useFakeTimers();
     invokeMock.mockRejectedValue("MLX request failed: boom");
@@ -158,7 +208,7 @@ describe("useBeaver", () => {
       await result.current.runCapture(region);
     });
     expect(result.current.state).toBe("error");
-    invokeMock.mockResolvedValue("recovered");
+    invokeMock.mockResolvedValue(extraction("recovered"));
     await act(async () => {
       await result.current.retry();
     });
@@ -191,7 +241,7 @@ describe("useBeaver", () => {
     act(() => {
       first = result.current.reExtract("csv");
     });
-    invokeMock.mockResolvedValue("second result");
+    invokeMock.mockResolvedValue(extraction("second result"));
     await act(async () => {
       await result.current.reExtract("json");
     });
@@ -210,7 +260,7 @@ describe("useBeaver", () => {
     await act(async () => {
       await result.current.runCapture(region);
     });
-    let resolveLate: (v: string) => void;
+    let resolveLate: (v: { text: string; engine: string }) => void;
     invokeMock.mockImplementationOnce(
       () => new Promise(resolve => { resolveLate = resolve; })
     );
@@ -223,10 +273,50 @@ describe("useBeaver", () => {
     });
     invokeMock.mockClear();
     await act(async () => {
-      resolveLate!("late content");
+      resolveLate!(extraction("late content"));
       await pending!;
     });
     expect(invokeMock).not.toHaveBeenCalledWith("write_to_clipboard", { text: "late content" });
     expect(result.current.state).toBe("idle");
+  });
+
+  it("exposes the engine reported by the capture", async () => {
+    invokeMock.mockResolvedValue(extraction("hello", "cloud"));
+    const { result } = renderHook(() => useBeaver());
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    expect(result.current.engine).toBe("cloud");
+  });
+
+  it("starts with no known engine before any capture", () => {
+    const { result } = renderHook(() => useBeaver());
+    expect(result.current.engine).toBeNull();
+  });
+
+  it("ignores the engine from a superseded capture", async () => {
+    // A slow cloud capture outlived by a fast local one must not repaint the
+    // indicator for the local result the user is already looking at.
+    const { result } = renderHook(() => useBeaver());
+    let resolveSlow: (v: { text: string; engine: string }) => void;
+    invokeMock.mockImplementationOnce(
+      () => new Promise(resolve => { resolveSlow = resolve; })
+    );
+    let slow: Promise<void>;
+    act(() => {
+      slow = result.current.runCapture(region);
+    });
+
+    invokeMock.mockResolvedValue(extraction("local result", "local"));
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    expect(result.current.engine).toBe("local");
+
+    await act(async () => {
+      resolveSlow!({ text: "cloud result", engine: "cloud" });
+      await slow!.catch(() => {});
+    });
+    expect(result.current.engine).toBe("local");
   });
 });

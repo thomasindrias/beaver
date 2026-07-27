@@ -6,11 +6,22 @@ import type { ExtractFormat } from "../types";
 // and payload shapes live in exactly one place on each side of the IPC
 // boundary.
 
+export type EngineKind = "local" | "cloud";
+
 export interface Settings {
   default_format: ExtractFormat;
   shortcut: string;
   history_retention_days: number | null;
   update_check_enabled: boolean;
+  engine: EngineKind;
+  cloud_base_url: string;
+  cloud_model: string;
+}
+
+/** An extraction plus the engine that actually produced it. */
+export interface ExtractionResult {
+  text: string;
+  engine: EngineKind;
 }
 
 export interface CaptureRegion {
@@ -41,13 +52,13 @@ export interface UpdateInfo {
   url: string;
 }
 
-/** Capture a screen region and extract it; resolves to the extracted text. */
+/** Capture a screen region and extract it. */
 export const captureAndExtract = (region: CaptureRegion, format: ExtractFormat) =>
-  invoke<string>("capture_and_extract", { region, format });
+  invoke<ExtractionResult>("capture_and_extract", { region, format });
 
 /** Re-run extraction on the last capture with a new format and optional hint. */
 export const reExtract = (format: ExtractFormat, hint?: string) =>
-  invoke<string>("re_extract", { format, hint: hint ?? null });
+  invoke<ExtractionResult>("re_extract", { format, hint: hint ?? null });
 
 export const engineStatus = () => invoke<EngineStatusReport>("engine_status");
 
@@ -80,3 +91,16 @@ export const updateSettings = (next: Settings) =>
   invoke<Settings>("update_settings", { next });
 
 export const openSettings = () => invoke<void>("open_settings");
+
+/** Saves the cloud configuration and, optionally, a new API key as one
+ *  action, so a provider's URL and its key can never be left paired with
+ *  each other's predecessor. Resolves to the saved settings. */
+export const saveCloudConfig = (next: Settings, apiKey: string | null) =>
+  invoke<Settings>("save_cloud_config", { next, apiKey });
+
+/** Whether a key is stored. The key itself never crosses the IPC boundary. */
+export const hasCloudApiKey = () => invoke<boolean>("has_cloud_api_key");
+
+/** Deletes the stored key. Also resets a stored cloud engine back to local,
+ *  since a cloud engine with no key cannot run. Resolves to the updated settings. */
+export const deleteCloudApiKey = () => invoke<Settings>("delete_cloud_api_key");

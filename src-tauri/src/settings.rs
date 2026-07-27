@@ -16,6 +16,11 @@ pub struct Settings {
     pub shortcut: String,
     pub history_retention_days: Option<u32>,
     pub update_check_enabled: bool,
+    pub engine: crate::engine::EngineKind,
+    /// Base URL of an OpenAI-compatible endpoint, e.g. `https://api.openai.com/v1`.
+    /// Empty until the user configures cloud.
+    pub cloud_base_url: String,
+    pub cloud_model: String,
 }
 
 impl Default for Settings {
@@ -25,6 +30,12 @@ impl Default for Settings {
             shortcut: crate::shortcut::CAPTURE_SHORTCUT.to_string(),
             history_retention_days: None,
             update_check_enabled: true,
+            // Local is the default and the identity. Note this also means a
+            // corrupt settings.json — which falls back to Default — can never
+            // silently route captures to a cloud provider.
+            engine: crate::engine::EngineKind::Local,
+            cloud_base_url: String::new(),
+            cloud_model: String::new(),
         }
     }
 }
@@ -99,6 +110,7 @@ mod tests {
             shortcut: "CmdOrCtrl+Shift+X".to_string(),
             history_retention_days: Some(30),
             update_check_enabled: false,
+            ..Settings::default()
         };
         save_to(&path, &settings).unwrap();
         assert_eq!(load_from(&path), settings);
@@ -120,5 +132,30 @@ mod tests {
     #[test]
     fn default_settings_use_the_hardcoded_capture_shortcut() {
         assert_eq!(Settings::default().shortcut, crate::shortcut::CAPTURE_SHORTCUT);
+    }
+
+    #[test]
+    fn load_from_defaults_engine_to_local_for_a_pre_cloud_settings_file() {
+        let path = scratch_path("pre-cloud");
+        std::fs::write(&path, br#"{"shortcut":"CmdOrCtrl+Shift+Z"}"#).unwrap();
+        let settings = load_from(&path);
+        assert_eq!(settings.engine, crate::engine::EngineKind::Local);
+        assert_eq!(settings.cloud_base_url, "");
+        assert_eq!(settings.cloud_model, "");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn save_then_load_round_trips_the_cloud_fields() {
+        let path = scratch_path("cloud-roundtrip");
+        let settings = Settings {
+            engine: crate::engine::EngineKind::Cloud,
+            cloud_base_url: "https://api.anthropic.com/v1".to_string(),
+            cloud_model: "claude-haiku-4-5-20251001".to_string(),
+            ..Settings::default()
+        };
+        save_to(&path, &settings).unwrap();
+        assert_eq!(load_from(&path), settings);
+        let _ = std::fs::remove_file(&path);
     }
 }
