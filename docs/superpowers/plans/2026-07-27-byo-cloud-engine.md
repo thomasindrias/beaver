@@ -1372,6 +1372,32 @@ Append to `src/tests/useBeaver.test.ts`, inside its existing `describe("useBeave
     const { result } = renderHook(() => useBeaver());
     expect(result.current.engine).toBeNull();
   });
+
+  it("ignores the engine from a superseded capture", async () => {
+    // A slow cloud capture outlived by a fast local one must not repaint the
+    // indicator for the local result the user is already looking at.
+    const { result } = renderHook(() => useBeaver());
+    let resolveSlow: (v: { text: string; engine: string }) => void;
+    invokeMock.mockImplementationOnce(
+      () => new Promise(resolve => { resolveSlow = resolve; })
+    );
+    let slow: Promise<void>;
+    act(() => {
+      slow = result.current.runCapture(region);
+    });
+
+    invokeMock.mockResolvedValue(extraction("local result", "local"));
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    expect(result.current.engine).toBe("local");
+
+    await act(async () => {
+      resolveSlow!({ text: "cloud result", engine: "cloud" });
+      await slow!.catch(() => {});
+    });
+    expect(result.current.engine).toBe("local");
+  });
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -1390,21 +1416,38 @@ Extend the type import on line 3 and add to the api import on line 2 (`type Engi
   const [engine, setEngine] = useState<EngineKind | null>(null);
 ```
 
+Commit the engine inside `finish`, behind the generation guard that already
+lives there, rather than at the call sites. `useBeaver` bumps `genRef` on every
+new request so a superseded response cannot write the clipboard or revive
+state, and the engine has to obey the same rule: a slow cloud capture outlived
+by a fast local one would otherwise repaint the indicator for content the user
+is already looking at, claiming ☁️ over a result that ran 🔒. Change `finish`'s
+signature and set the engine right after its first guard:
+
+```ts
+  const finish = useCallback(async (markdown: string, resultEngine: EngineKind, gen: number) => {
+    if (gen !== genRef.current) return;
+    // Committed behind the generation guard along with every other result of
+    // this capture: a superseded response must not repaint the indicator for
+    // content the user is already looking at.
+    setEngine(resultEngine);
+    const ct = detectContentType(markdown);
+    // ... rest of finish unchanged
+```
+
 In `runCapture`, after awaiting the result:
 
 ```ts
       const result = await captureAndExtract(region, "markdown");
       setFormat("markdown");
-      setEngine(result.engine);
-      await finish(result.text, gen);
+      await finish(result.text, result.engine, gen);
 ```
 
 In `reExtract`:
 
 ```ts
       const result = await reExtractCommand(next, hint);
-      setEngine(result.engine);
-      await finish(result.text, gen);
+      await finish(result.text, result.engine, gen);
 ```
 
 And extend the return on line 117:
