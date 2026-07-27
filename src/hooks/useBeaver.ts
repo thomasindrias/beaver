@@ -89,12 +89,11 @@ export function useBeaver(
   const fail = useCallback((e: unknown, gen: number) => {
     if (gen !== genRef.current) return;
     const str = String(e);
-    const prefixIndex = str.indexOf(CLOUD_ERROR_PREFIX);
     let kind: CaptureErrorKind;
     let message: string | null = null;
-    if (prefixIndex !== -1) {
+    if (str.startsWith(CLOUD_ERROR_PREFIX)) {
       kind = "cloud";
-      message = str.slice(prefixIndex + CLOUD_ERROR_PREFIX.length);
+      message = str.slice(CLOUD_ERROR_PREFIX.length);
     } else if (str.includes("screen-permission-missing")) {
       kind = "permission";
     } else {

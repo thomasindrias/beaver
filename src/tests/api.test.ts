@@ -99,9 +99,40 @@ describe("api", () => {
     expect(result).toEqual({ text: "| a | b |", engine: "cloud" });
   });
 
-  it("setCloudApiKey sends the key", async () => {
-    await api.setCloudApiKey("sk-abc");
-    expect(invokeMock).toHaveBeenCalledWith("set_cloud_api_key", { key: "sk-abc" });
+  it("saveCloudConfig sends the settings and the key together and resolves to the saved settings", async () => {
+    const next = {
+      default_format: "markdown" as const,
+      shortcut: "CmdOrCtrl+Shift+D",
+      history_retention_days: null,
+      update_check_enabled: true,
+      engine: "cloud" as const,
+      cloud_base_url: "https://api.anthropic.com/v1",
+      cloud_model: "claude-haiku-4-5-20251001",
+    };
+    invokeMock.mockResolvedValue(next);
+    await expect(api.saveCloudConfig(next, "sk-abc")).resolves.toEqual(next);
+    expect(invokeMock).toHaveBeenCalledWith("save_cloud_config", {
+      next,
+      apiKey: "sk-abc",
+    });
+  });
+
+  it("saveCloudConfig sends a null key when the config is saved without one", async () => {
+    const next = {
+      default_format: "markdown" as const,
+      shortcut: "CmdOrCtrl+Shift+D",
+      history_retention_days: null,
+      update_check_enabled: true,
+      engine: "cloud" as const,
+      cloud_base_url: "https://api.anthropic.com/v1",
+      cloud_model: "claude-haiku-4-5-20251001",
+    };
+    invokeMock.mockResolvedValue(next);
+    await api.saveCloudConfig(next, null);
+    expect(invokeMock).toHaveBeenCalledWith("save_cloud_config", {
+      next,
+      apiKey: null,
+    });
   });
 
   it("deleteCloudApiKey takes no payload and resolves to the updated settings", async () => {

@@ -235,7 +235,7 @@ export function CaptureHud({
           ) : (
             <TriangleAlert className="size-4 text-red-300" />
           )}
-          <span className="whitespace-nowrap">
+          <span className="max-w-[260px]">
             {errorKind === "permission"
               ? "Needs Screen Recording access"
               : errorKind === "cloud" && errorMessage

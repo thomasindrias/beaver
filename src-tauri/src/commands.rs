@@ -260,11 +260,6 @@ pub fn get_settings(app: tauri::AppHandle) -> settings::Settings {
     settings::load(&app)
 }
 
-#[tauri::command]
-pub fn set_cloud_api_key(key: String) -> Result<(), String> {
-    keychain::set_api_key(&key)
-}
-
 /// Whether a key is stored. Deliberately a boolean: the key itself is never
 /// returned across the IPC boundary.
 #[tauri::command]
@@ -317,6 +312,49 @@ pub fn validate_cloud_settings(next: &settings::Settings, has_key: bool) -> Resu
         return Err("Cloud engine needs an API key. Save one first.".to_string());
     }
     Ok(())
+}
+
+/// Whether a save has enough to run cloud: a key supplied in this very call
+/// counts, even before it has reached the Keychain, so first-time cloud setup
+/// (settings and key committed together) is not rejected for "no key" merely
+/// because the key isn't in the Keychain yet — this call is about to put it
+/// there. Pure so the rule is unit-testable.
+fn has_key_for_save(supplied: Option<&str>, already_stored: bool) -> bool {
+    supplied.is_some_and(|k| !k.trim().is_empty()) || already_stored
+}
+
+/// Saves the cloud configuration, optionally along with a new API key, as one
+/// action.
+///
+/// The key and the endpoint it authenticates to are one logical identity.
+/// Committing them separately lets a provider switch leave a key paired with
+/// the previous provider's URL, which sends the user's credential to a
+/// company that does not own it.
+///
+/// Settings are written first and rolled back if the key write then fails, so
+/// every failure path leaves the previous pairing intact. The reverse order
+/// could not recover: the old key is never read back, so it cannot be
+/// restored.
+#[tauri::command]
+pub fn save_cloud_config(
+    app: tauri::AppHandle,
+    next: settings::Settings,
+    api_key: Option<String>,
+) -> Result<settings::Settings, String> {
+    validate_cloud_settings(&next, has_key_for_save(api_key.as_deref(), has_cloud_api_key()))?;
+
+    let current = settings::load(&app);
+    settings::save(&app, &next).map_err(|e| e.to_string())?;
+
+    if let Some(key) = api_key.filter(|k| !k.trim().is_empty()) {
+        if let Err(e) = keychain::set_api_key(&key) {
+            if let Err(rollback) = settings::save(&app, &current) {
+                log::error!("failed to roll back settings after a key write failure: {rollback}");
+            }
+            return Err(e);
+        }
+    }
+    Ok(next)
 }
 
 // Saves before touching the live shortcut registration, and rolls the save
@@ -424,5 +462,30 @@ mod tests {
     fn removing_the_key_needs_no_save_when_the_engine_is_already_local() {
         let s = Settings { engine: EngineKind::Local, ..Settings::default() };
         assert!(settings_after_key_removal(&s).is_none());
+    }
+
+    // `has_key_for_save` backs `save_cloud_config`'s validation: a key
+    // supplied in the same call must count even before it reaches the
+    // Keychain, or first-time cloud setup (settings and key committed
+    // together) would be rejected for "no key" when the key is sitting
+    // right there in the request.
+    #[test]
+    fn has_key_for_save_counts_a_key_supplied_in_this_call() {
+        assert!(has_key_for_save(Some("sk-abc"), false));
+    }
+
+    #[test]
+    fn has_key_for_save_counts_an_already_stored_key_when_none_is_supplied() {
+        assert!(has_key_for_save(None, true));
+    }
+
+    #[test]
+    fn has_key_for_save_rejects_a_blank_supplied_key_with_none_already_stored() {
+        assert!(!has_key_for_save(Some("   "), false));
+    }
+
+    #[test]
+    fn has_key_for_save_rejects_when_neither_supplied_nor_stored() {
+        assert!(!has_key_for_save(None, false));
     }
 }

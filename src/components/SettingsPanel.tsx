@@ -5,7 +5,7 @@ import {
   deleteCloudApiKey,
   getSettings,
   hasCloudApiKey,
-  setCloudApiKey,
+  saveCloudConfig,
   updateSettings,
   type Settings,
 } from "../lib/api";
@@ -76,18 +76,6 @@ export function SettingsPanel() {
     }
   }, []);
 
-  const saveKey = useCallback(async () => {
-    if (!keyDraft.trim()) return;
-    try {
-      await setCloudApiKey(keyDraft);
-      setKeyDraft("");
-      setHasKey(true);
-      setCloudError(null);
-    } catch (e) {
-      setCloudError(e instanceof Error ? e.message : String(e));
-    }
-  }, [keyDraft]);
-
   // `deleteCloudApiKey` also resets a stored cloud engine back to local in the
   // backend, since a cloud engine with no key cannot run. Re-render from its
   // response rather than assuming settings are unchanged, or the picker would
@@ -102,27 +90,33 @@ export function SettingsPanel() {
     }
   }, []);
 
-  // Commits the draft and the engine flip in one save, so the backend
-  // validates the whole configuration together and a rejection leaves the
-  // engine untouched. This is also the *only* path that persists draft
+  // Commits the draft, the engine flip, and any pending key as one save, so
+  // the key and the endpoint it authenticates to can never be split across
+  // two independent commands that a global shortcut could fire between —
+  // that split is what let a provider switch mispair a key with the wrong
+  // provider's URL. This is also the *only* path that persists draft
   // changes, so it must stay reachable both when switching local -> cloud
   // and when the draft is edited (e.g. a provider preset) while cloud is
-  // already active — otherwise a provider switch after cloud is on has no
-  // way to reach the backend, leaving a stale base_url paired with whatever
-  // key gets saved next.
-  const enableCloud = useCallback(async () => {
+  // already active.
+  const saveCloud = useCallback(async () => {
     if (!settings) return;
+    const next: Settings = {
+      ...settings,
+      engine: "cloud",
+      cloud_base_url: draft.base_url,
+      cloud_model: draft.model,
+    };
+    const key = keyDraft.trim() || null;
     try {
-      await apply({
-        ...settings,
-        engine: "cloud",
-        cloud_base_url: draft.base_url,
-        cloud_model: draft.model,
-      });
+      const saved = await saveCloudConfig(next, key);
+      setSettings(saved);
+      setKeyDraft("");
+      if (key) setHasKey(true);
+      setCloudError(null);
     } catch (e) {
       setCloudError(e instanceof Error ? e.message : String(e));
     }
-  }, [settings, draft, apply]);
+  }, [settings, draft, keyDraft]);
 
   useEffect(() => {
     if (!recording || !settings) return;
@@ -295,9 +289,6 @@ export function SettingsPanel() {
                 onChange={e => setKeyDraft(e.target.value)}
                 className="w-40 rounded-md border border-border bg-transparent px-2 py-1 text-xs"
               />
-              <Button size="sm" variant="outline" onClick={saveKey}>
-                Save key
-              </Button>
               {hasKey && (
                 <Button size="sm" variant="outline" onClick={removeKey}>
                   Remove key
@@ -309,10 +300,11 @@ export function SettingsPanel() {
           <Row label="">
             <div className="flex items-center gap-2">
               {(draft.base_url !== settings.cloud_base_url ||
-                draft.model !== settings.cloud_model) && (
+                draft.model !== settings.cloud_model ||
+                keyDraft.trim() !== "") && (
                 <span className="text-[11px] text-muted-foreground">Unsaved changes</span>
               )}
-              <Button size="sm" onClick={enableCloud}>
+              <Button size="sm" onClick={saveCloud}>
                 {settings.engine === "cloud" ? "Save cloud settings" : "Use cloud engine"}
               </Button>
             </div>

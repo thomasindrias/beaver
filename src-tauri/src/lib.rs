@@ -157,7 +157,7 @@ pub fn run() {
             commands::open_external,
             commands::get_settings,
             commands::update_settings,
-            commands::set_cloud_api_key,
+            commands::save_cloud_config,
             commands::has_cloud_api_key,
             commands::delete_cloud_api_key,
             commands::open_settings

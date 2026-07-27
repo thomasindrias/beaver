@@ -162,6 +162,21 @@ describe("useBeaver", () => {
     expect(result.current.errorMessage).toBe("Provider rejected the API key");
   });
 
+  it("does not treat a sentinel merely embedded mid-string as a cloud error", async () => {
+    // The Rust contract emits the sentinel only at position 0 (cloud.rs uses
+    // strip_prefix). A local-engine diagnostic that happens to contain the
+    // same substring further in must stay generic and hidden — that's the
+    // internal-diagnostic leak the sentinel exists to prevent.
+    invokeMock.mockRejectedValue("MLX request failed: cloud-error:leaked internal detail");
+    const { result } = renderHook(() => useBeaver());
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    expect(result.current.state).toBe("error");
+    expect(result.current.errorKind).toBe("generic");
+    expect(result.current.errorMessage).toBeNull();
+  });
+
   it("keeps errorMessage null for permission errors", async () => {
     invokeMock.mockRejectedValue("screen-permission-missing");
     const { result } = renderHook(() => useBeaver());

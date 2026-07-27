@@ -92,8 +92,11 @@ export const updateSettings = (next: Settings) =>
 
 export const openSettings = () => invoke<void>("open_settings");
 
-export const setCloudApiKey = (key: string) =>
-  invoke<void>("set_cloud_api_key", { key });
+/** Saves the cloud configuration and, optionally, a new API key as one
+ *  action, so a provider's URL and its key can never be left paired with
+ *  each other's predecessor. Resolves to the saved settings. */
+export const saveCloudConfig = (next: Settings, apiKey: string | null) =>
+  invoke<Settings>("save_cloud_config", { next, apiKey });
 
 /** Whether a key is stored. The key itself never crosses the IPC boundary. */
 export const hasCloudApiKey = () => invoke<boolean>("has_cloud_api_key");

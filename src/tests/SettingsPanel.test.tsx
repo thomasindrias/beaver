@@ -141,19 +141,55 @@ describe("SettingsPanel", () => {
     expect(screen.getByLabelText("Model")).toHaveValue("claude-haiku-4-5-20251001");
   });
 
-  it("saving a key calls set_cloud_api_key and never renders it back", async () => {
+  // Regression coverage for the atomic-save fix: the key and the config it
+  // authenticates to must commit through a single command, never through two
+  // independent ones that a global shortcut could race between.
+  it("saving calls save_cloud_config with the draft settings and the key together, and never renders the key back", async () => {
+    const saved = {
+      ...BASE_SETTINGS,
+      engine: "cloud" as const,
+      cloud_base_url: "https://api.openai.com/v1",
+      cloud_model: "gpt-4o-mini",
+    };
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_settings") return BASE_SETTINGS;
+      if (cmd === "has_cloud_api_key") return false;
+      if (cmd === "save_cloud_config") return saved;
+      return undefined;
+    });
     render(<SettingsPanel />);
     fireEvent.click(await screen.findByRole("button", { name: "☁️ Cloud" }));
+    fireEvent.click(await screen.findByRole("button", { name: "OpenAI" }));
     const field = await screen.findByLabelText("API key");
     fireEvent.change(field, { target: { value: "sk-secret-123" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use cloud engine" }));
     await waitFor(() =>
-      expect(invokeMock).toHaveBeenCalledWith("set_cloud_api_key", {
-        key: "sk-secret-123",
+      expect(invokeMock).toHaveBeenCalledWith("save_cloud_config", {
+        next: saved,
+        apiKey: "sk-secret-123",
       })
     );
     expect(await screen.findByText("Key stored")).toBeInTheDocument();
     expect(screen.getByLabelText("API key")).toHaveValue("");
+  });
+
+  it("saving without typing a key sends a null apiKey, leaving the stored key untouched", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_settings") return BASE_SETTINGS;
+      if (cmd === "has_cloud_api_key") return true;
+      if (cmd === "save_cloud_config") return BASE_SETTINGS;
+      return undefined;
+    });
+    render(<SettingsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "☁️ Cloud" }));
+    await screen.findByLabelText("Base URL");
+    fireEvent.click(screen.getByRole("button", { name: "Use cloud engine" }));
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith(
+        "save_cloud_config",
+        expect.objectContaining({ apiKey: null })
+      )
+    );
   });
 
   it("the API key field masks its input", async () => {
@@ -166,7 +202,7 @@ describe("SettingsPanel", () => {
     invokeMock.mockImplementation(async (cmd: string) => {
       if (cmd === "get_settings") return BASE_SETTINGS;
       if (cmd === "has_cloud_api_key") return false;
-      if (cmd === "update_settings") throw new Error("Cloud engine needs an API key. Save one first.");
+      if (cmd === "save_cloud_config") throw new Error("Cloud engine needs an API key. Save one first.");
       return undefined;
     });
     render(<SettingsPanel />);
@@ -290,13 +326,24 @@ describe("SettingsPanel", () => {
     expect(await screen.findByText("Unsaved changes")).toBeInTheDocument();
   });
 
+  it("flags a pending, unsaved key with 'Unsaved changes' even when the URL and model are untouched", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_settings") return CLOUD_SETTINGS;
+      if (cmd === "has_cloud_api_key") return true;
+      return undefined;
+    });
+    render(<SettingsPanel />);
+    const field = await screen.findByLabelText("API key");
+    expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
+    fireEvent.change(field, { target: { value: "sk-new-key" } });
+    expect(await screen.findByText("Unsaved changes")).toBeInTheDocument();
+  });
+
   // This is the regression test for the critical bug: switching providers
-  // while cloud is already active must be committable through the panel.
-  // Before the fix, the only save path was gated behind
-  // settings.engine !== "cloud", so a provider switch made after cloud was
-  // enabled had no way to reach the backend — leaving the old provider's
-  // base_url persisted while a fresh key for the new provider got saved
-  // straight to the Keychain by "Save key", sending that key to the wrong host.
+  // while cloud is already active must be committable through the panel, and
+  // through the same one action that also carries any pending key — not a
+  // config save and a key save that a global shortcut could fire between,
+  // mispairing a provider's URL with another provider's key.
   it("committing while cloud is already active saves the current draft (a provider switch), not the stale persisted config", async () => {
     const savedAnthropicConfig = {
       ...CLOUD_SETTINGS,
@@ -306,7 +353,7 @@ describe("SettingsPanel", () => {
     invokeMock.mockImplementation(async (cmd: string) => {
       if (cmd === "get_settings") return CLOUD_SETTINGS;
       if (cmd === "has_cloud_api_key") return true;
-      if (cmd === "update_settings") return savedAnthropicConfig;
+      if (cmd === "save_cloud_config") return savedAnthropicConfig;
       return undefined;
     });
     render(<SettingsPanel />);
@@ -314,10 +361,18 @@ describe("SettingsPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Anthropic" }));
     fireEvent.click(screen.getByRole("button", { name: "Save cloud settings" }));
     await waitFor(() =>
-      expect(invokeMock).toHaveBeenCalledWith("update_settings", {
+      expect(invokeMock).toHaveBeenCalledWith("save_cloud_config", {
         next: savedAnthropicConfig,
+        apiKey: null,
       })
     );
     expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
+  });
+
+  it("no longer offers an independent 'Save key' action", async () => {
+    render(<SettingsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "☁️ Cloud" }));
+    await screen.findByLabelText("API key");
+    expect(screen.queryByRole("button", { name: "Save key" })).not.toBeInTheDocument();
   });
 });
