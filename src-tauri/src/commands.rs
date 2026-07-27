@@ -323,6 +323,30 @@ fn has_key_for_save(supplied: Option<&str>, already_stored: bool) -> bool {
     supplied.is_some_and(|k| !k.trim().is_empty()) || already_stored
 }
 
+/// Whether this save may proceed given how the provider is changing.
+///
+/// An API key belongs to exactly one provider. If the base URL is changing, the
+/// stored key authenticates to the *previous* provider, so reusing it would
+/// send the user's credential to a company that does not own it. Require the
+/// new provider's key in the same action.
+///
+/// A change of model alone is fine: the key is still valid for that endpoint.
+fn check_provider_change(
+    current_base_url: &str,
+    next_base_url: &str,
+    supplies_key: bool,
+    has_stored_key: bool,
+) -> Result<(), String> {
+    let changed = current_base_url.trim() != next_base_url.trim();
+    if changed && has_stored_key && !supplies_key {
+        return Err(
+            "Changing the provider needs that provider's own API key. Enter it below and save again."
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
 /// Saves the cloud configuration, optionally along with a new API key, as one
 /// action.
 ///
@@ -341,9 +365,17 @@ pub fn save_cloud_config(
     next: settings::Settings,
     api_key: Option<String>,
 ) -> Result<settings::Settings, String> {
-    validate_cloud_settings(&next, has_key_for_save(api_key.as_deref(), has_cloud_api_key()))?;
+    let stored_key = has_cloud_api_key();
+    let supplies_key = api_key.as_deref().is_some_and(|k| !k.trim().is_empty());
+    validate_cloud_settings(&next, has_key_for_save(api_key.as_deref(), stored_key))?;
 
     let current = settings::load(&app);
+    check_provider_change(
+        &current.cloud_base_url,
+        &next.cloud_base_url,
+        supplies_key,
+        stored_key,
+    )?;
     settings::save(&app, &next).map_err(|e| e.to_string())?;
 
     if let Some(key) = api_key.filter(|k| !k.trim().is_empty()) {
@@ -487,5 +519,68 @@ mod tests {
     #[test]
     fn has_key_for_save_rejects_when_neither_supplied_nor_stored() {
         assert!(!has_key_for_save(None, false));
+    }
+
+    #[test]
+    fn changing_the_provider_without_a_new_key_is_rejected() {
+        let err = check_provider_change(
+            "https://api.openai.com/v1",
+            "https://api.anthropic.com/v1",
+            false,
+            true,
+        )
+        .unwrap_err();
+        assert!(err.contains("own API key"), "unexpected message: {err}");
+    }
+
+    #[test]
+    fn changing_the_provider_with_a_new_key_is_allowed() {
+        assert!(check_provider_change(
+            "https://api.openai.com/v1",
+            "https://api.anthropic.com/v1",
+            true,
+            true,
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn keeping_the_same_provider_needs_no_new_key() {
+        assert!(check_provider_change(
+            "https://api.openai.com/v1",
+            "https://api.openai.com/v1",
+            false,
+            true,
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn changing_only_the_model_needs_no_new_key() {
+        // Same endpoint, so the stored key is still the right credential.
+        assert!(check_provider_change(
+            "https://api.openai.com/v1",
+            "https://api.openai.com/v1",
+            false,
+            true,
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn first_time_setup_is_not_blocked_by_the_provider_rule() {
+        // No stored key yet, so there is no credential to mispair.
+        assert!(check_provider_change("", "https://api.openai.com/v1", true, false).is_ok());
+    }
+
+    #[test]
+    fn whitespace_differences_alone_are_not_a_provider_change() {
+        assert!(check_provider_change(
+            "https://api.openai.com/v1",
+            "  https://api.openai.com/v1  ",
+            false,
+            true,
+        )
+        .is_ok());
     }
 }

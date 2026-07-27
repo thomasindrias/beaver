@@ -369,6 +369,39 @@ describe("SettingsPanel", () => {
     expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
   });
 
+  // Regression coverage for the last credential-mispairing hole: switching
+  // providers without typing that provider's own key must be rejected by the
+  // backend, and the rejection must actually reach the user in the cloud
+  // panel (cloudError), not silently vanish.
+  it("surfaces the backend's provider-change rejection in the cloud panel when no new key is typed", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_settings") return CLOUD_SETTINGS;
+      if (cmd === "has_cloud_api_key") return true;
+      if (cmd === "save_cloud_config") {
+        throw new Error(
+          "Changing the provider needs that provider's own API key. Enter it below and save again."
+        );
+      }
+      return undefined;
+    });
+    render(<SettingsPanel />);
+    await screen.findByLabelText("Base URL");
+    fireEvent.click(screen.getByRole("button", { name: "Anthropic" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save cloud settings" }));
+
+    const message = await screen.findByText(/own API key/);
+    expect(message).toBeInTheDocument();
+    // The error must render inside the cloud configuration block: the Base
+    // URL field's row and the error share the same panel as their nearest
+    // common container.
+    const cloudPanel = screen.getByLabelText("Base URL").closest("div")?.parentElement;
+    expect(cloudPanel).toContainElement(message);
+    // A failed save must not clobber the settings the user is still
+    // looking at — the panel should still show the (unsaved) Anthropic
+    // draft, not silently revert.
+    expect(screen.getByLabelText("Base URL")).toHaveValue("https://api.anthropic.com/v1");
+  });
+
   it("no longer offers an independent 'Save key' action", async () => {
     render(<SettingsPanel />);
     fireEvent.click(await screen.findByRole("button", { name: "☁️ Cloud" }));
