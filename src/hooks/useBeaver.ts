@@ -9,7 +9,13 @@ import type { AppState, Capture, ContentType, ExtractFormat } from "../types";
 export const SUCCESS_DWELL_MS = 1500;
 export const ERROR_DWELL_MS = 6000;
 
-export type CaptureErrorKind = "generic" | "permission";
+export type CaptureErrorKind = "generic" | "permission" | "cloud";
+
+// Mirrors CLOUD_ERROR_PREFIX in src-tauri/src/engine/cloud.rs. Local-engine
+// errors are internal diagnostics ("MLX request failed: …") and must never
+// reach the user; only errors carrying this sentinel are safe to display
+// verbatim, so it doubles as the switch between "show it" and "hide it".
+const CLOUD_ERROR_PREFIX = "cloud-error:";
 
 export function useBeaver(
   onSave?: (capture: Omit<Capture, "id" | "created_at">) => Promise<void>,
@@ -17,6 +23,7 @@ export function useBeaver(
 ) {
   const [state, setState] = useState<AppState>("idle");
   const [errorKind, setErrorKind] = useState<CaptureErrorKind>("generic");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [format, setFormat] = useState<ExtractFormat>("markdown");
   const [contentType, setContentType] = useState<ContentType>("prose");
   const [engine, setEngine] = useState<EngineKind | null>(null);
@@ -81,10 +88,20 @@ export function useBeaver(
 
   const fail = useCallback((e: unknown, gen: number) => {
     if (gen !== genRef.current) return;
-    const kind: CaptureErrorKind = String(e).includes("screen-permission-missing")
-      ? "permission"
-      : "generic";
+    const str = String(e);
+    const prefixIndex = str.indexOf(CLOUD_ERROR_PREFIX);
+    let kind: CaptureErrorKind;
+    let message: string | null = null;
+    if (prefixIndex !== -1) {
+      kind = "cloud";
+      message = str.slice(prefixIndex + CLOUD_ERROR_PREFIX.length);
+    } else if (str.includes("screen-permission-missing")) {
+      kind = "permission";
+    } else {
+      kind = "generic";
+    }
     setErrorKind(kind);
+    setErrorMessage(message);
     setState("error");
     armDwell(ERROR_DWELL_MS);
   }, [armDwell]);
@@ -119,7 +136,7 @@ export function useBeaver(
     if (regionRef.current) await runCapture(regionRef.current);
   }, [runCapture]);
 
-  return { state, errorKind, format, contentType, engine, runCapture, reExtract, retry, engage, dismiss };
+  return { state, errorKind, errorMessage, format, contentType, engine, runCapture, reExtract, retry, engage, dismiss };
 }
 
 function detectContentType(md: string): Capture["content_type"] {

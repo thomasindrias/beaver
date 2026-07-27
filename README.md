@@ -3,12 +3,16 @@
 A macOS menu-bar utility that turns a screenshot into structured data. Press a
 shortcut, drag a box around anything on screen, and Beaver extracts what's
 inside it as clean Markdown — tables stay tables, lists stay lists, code stays
-code. Vision runs **fully on-device** after a one-time model download, so
-captures never leave your machine.
+code. Vision runs **fully on-device by default** after a one-time model
+download, so captures never leave your machine unless you choose otherwise.
 
 > Vision runs on-device via [MLX](https://github.com/ml-explore/mlx) on Apple
 > Silicon, or [llama.cpp](https://github.com/ggml-org/llama.cpp) on Intel Macs
 > — same install, same privacy guarantee, either way.
+
+> You can also opt into your own cloud provider with your own API key from
+> Settings. That choice is explicit and configured by you; on-device stays
+> the default.
 
 ![Beaver turning a screenshot region into Markdown](docs/media/demo.gif)
 

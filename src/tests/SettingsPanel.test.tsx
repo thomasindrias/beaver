@@ -226,8 +226,13 @@ describe("SettingsPanel", () => {
     );
   });
 
+  // The prior version of this test returned engine: "local" from
+  // delete_cloud_api_key, which collapses the whole cloud panel and makes
+  // "Key stored" disappear because its container unmounted, not because
+  // hasKey flipped. Keeping engine: "cloud" here isolates the real claim:
+  // only hasKey can explain the indicator vanishing while the panel stays up.
   it("removing a stored key clears the stored-key indicator", async () => {
-    const afterRemoval = { ...CLOUD_SETTINGS, engine: "local" as const };
+    const afterRemoval = { ...CLOUD_SETTINGS, engine: "cloud" as const };
     invokeMock.mockImplementation(async (cmd: string) => {
       if (cmd === "get_settings") return CLOUD_SETTINGS;
       if (cmd === "has_cloud_api_key") return true;
@@ -239,5 +244,80 @@ describe("SettingsPanel", () => {
     expect(await screen.findByText("Key stored")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Remove key" }));
     await waitFor(() => expect(screen.queryByText("Key stored")).not.toBeInTheDocument());
+    // The panel itself must still be mounted — only the indicator changed.
+    expect(screen.getByLabelText("Base URL")).toBeInTheDocument();
+  });
+
+  it("removing the key backing an active cloud engine closes the cloud panel", async () => {
+    const afterRemoval = { ...CLOUD_SETTINGS, engine: "local" as const };
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_settings") return CLOUD_SETTINGS;
+      if (cmd === "has_cloud_api_key") return true;
+      if (cmd === "delete_cloud_api_key") return afterRemoval;
+      if (cmd === "update_settings") return CLOUD_SETTINGS;
+      return undefined;
+    });
+    render(<SettingsPanel />);
+    await screen.findByText("Key stored");
+    expect(screen.getByLabelText("Base URL")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove key" }));
+    await waitFor(() => expect(screen.queryByLabelText("Base URL")).not.toBeInTheDocument());
+  });
+
+  it("shows 'Save cloud settings' instead of 'Use cloud engine' once cloud is already active", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_settings") return CLOUD_SETTINGS;
+      if (cmd === "has_cloud_api_key") return true;
+      if (cmd === "update_settings") return CLOUD_SETTINGS;
+      return undefined;
+    });
+    render(<SettingsPanel />);
+    await screen.findByLabelText("Base URL");
+    expect(screen.getByRole("button", { name: "Save cloud settings" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use cloud engine" })).not.toBeInTheDocument();
+  });
+
+  it("flags a draft that no longer matches the saved cloud config with 'Unsaved changes'", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_settings") return CLOUD_SETTINGS;
+      if (cmd === "has_cloud_api_key") return true;
+      return undefined;
+    });
+    render(<SettingsPanel />);
+    await screen.findByLabelText("Base URL");
+    expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Anthropic" }));
+    expect(await screen.findByText("Unsaved changes")).toBeInTheDocument();
+  });
+
+  // This is the regression test for the critical bug: switching providers
+  // while cloud is already active must be committable through the panel.
+  // Before the fix, the only save path was gated behind
+  // settings.engine !== "cloud", so a provider switch made after cloud was
+  // enabled had no way to reach the backend — leaving the old provider's
+  // base_url persisted while a fresh key for the new provider got saved
+  // straight to the Keychain by "Save key", sending that key to the wrong host.
+  it("committing while cloud is already active saves the current draft (a provider switch), not the stale persisted config", async () => {
+    const savedAnthropicConfig = {
+      ...CLOUD_SETTINGS,
+      cloud_base_url: "https://api.anthropic.com/v1",
+      cloud_model: "claude-haiku-4-5-20251001",
+    };
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_settings") return CLOUD_SETTINGS;
+      if (cmd === "has_cloud_api_key") return true;
+      if (cmd === "update_settings") return savedAnthropicConfig;
+      return undefined;
+    });
+    render(<SettingsPanel />);
+    await screen.findByLabelText("Base URL");
+    fireEvent.click(screen.getByRole("button", { name: "Anthropic" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save cloud settings" }));
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("update_settings", {
+        next: savedAnthropicConfig,
+      })
+    );
+    expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
   });
 });

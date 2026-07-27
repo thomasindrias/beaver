@@ -102,9 +102,14 @@ export function SettingsPanel() {
     }
   }, []);
 
-  // Commits the draft and flips the engine in one save, so the backend
+  // Commits the draft and the engine flip in one save, so the backend
   // validates the whole configuration together and a rejection leaves the
-  // engine untouched.
+  // engine untouched. This is also the *only* path that persists draft
+  // changes, so it must stay reachable both when switching local -> cloud
+  // and when the draft is edited (e.g. a provider preset) while cloud is
+  // already active — otherwise a provider switch after cloud is on has no
+  // way to reach the backend, leaving a stale base_url paired with whatever
+  // key gets saved next.
   const enableCloud = useCallback(async () => {
     if (!settings) return;
     try {
@@ -301,13 +306,17 @@ export function SettingsPanel() {
             </div>
           </Row>
 
-          {settings.engine !== "cloud" && (
-            <Row label="">
+          <Row label="">
+            <div className="flex items-center gap-2">
+              {(draft.base_url !== settings.cloud_base_url ||
+                draft.model !== settings.cloud_model) && (
+                <span className="text-[11px] text-muted-foreground">Unsaved changes</span>
+              )}
               <Button size="sm" onClick={enableCloud}>
-                Use cloud engine
+                {settings.engine === "cloud" ? "Save cloud settings" : "Use cloud engine"}
               </Button>
-            </Row>
-          )}
+            </div>
+          </Row>
 
           {cloudError && (
             <span className="text-[11px] text-destructive">{cloudError}</span>

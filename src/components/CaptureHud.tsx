@@ -58,6 +58,7 @@ const TYPE_LABELS: Record<ContentType, string> = {
 interface Props {
   state: AppState;
   errorKind: CaptureErrorKind;
+  errorMessage: string | null;
   contentType: ContentType;
   format: ExtractFormat;
   engine: EngineKind | null;
@@ -73,6 +74,7 @@ interface Props {
 export function CaptureHud({
   state,
   errorKind,
+  errorMessage,
   contentType,
   format,
   engine,
@@ -236,7 +238,9 @@ export function CaptureHud({
           <span className="whitespace-nowrap">
             {errorKind === "permission"
               ? "Needs Screen Recording access"
-              : "Dam — couldn't read that"}
+              : errorKind === "cloud" && errorMessage
+                ? errorMessage
+                : "Dam — couldn't read that"}
           </span>
           <button
             aria-label={errorKind === "permission" ? "Open System Settings" : "Retry"}

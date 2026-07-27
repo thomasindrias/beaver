@@ -11,6 +11,7 @@ const noop = () => {};
 const baseProps = {
   state: "success" as const,
   errorKind: "generic" as const,
+  errorMessage: null as string | null,
   contentType: "table" as const,
   format: "markdown" as const,
   engine: "local" as const,
@@ -93,6 +94,41 @@ describe("CaptureHud rendering", () => {
     expect(onDismiss).toHaveBeenCalled();
     expect(onFormatChange).not.toHaveBeenCalled();
     vi.useRealTimers();
+  });
+
+  it("shows the cloud error message in place of the generic copy when one is present", () => {
+    render(
+      <CaptureHud
+        {...baseProps}
+        state="error"
+        errorKind="cloud"
+        errorMessage="Provider rejected the API key"
+      />
+    );
+    expect(screen.getByText("Provider rejected the API key")).toBeInTheDocument();
+    expect(screen.queryByText("Dam — couldn't read that")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the generic copy for a cloud error with no message", () => {
+    render(
+      <CaptureHud {...baseProps} state="error" errorKind="cloud" errorMessage={null} />
+    );
+    expect(screen.getByText("Dam — couldn't read that")).toBeInTheDocument();
+  });
+
+  it("cloud errors offer a retry action, same as generic errors", () => {
+    const onRetry = vi.fn();
+    render(
+      <CaptureHud
+        {...baseProps}
+        state="error"
+        errorKind="cloud"
+        errorMessage="Provider rejected the API key"
+        onRetry={onRetry}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(onRetry).toHaveBeenCalled();
   });
 
   it("permission errors offer to open System Settings", () => {

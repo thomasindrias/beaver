@@ -142,6 +142,36 @@ describe("useBeaver", () => {
     expect(result.current.errorKind).toBe("generic");
   });
 
+  it("never surfaces the internal local-engine diagnostic as a message", async () => {
+    invokeMock.mockRejectedValue("MLX request failed: boom");
+    const { result } = renderHook(() => useBeaver());
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    expect(result.current.errorMessage).toBeNull();
+  });
+
+  it("flags cloud errors and strips the sentinel prefix into a user-facing message", async () => {
+    invokeMock.mockRejectedValue("cloud-error:Provider rejected the API key");
+    const { result } = renderHook(() => useBeaver());
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    expect(result.current.state).toBe("error");
+    expect(result.current.errorKind).toBe("cloud");
+    expect(result.current.errorMessage).toBe("Provider rejected the API key");
+  });
+
+  it("keeps errorMessage null for permission errors", async () => {
+    invokeMock.mockRejectedValue("screen-permission-missing");
+    const { result } = renderHook(() => useBeaver());
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    expect(result.current.errorKind).toBe("permission");
+    expect(result.current.errorMessage).toBeNull();
+  });
+
   it("errors auto-dismiss after the error dwell when not engaged", async () => {
     vi.useFakeTimers();
     invokeMock.mockRejectedValue("MLX request failed: boom");

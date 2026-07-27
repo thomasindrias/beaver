@@ -32,6 +32,7 @@ export default function App() {
   const {
     state,
     errorKind,
+    errorMessage,
     format,
     contentType,
     engine,
@@ -86,6 +87,7 @@ export default function App() {
         <CaptureHud
           state={state}
           errorKind={errorKind}
+          errorMessage={errorMessage}
           contentType={contentType}
           format={format}
           engine={engine}
