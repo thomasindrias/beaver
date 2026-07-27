@@ -138,25 +138,75 @@ inference, and they will care about the model choice and the quantization.
   the two have asymmetric surfaces.
 - Do not just announce the app here. Lead with the design decision.
 
-### r/macapps — needs preparation, do not post cold
+### r/macapps — has a real, verified qualification bar. Read this before posting.
 
-This one is gated harder than it looks:
+I found and read the mods' actual policy thread (not just the summarized rules
+page), which spells out exactly who can post where. This changes the plan.
 
-- **10 local karma required** before you can post. Earn it by commenting in the
-  sub first.
-- **One self-promo post per developer per 30 days**, counted from your last app
-  post **even if it was removed.** A rejected post burns the slot.
-- Unless you qualify under their Trust vs. Transparency initiative, promotion is
-  limited to the **monthly megathread**.
-- A **PCP template** is required for main-feed dev posts.
-- Open source posts must prefix the title with `[OS]`.
-- Flair hierarchy is Lifetime > Subscription > Free, and "Free flair" is
-  explicitly not for limited tiers. Beaver is genuinely ambiguous here since the
-  source is MIT and free to build while the notarized build is the paid artifact.
-  Read their flair guidance before choosing, and consider asking a mod.
+**Three tiers, and where Beaver almost certainly lands:**
 
-Plan: spend a week or two genuinely participating, then post. Do not make this
-your first channel.
+- **Tier 1 (Trust route, post to main feed):** any ONE of: Mac App Store
+  distribution with a paid developer account (notarization alone does not
+  count), an established GitHub repo (1 year+ old OR 100+ stars), or an
+  existing "Recognized Developer" flair in the sub. Plus 10+ local karma
+  regardless.
+  **Beaver fails all three right now:** not on the Mac App Store, the repo is
+  under a month old with 0 stars, and there's no flair yet.
+- **Tier 2 (Transparency route, post to main feed):** requires BOTH a real-
+  identity developer portfolio (LinkedIn is what they explicitly ask for, plus
+  real contact details) AND a website with a genuine Privacy Policy and Terms
+  of Service. A mod's own example of what counts as sufficient is as short as
+  one line stating the app is fully offline with zero telemetry.
+  **This is reachable.** The website needs a real Privacy Policy / ToS page,
+  which is good practice to have regardless of Reddit and is a straightforward
+  build. The LinkedIn/identity part is your call, not mine to add.
+- **Tier 3 (everyone else): the monthly megathread only.**
+  **This is where Beaver stands today**, unless you choose to build out Tier 2.
+
+**The exact PCP format** (confirmed from the mod's own post, not guessed):
+
+```
+App Name/Title [screenshot encouraged]
+Problem: What problem does your app solve.
+Comparison: Name 1-2 top competitors/alternatives and describe HOW what you
+  offer is better (the mods explicitly distinguish "how" from just claiming
+  "better" — do the comparison honestly).
+Pricing: Amounts + link.
+```
+
+**Why posts get auto-removed** (from the mods' own FAQ, this is the real list):
+
+1. Text that reads as AI-assisted — they specifically call out em-dashes as a
+   detected pattern. One more reason not to paste AI-written copy here.
+2. Repeating the same content across posts/comments trips Reddit's own spam
+   filter, separate from mod action.
+3. An unverified email on your Reddit account, or multiple accounts.
+4. Reposting after a removal instead of asking a mod to edit-and-restore —
+   this leaves a strike.
+
+**Practical facts:**
+
+- The current megathread ("The App Pile," month-to-month) is live right now
+  and still actively accepting entries — comments are landing within the hour
+  as I write this. You do not need to wait for next month's thread.
+- **A megathread post still counts against your 30-day self-promo limit**,
+  same as a main-feed post.
+- Homebrew availability is explicitly **not** treated as a trust signal by the
+  mods. Neither is a TestFlight beta.
+- Check your actual local karma at `old.reddit.com/user/me/` → "show karma
+  breakdown by subreddit" before assuming you qualify for anything.
+- itch.io-style third-party distribution is "likely" treated the same as a
+  random site — i.e., megathread territory even with a portfolio.
+
+**Recommendation:** post in the current live megathread using the exact PCP
+format above, once you have 10 local karma from genuinely participating first.
+Do this in week 2-4, not as your first channel — Show HN and r/LocalLLaMA carry
+zero gatekeeping and should go first.
+
+If you want the main feed instead of the megathread, the reachable path is
+Tier 2: add a real Privacy Policy and Terms of Service page to the site (worth
+doing anyway) and decide for yourself whether you want to attach your identity
+via LinkedIn. That is a call only you can make, and I did not make it for you.
 
 ---
 
@@ -201,6 +251,13 @@ path; the only outbound calls are an optional daily GitHub version check and
 update downloads, both disableable with `BEAVER_DISABLE_UPDATE_CHECK=1`. Invite
 them to watch it with Little Snitch. Note that BYO cloud is opt-in, off by
 default, and every capture shows which engine ran.
+
+This exact question came up almost verbatim on a comparable r/macapps post for
+a privacy-first local AI tool: a commenter asked the poster to make explicit
+"what stays on the Mac, what can go to a configured provider, and whether
+anything is retained after processing," and said that mattered more than model
+quality. Expect this question, and answer it with the same specificity: name
+what leaves and what does not, in those exact three buckets.
 
 **"Windows/Linux?"**
 Honest answer: a stretch goal, not scheduled. The capture overlay, global
