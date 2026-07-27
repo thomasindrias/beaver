@@ -259,9 +259,33 @@ pub fn has_cloud_api_key() -> bool {
     keychain::api_key().ok().flatten().is_some()
 }
 
+/// Deletes the stored key. Also resets a stored `engine: Cloud` back to Local,
+/// because a cloud engine with no key cannot run and `settings.json` must not
+/// claim an engine it cannot honor. Returns the settings as they now stand.
 #[tauri::command]
-pub fn delete_cloud_api_key() -> Result<(), String> {
-    keychain::delete_api_key()
+pub fn delete_cloud_api_key(app: tauri::AppHandle) -> Result<settings::Settings, String> {
+    keychain::delete_api_key()?;
+    let current = settings::load(&app);
+    match settings_after_key_removal(&current) {
+        Some(next) => {
+            settings::save(&app, &next).map_err(|e| e.to_string())?;
+            Ok(next)
+        }
+        None => Ok(current),
+    }
+}
+
+/// Removing the key makes a stored `engine: Cloud` unrunnable, so the engine is
+/// reset to Local. Pure so the rule is unit-testable; returns `None` when
+/// nothing needs saving.
+fn settings_after_key_removal(current: &settings::Settings) -> Option<settings::Settings> {
+    if current.engine != engine::EngineKind::Cloud {
+        return None;
+    }
+    Some(settings::Settings {
+        engine: engine::EngineKind::Local,
+        ..current.clone()
+    })
 }
 
 /// Refuse to persist a cloud engine that could not actually run. Pure so the
@@ -365,5 +389,27 @@ mod tests {
         let s = Settings { cloud_model: String::new(), ..cloud_settings() };
         let err = validate_cloud_settings(&s, true).unwrap_err();
         assert!(err.contains("model"), "unexpected message: {err}");
+    }
+
+    #[test]
+    fn removing_the_key_resets_a_cloud_engine_to_local() {
+        let next = settings_after_key_removal(&cloud_settings()).expect("a save is needed");
+        assert_eq!(next.engine, EngineKind::Local);
+    }
+
+    #[test]
+    fn removing_the_key_preserves_the_rest_of_the_configuration() {
+        // The URL and model are kept so re-adding a key restores the setup
+        // without retyping it.
+        let next = settings_after_key_removal(&cloud_settings()).expect("a save is needed");
+        assert_eq!(next.cloud_base_url, "https://api.openai.com/v1");
+        assert_eq!(next.cloud_model, "gpt-4o-mini");
+        assert_eq!(next.shortcut, Settings::default().shortcut);
+    }
+
+    #[test]
+    fn removing_the_key_needs_no_save_when_the_engine_is_already_local() {
+        let s = Settings { engine: EngineKind::Local, ..Settings::default() };
+        assert!(settings_after_key_removal(&s).is_none());
     }
 }

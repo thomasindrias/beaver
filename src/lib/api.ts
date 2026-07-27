@@ -98,4 +98,6 @@ export const setCloudApiKey = (key: string) =>
 /** Whether a key is stored. The key itself never crosses the IPC boundary. */
 export const hasCloudApiKey = () => invoke<boolean>("has_cloud_api_key");
 
-export const deleteCloudApiKey = () => invoke<void>("delete_cloud_api_key");
+/** Deletes the stored key. Also resets a stored cloud engine back to local,
+ *  since a cloud engine with no key cannot run. Resolves to the updated settings. */
+export const deleteCloudApiKey = () => invoke<Settings>("delete_cloud_api_key");

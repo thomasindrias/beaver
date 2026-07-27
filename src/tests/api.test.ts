@@ -104,8 +104,18 @@ describe("api", () => {
     expect(invokeMock).toHaveBeenCalledWith("set_cloud_api_key", { key: "sk-abc" });
   });
 
-  it("deleteCloudApiKey takes no payload", async () => {
-    await api.deleteCloudApiKey();
+  it("deleteCloudApiKey takes no payload and resolves to the updated settings", async () => {
+    const updated = {
+      default_format: "markdown" as const,
+      shortcut: "CmdOrCtrl+Shift+D",
+      history_retention_days: null,
+      update_check_enabled: true,
+      engine: "local" as const,
+      cloud_base_url: "https://api.openai.com/v1",
+      cloud_model: "gpt-4o-mini",
+    };
+    invokeMock.mockResolvedValue(updated);
+    await expect(api.deleteCloudApiKey()).resolves.toEqual(updated);
     expect(invokeMock).toHaveBeenCalledWith("delete_cloud_api_key");
   });
 
