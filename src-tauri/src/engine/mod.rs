@@ -21,6 +21,8 @@ pub use llamacpp as local;
 #[cfg(target_arch = "aarch64")]
 pub use mlx as local;
 
+pub mod cloud;
+
 /// Lifecycle states reported by an engine server's health check.
 #[derive(serde::Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
