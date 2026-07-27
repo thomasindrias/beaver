@@ -13,6 +13,7 @@ const baseProps = {
   errorKind: "generic" as const,
   contentType: "table" as const,
   format: "markdown" as const,
+  engine: "local" as const,
   anchor: { x: 20, y: 200 },
   onFormatChange: noop,
   onCustomSubmit: noop,
@@ -107,6 +108,32 @@ describe("CaptureHud rendering", () => {
     expect(screen.getByText("Needs Screen Recording access")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Open System Settings" }));
     expect(onOpenSettings).toHaveBeenCalled();
+  });
+
+  it("shows the on-device indicator in the expanded state", () => {
+    render(<CaptureHud {...baseProps} engine="local" />);
+    fireEvent.mouseEnter(screen.getByTestId("hud"));
+    expect(screen.getByTestId("engine-indicator")).toHaveAccessibleName(
+      "On-device engine"
+    );
+  });
+
+  it("shows the cloud indicator in the expanded state", () => {
+    render(<CaptureHud {...baseProps} engine="cloud" />);
+    fireEvent.mouseEnter(screen.getByTestId("hud"));
+    expect(screen.getByTestId("engine-indicator")).toHaveAccessibleName("Cloud engine");
+  });
+
+  it("keeps the indicator out of the collapsed pill", () => {
+    render(<CaptureHud {...baseProps} engine="cloud" />);
+    expect(screen.getByText("Copied as table")).toBeInTheDocument();
+    expect(screen.queryByTestId("engine-indicator")).not.toBeInTheDocument();
+  });
+
+  it("omits the indicator when no engine is known", () => {
+    render(<CaptureHud {...baseProps} engine={null} />);
+    fireEvent.mouseEnter(screen.getByTestId("hud"));
+    expect(screen.queryByTestId("engine-indicator")).not.toBeInTheDocument();
   });
 });
 

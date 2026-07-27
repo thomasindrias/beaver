@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { AppState, ContentType, ExtractFormat } from "../types";
 import type { CaptureErrorKind } from "../hooks/useBeaver";
+import type { EngineKind } from "../lib/api";
 
 // On-brand loading copy (moved here from the retired CursorToast): a busy
 // beaver gnawing your pixels into a tidy dam of data.
@@ -59,6 +60,7 @@ interface Props {
   errorKind: CaptureErrorKind;
   contentType: ContentType;
   format: ExtractFormat;
+  engine: EngineKind | null;
   anchor: { x: number; y: number };
   onFormatChange: (f: ExtractFormat) => void;
   onCustomSubmit: (hint: string) => void;
@@ -73,6 +75,7 @@ export function CaptureHud({
   errorKind,
   contentType,
   format,
+  engine,
   anchor,
   onFormatChange,
   onCustomSubmit,
@@ -260,6 +263,19 @@ export function CaptureHud({
 
       {(state === "success" || state === "rerendering") && revealed && (
         <div className={`${pill} gap-0.5 px-1.5 py-1`}>
+          {engine && (
+            <>
+              <span
+                data-testid="engine-indicator"
+                role="img"
+                aria-label={engine === "cloud" ? "Cloud engine" : "On-device engine"}
+                className="flex h-6 w-6 select-none items-center justify-center text-[11px] leading-none"
+              >
+                {engine === "cloud" ? "☁️" : "🔒"}
+              </span>
+              <span className="mx-1 h-3.5 w-px bg-white/15" />
+            </>
+          )}
           {!inputOpen && (
             <>
               {FORMATS.map(({ key, label, Icon }) => {

@@ -34,6 +34,7 @@ export default function App() {
     errorKind,
     format,
     contentType,
+    engine,
     runCapture,
     reExtract,
     retry,
@@ -87,6 +88,7 @@ export default function App() {
           errorKind={errorKind}
           contentType={contentType}
           format={format}
+          engine={engine}
           anchor={hudPosition(sel, {
             width: window.innerWidth,
             height: window.innerHeight,

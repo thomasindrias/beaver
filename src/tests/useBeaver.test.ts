@@ -234,4 +234,18 @@ describe("useBeaver", () => {
     expect(invokeMock).not.toHaveBeenCalledWith("write_to_clipboard", { text: "late content" });
     expect(result.current.state).toBe("idle");
   });
+
+  it("exposes the engine reported by the capture", async () => {
+    invokeMock.mockResolvedValue(extraction("hello", "cloud"));
+    const { result } = renderHook(() => useBeaver());
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    expect(result.current.engine).toBe("cloud");
+  });
+
+  it("starts with no known engine before any capture", () => {
+    const { result } = renderHook(() => useBeaver());
+    expect(result.current.engine).toBeNull();
+  });
 });

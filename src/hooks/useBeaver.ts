@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { captureAndExtract, reExtract as reExtractCommand, writeToClipboard, type CaptureRegion } from "../lib/api";
+import { captureAndExtract, reExtract as reExtractCommand, writeToClipboard, type CaptureRegion, type EngineKind } from "../lib/api";
 import type { AppState, Capture, ContentType, ExtractFormat } from "../types";
 
 // Success auto-dismiss is short: the HUD's job is done unless the user
@@ -19,6 +19,7 @@ export function useBeaver(
   const [errorKind, setErrorKind] = useState<CaptureErrorKind>("generic");
   const [format, setFormat] = useState<ExtractFormat>("markdown");
   const [contentType, setContentType] = useState<ContentType>("prose");
+  const [engine, setEngine] = useState<EngineKind | null>(null);
   const dwellRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const regionRef = useRef<CaptureRegion | null>(null);
   const savedRef = useRef(false);
@@ -91,6 +92,7 @@ export function useBeaver(
     try {
       const result = await captureAndExtract(region, "markdown");
       setFormat("markdown");
+      setEngine(result.engine);
       await finish(result.text, gen);
     } catch (e) {
       fail(e, gen);
@@ -104,6 +106,7 @@ export function useBeaver(
     setState("rerendering");
     try {
       const result = await reExtractCommand(next, hint);
+      setEngine(result.engine);
       await finish(result.text, gen);
     } catch (e) {
       fail(e, gen);
@@ -114,7 +117,7 @@ export function useBeaver(
     if (regionRef.current) await runCapture(regionRef.current);
   }, [runCapture]);
 
-  return { state, errorKind, format, contentType, runCapture, reExtract, retry, engage, dismiss };
+  return { state, errorKind, format, contentType, engine, runCapture, reExtract, retry, engage, dismiss };
 }
 
 function detectContentType(md: string): Capture["content_type"] {
