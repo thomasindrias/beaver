@@ -12,6 +12,12 @@
 
 use std::time::Duration;
 
+/// Marks an error as originating from the cloud provider and safe to show the
+/// user verbatim. Local-engine errors are internal diagnostics and must never
+/// be surfaced, so the frontend needs a way to tell them apart. Mirrors the
+/// `screen-permission-missing` sentinel convention in `permission.rs`.
+pub const CLOUD_ERROR_PREFIX: &str = "cloud-error:";
+
 /// Where to send a cloud extraction and how to authenticate it.
 ///
 /// `Debug` is implemented by hand so the key cannot reach a log line through
@@ -62,12 +68,13 @@ pub fn chat_completions_url(base_url: &str) -> String {
 /// HUD is not a place to render a stranger's JSON. Taking no `Config` also
 /// means the API key cannot reach a message from here by construction.
 fn map_error_status(status: u16) -> String {
-    match status {
+    let cause = match status {
         401 | 403 => "Provider rejected the API key".to_string(),
         429 => "Provider rate limit reached".to_string(),
         s if (500..600).contains(&s) => "Provider is unavailable".to_string(),
         s => format!("Provider error (HTTP {s})"),
-    }
+    };
+    format!("{CLOUD_ERROR_PREFIX}{cause}")
 }
 
 #[derive(serde::Serialize)]
@@ -153,7 +160,7 @@ pub async fn extract_from_image(
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(120))
         .build()
-        .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
+        .map_err(|e| format!("{CLOUD_ERROR_PREFIX}Failed to build HTTP client: {e}"))?;
     let body = build_request(&cfg.model, image_base64, prompt);
     let resp = client
         .post(chat_completions_url(&cfg.base_url))
@@ -164,15 +171,15 @@ pub async fn extract_from_image(
         // The transport error is intentionally not interpolated: a user may
         // paste a base URL carrying a secret in its query string, and reqwest's
         // Display includes the URL.
-        .map_err(|_| "Couldn't reach the provider".to_string())?;
+        .map_err(|_| format!("{CLOUD_ERROR_PREFIX}Couldn't reach the provider"))?;
     if !resp.status().is_success() {
         return Err(map_error_status(resp.status().as_u16()));
     }
     let parsed: ChatResponse = resp
         .json()
         .await
-        .map_err(|_| "Provider returned an unreadable response".to_string())?;
-    first_choice(parsed)
+        .map_err(|_| format!("{CLOUD_ERROR_PREFIX}Provider returned an unreadable response"))?;
+    first_choice(parsed).map_err(|e| format!("{CLOUD_ERROR_PREFIX}{e}"))
 }
 
 #[cfg(test)]
@@ -234,24 +241,48 @@ mod tests {
 
     #[test]
     fn map_error_status_reports_a_rejected_key() {
-        assert_eq!(map_error_status(401), "Provider rejected the API key");
-        assert_eq!(map_error_status(403), "Provider rejected the API key");
+        assert_eq!(
+            map_error_status(401),
+            "cloud-error:Provider rejected the API key"
+        );
+        assert_eq!(
+            map_error_status(403),
+            "cloud-error:Provider rejected the API key"
+        );
     }
 
     #[test]
     fn map_error_status_reports_rate_limiting() {
-        assert_eq!(map_error_status(429), "Provider rate limit reached");
+        assert_eq!(map_error_status(429), "cloud-error:Provider rate limit reached");
     }
 
     #[test]
     fn map_error_status_reports_provider_outages() {
-        assert_eq!(map_error_status(500), "Provider is unavailable");
-        assert_eq!(map_error_status(503), "Provider is unavailable");
+        assert_eq!(map_error_status(500), "cloud-error:Provider is unavailable");
+        assert_eq!(map_error_status(503), "cloud-error:Provider is unavailable");
     }
 
     #[test]
     fn map_error_status_falls_back_to_the_status_code() {
-        assert_eq!(map_error_status(404), "Provider error (HTTP 404)");
+        assert_eq!(map_error_status(404), "cloud-error:Provider error (HTTP 404)");
+    }
+
+    #[test]
+    fn every_mapped_error_is_marked_as_a_cloud_error() {
+        for status in [401, 403, 429, 500, 503, 404, 418] {
+            assert!(
+                map_error_status(status).starts_with(CLOUD_ERROR_PREFIX),
+                "status {status} produced an unmarked error"
+            );
+        }
+    }
+
+    #[test]
+    fn the_marker_is_stripped_to_a_readable_message() {
+        assert_eq!(
+            map_error_status(429).strip_prefix(CLOUD_ERROR_PREFIX),
+            Some("Provider rate limit reached")
+        );
     }
 
     #[test]

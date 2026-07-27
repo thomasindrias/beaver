@@ -24,16 +24,29 @@ pub struct ExtractionResult {
     pub engine: engine::EngineKind,
 }
 
-/// Read the settings and the keychain, then resolve the engine. A keychain
-/// read failure is logged and treated as "no key", which degrades to local —
-/// the safe direction.
-fn resolve_engine(app: &tauri::AppHandle, port: u16) -> engine::Engine {
+/// Resolve the engine for this capture.
+///
+/// The Keychain is only touched when cloud is actually selected: reading it on
+/// every local capture is wasted work, and after a code-signature change it
+/// would raise a system access prompt in the middle of the reflex.
+///
+/// A *missing* key is a normal state and falls back to local via `select`. A
+/// genuine read failure is an error rather than a silent downgrade, because
+/// quietly running on-device when the user asked for cloud would break the
+/// determinism the design depends on.
+fn resolve_engine(app: &tauri::AppHandle, port: u16) -> Result<engine::Engine, String> {
     let settings = settings::load(app);
-    let key = keychain::api_key().unwrap_or_else(|e| {
-        log::warn!("keychain read failed, falling back to the local engine: {e}");
-        None
-    });
-    engine::select(&settings, key, port)
+    if settings.engine != engine::EngineKind::Cloud {
+        return Ok(engine::Engine::Local { port });
+    }
+    let key = keychain::api_key().map_err(|e| {
+        log::warn!("keychain read failed: {e}");
+        format!(
+            "{}Couldn't read the API key from the Keychain",
+            engine::cloud::CLOUD_ERROR_PREFIX
+        )
+    })?;
+    Ok(engine::select(&settings, key, port))
 }
 
 // Capture and extract in one hop: the (multi-MB) image bytes stay in Rust and
@@ -56,7 +69,7 @@ pub async fn capture_and_extract(
     *last.0.lock().unwrap() = Some(bytes);
     let default_format = settings::load(&app).default_format;
     let prompt = prompts::prompt_for(format.unwrap_or(default_format), None);
-    let selected = resolve_engine(&app, port);
+    let selected = resolve_engine(&app, port)?;
     let kind = selected.kind();
     let text = selected.extract(&image_base64, &prompt).await?;
     Ok(ExtractionResult { text, engine: kind })
@@ -78,7 +91,7 @@ pub async fn re_extract(
         .ok_or_else(|| "no-capture-cached".to_string())?;
     let image_base64 = STANDARD.encode(&bytes);
     let prompt = prompts::prompt_for(format, hint.as_deref());
-    let selected = resolve_engine(&app, state.port);
+    let selected = resolve_engine(&app, state.port)?;
     let kind = selected.kind();
     let text = selected.extract(&image_base64, &prompt).await?;
     Ok(ExtractionResult { text, engine: kind })
