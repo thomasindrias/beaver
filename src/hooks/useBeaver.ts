@@ -89,9 +89,9 @@ export function useBeaver(
     regionRef.current = region;
     setState("processing");
     try {
-      const markdown = await captureAndExtract(region, "markdown");
+      const result = await captureAndExtract(region, "markdown");
       setFormat("markdown");
-      await finish(markdown, gen);
+      await finish(result.text, gen);
     } catch (e) {
       fail(e, gen);
     }
@@ -103,8 +103,8 @@ export function useBeaver(
     setFormat(next);
     setState("rerendering");
     try {
-      const markdown = await reExtractCommand(next, hint);
-      await finish(markdown, gen);
+      const result = await reExtractCommand(next, hint);
+      await finish(result.text, gen);
     } catch (e) {
       fail(e, gen);
     }

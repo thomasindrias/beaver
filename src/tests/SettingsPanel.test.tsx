@@ -11,6 +11,9 @@ const BASE_SETTINGS = {
   shortcut: "CmdOrCtrl+Shift+D",
   history_retention_days: null,
   update_check_enabled: true,
+  engine: "local" as const,
+  cloud_base_url: "",
+  cloud_model: "",
 };
 
 describe("SettingsPanel", () => {

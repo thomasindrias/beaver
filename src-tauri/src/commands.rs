@@ -4,13 +4,37 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
 use tauri::Manager;
 
-use crate::{capture, engine, is_truthy, permission, prompts, server, settings, shortcut, update, windows};
+use crate::{
+    capture, engine, is_truthy, keychain, permission, prompts, server, settings, shortcut, update,
+    windows,
+};
 
 /// The most recent capture's PNG bytes, kept so the HUD can re-extract with a
 /// different format or hint without re-shooting the screen (which may have
 /// changed, and which our own HUD could contaminate).
 #[derive(Default)]
 pub struct LastCapture(pub std::sync::Mutex<Option<Vec<u8>>>);
+
+/// An extraction plus the engine that actually produced it. The frontend
+/// cannot infer the engine from settings, because settings may change between
+/// the capture and the render — the indicator must report what ran.
+#[derive(serde::Serialize)]
+pub struct ExtractionResult {
+    pub text: String,
+    pub engine: engine::EngineKind,
+}
+
+/// Read the settings and the keychain, then resolve the engine. A keychain
+/// read failure is logged and treated as "no key", which degrades to local —
+/// the safe direction.
+fn resolve_engine(app: &tauri::AppHandle, port: u16) -> engine::Engine {
+    let settings = settings::load(app);
+    let key = keychain::api_key().unwrap_or_else(|e| {
+        log::warn!("keychain read failed, falling back to the local engine: {e}");
+        None
+    });
+    engine::select(&settings, key, port)
+}
 
 // Capture and extract in one hop: the (multi-MB) image bytes stay in Rust and
 // are base64-encoded once for the engine server, instead of round-tripping to
@@ -22,7 +46,7 @@ pub async fn capture_and_extract(
     format: Option<prompts::ExtractFormat>,
     state: tauri::State<'_, server::EngineState>,
     last: tauri::State<'_, LastCapture>,
-) -> Result<String, String> {
+) -> Result<ExtractionResult, String> {
     if !permission::screen_capture_granted() {
         return Err(permission::PERMISSION_ERROR.to_string());
     }
@@ -32,16 +56,20 @@ pub async fn capture_and_extract(
     *last.0.lock().unwrap() = Some(bytes);
     let default_format = settings::load(&app).default_format;
     let prompt = prompts::prompt_for(format.unwrap_or(default_format), None);
-    engine::local::extract_from_image(port, &image_base64, &prompt).await
+    let selected = resolve_engine(&app, port);
+    let kind = selected.kind();
+    let text = selected.extract(&image_base64, &prompt).await?;
+    Ok(ExtractionResult { text, engine: kind })
 }
 
 #[tauri::command]
 pub async fn re_extract(
+    app: tauri::AppHandle,
     format: prompts::ExtractFormat,
     hint: Option<String>,
     state: tauri::State<'_, server::EngineState>,
     last: tauri::State<'_, LastCapture>,
-) -> Result<String, String> {
+) -> Result<ExtractionResult, String> {
     let bytes = last
         .0
         .lock()
@@ -50,7 +78,10 @@ pub async fn re_extract(
         .ok_or_else(|| "no-capture-cached".to_string())?;
     let image_base64 = STANDARD.encode(&bytes);
     let prompt = prompts::prompt_for(format, hint.as_deref());
-    engine::local::extract_from_image(state.port, &image_base64, &prompt).await
+    let selected = resolve_engine(&app, state.port);
+    let kind = selected.kind();
+    let text = selected.extract(&image_base64, &prompt).await?;
+    Ok(ExtractionResult { text, engine: kind })
 }
 
 #[derive(serde::Serialize)]
@@ -216,6 +247,41 @@ pub fn get_settings(app: tauri::AppHandle) -> settings::Settings {
     settings::load(&app)
 }
 
+#[tauri::command]
+pub fn set_cloud_api_key(key: String) -> Result<(), String> {
+    keychain::set_api_key(&key)
+}
+
+/// Whether a key is stored. Deliberately a boolean: the key itself is never
+/// returned across the IPC boundary.
+#[tauri::command]
+pub fn has_cloud_api_key() -> bool {
+    keychain::api_key().ok().flatten().is_some()
+}
+
+#[tauri::command]
+pub fn delete_cloud_api_key() -> Result<(), String> {
+    keychain::delete_api_key()
+}
+
+/// Refuse to persist a cloud engine that could not actually run. Pure so the
+/// rule is unit-testable; `has_key` is supplied by the caller.
+pub fn validate_cloud_settings(next: &settings::Settings, has_key: bool) -> Result<(), String> {
+    if next.engine != engine::EngineKind::Cloud {
+        return Ok(());
+    }
+    if next.cloud_base_url.trim().is_empty() {
+        return Err("Cloud engine needs a base URL.".to_string());
+    }
+    if next.cloud_model.trim().is_empty() {
+        return Err("Cloud engine needs a model.".to_string());
+    }
+    if !has_key {
+        return Err("Cloud engine needs an API key. Save one first.".to_string());
+    }
+    Ok(())
+}
+
 // Saves before touching the live shortcut registration, and rolls the save
 // back if the registration then fails. Either order has a failure window;
 // this one fails closed on the cheap, rarely-failing operation (a local
@@ -227,6 +293,7 @@ pub fn update_settings(
     app: tauri::AppHandle,
     next: settings::Settings,
 ) -> Result<settings::Settings, String> {
+    validate_cloud_settings(&next, has_cloud_api_key())?;
     let current = settings::load(&app);
     settings::save(&app, &next).map_err(|e| e.to_string())?;
     if next.shortcut != current.shortcut {
@@ -255,5 +322,48 @@ mod tests {
         assert!(last.0.lock().unwrap().is_none());
         *last.0.lock().unwrap() = Some(vec![1, 2, 3]);
         assert_eq!(last.0.lock().unwrap().clone().unwrap(), vec![1, 2, 3]);
+    }
+
+    use crate::engine::EngineKind;
+    use crate::settings::Settings;
+
+    fn cloud_settings() -> Settings {
+        Settings {
+            engine: EngineKind::Cloud,
+            cloud_base_url: "https://api.openai.com/v1".to_string(),
+            cloud_model: "gpt-4o-mini".to_string(),
+            ..Settings::default()
+        }
+    }
+
+    #[test]
+    fn validate_accepts_a_complete_cloud_configuration() {
+        assert!(validate_cloud_settings(&cloud_settings(), true).is_ok());
+    }
+
+    #[test]
+    fn validate_ignores_cloud_fields_when_the_engine_is_local() {
+        let s = Settings { engine: EngineKind::Local, ..Settings::default() };
+        assert!(validate_cloud_settings(&s, false).is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_cloud_without_a_key() {
+        let err = validate_cloud_settings(&cloud_settings(), false).unwrap_err();
+        assert!(err.contains("API key"), "unexpected message: {err}");
+    }
+
+    #[test]
+    fn validate_rejects_a_blank_base_url() {
+        let s = Settings { cloud_base_url: "  ".to_string(), ..cloud_settings() };
+        let err = validate_cloud_settings(&s, true).unwrap_err();
+        assert!(err.contains("base URL"), "unexpected message: {err}");
+    }
+
+    #[test]
+    fn validate_rejects_a_blank_model() {
+        let s = Settings { cloud_model: String::new(), ..cloud_settings() };
+        let err = validate_cloud_settings(&s, true).unwrap_err();
+        assert!(err.contains("model"), "unexpected message: {err}");
     }
 }
