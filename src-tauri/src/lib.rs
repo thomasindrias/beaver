@@ -7,6 +7,7 @@ mod capture;
 mod commands;
 mod db;
 mod engine;
+mod keychain;
 mod permission;
 mod prompts;
 mod server;
