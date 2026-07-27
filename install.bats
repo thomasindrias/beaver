@@ -1,0 +1,303 @@
+#!/usr/bin/env bats
+#
+# Tests for install.sh. Sourcing install.sh is safe: its bottom-of-file
+# source guard means `main` only runs when the script is executed directly.
+
+setup() {
+  source "${BATS_TEST_DIRNAME}/install.sh"
+  STUB_BIN="$BATS_TEST_TMPDIR/bin"
+  mkdir -p "$STUB_BIN"
+  ORIG_PATH="$PATH"
+}
+
+# only_stubs strips PATH down to the stub dir; bats runs its own per-test
+# cleanup (which shells out to `rm`) in this same process afterwards, so
+# PATH has to come back before that.
+teardown() {
+  PATH="$ORIG_PATH"
+}
+
+# Writes an executable stub named $1 into the stub bin dir. Remaining args
+# form the stub's body (default: succeed silently).
+#
+# The shebang must be an absolute interpreter path: only_stubs leaves no
+# `bash` on PATH, so a `#!/usr/bin/env bash` stub would die with
+# "env: bash: No such file or directory" and every stubbed command would
+# return 127 instead of running.
+stub() {
+  local name="$1"
+  shift
+  local body="${*:-exit 0}"
+  printf '#!/bin/bash\n%s\n' "$body" > "$STUB_BIN/$name"
+  chmod +x "$STUB_BIN/$name"
+}
+
+# Restricts PATH to the stubs created for this test. Call this LAST, after
+# every stub/rm, so setup work still sees the real coreutils. Assertions
+# after this point must use bash builtins ($(< file), [[ ]]) rather than
+# external commands like cat.
+only_stubs() {
+  PATH="$STUB_BIN"
+}
+
+# Stubs a machine where every prerequisite is satisfied.
+all_prereqs_present() {
+  stub uname 'echo Darwin'
+  stub xcode-select 'echo /Library/Developer/CommandLineTools'
+  stub cargo
+  stub rustc
+  stub node
+  stub pnpm
+  mkdir -p "$BATS_TEST_TMPDIR/Applications"
+  export BEAVER_INSTALL_DIR="$BATS_TEST_TMPDIR/Applications"
+}
+
+@test "is_macos is true when uname reports Darwin" {
+  stub uname 'echo Darwin'
+  only_stubs
+  run is_macos
+  [ "$status" -eq 0 ]
+}
+
+@test "is_macos is false when uname reports Linux" {
+  stub uname 'echo Linux'
+  only_stubs
+  run is_macos
+  [ "$status" -ne 0 ]
+}
+
+@test "has_command_line_tools is true when xcode-select resolves a path" {
+  stub xcode-select 'echo /Library/Developer/CommandLineTools'
+  only_stubs
+  run has_command_line_tools
+  [ "$status" -eq 0 ]
+}
+
+@test "has_command_line_tools is false when xcode-select fails" {
+  stub xcode-select 'exit 2'
+  only_stubs
+  run has_command_line_tools
+  [ "$status" -ne 0 ]
+}
+
+@test "has_rust is true when cargo and rustc are both present" {
+  stub cargo
+  stub rustc
+  only_stubs
+  run has_rust
+  [ "$status" -eq 0 ]
+}
+
+@test "has_rust is false when cargo is missing" {
+  stub rustc
+  only_stubs
+  run has_rust
+  [ "$status" -ne 0 ]
+}
+
+@test "has_rust is false when rustc is missing" {
+  stub cargo
+  only_stubs
+  run has_rust
+  [ "$status" -ne 0 ]
+}
+
+@test "has_node_and_pnpm is true when node and pnpm are both present" {
+  stub node
+  stub pnpm
+  only_stubs
+  run has_node_and_pnpm
+  [ "$status" -eq 0 ]
+}
+
+@test "has_node_and_pnpm is false when node is missing" {
+  stub pnpm
+  only_stubs
+  run has_node_and_pnpm
+  [ "$status" -ne 0 ]
+}
+
+@test "has_node_and_pnpm is false when pnpm is missing" {
+  stub node
+  only_stubs
+  run has_node_and_pnpm
+  [ "$status" -ne 0 ]
+}
+
+@test "has_writable_install_dir is true for an existing writable directory" {
+  mkdir -p "$BATS_TEST_TMPDIR/Applications"
+  export BEAVER_INSTALL_DIR="$BATS_TEST_TMPDIR/Applications"
+  run has_writable_install_dir
+  [ "$status" -eq 0 ]
+}
+
+@test "has_writable_install_dir is false for an existing non-writable directory" {
+  mkdir -p "$BATS_TEST_TMPDIR/Applications"
+  chmod 500 "$BATS_TEST_TMPDIR/Applications"
+  export BEAVER_INSTALL_DIR="$BATS_TEST_TMPDIR/Applications"
+  run has_writable_install_dir
+  chmod 700 "$BATS_TEST_TMPDIR/Applications"
+  [ "$status" -ne 0 ]
+}
+
+@test "has_writable_install_dir is true for a directory that does not exist yet" {
+  export BEAVER_INSTALL_DIR="$BATS_TEST_TMPDIR/Applications"
+  run has_writable_install_dir
+  [ "$status" -eq 0 ]
+}
+
+@test "check_prereqs succeeds when every prerequisite is present" {
+  all_prereqs_present
+  only_stubs
+  run check_prereqs
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "check_prereqs rejects a non-macOS host before checking anything else" {
+  all_prereqs_present
+  stub uname 'echo Linux'
+  only_stubs
+  run check_prereqs
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"only builds on macOS"* ]]
+}
+
+@test "check_prereqs points at xcode-select --install when Command Line Tools are missing" {
+  all_prereqs_present
+  stub xcode-select 'exit 2'
+  only_stubs
+  run check_prereqs
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"xcode-select --install"* ]]
+}
+
+@test "check_prereqs points at rustup.rs when Rust is missing" {
+  all_prereqs_present
+  rm "$STUB_BIN/cargo"
+  only_stubs
+  run check_prereqs
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"rustup.rs"* ]]
+}
+
+@test "check_prereqs points at nodejs.org and pnpm.io when Node is missing" {
+  all_prereqs_present
+  rm "$STUB_BIN/node"
+  only_stubs
+  run check_prereqs
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"nodejs.org"* ]]
+  [[ "$output" == *"pnpm.io"* ]]
+}
+
+@test "check_prereqs rejects a non-writable install destination" {
+  all_prereqs_present
+  chmod 500 "$BEAVER_INSTALL_DIR"
+  only_stubs
+  run check_prereqs
+  PATH="$ORIG_PATH"
+  chmod 700 "$BEAVER_INSTALL_DIR"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"is not writable"* ]]
+}
+
+@test "find_built_app prints the .app bundle in the build directory" {
+  mkdir -p "$BATS_TEST_TMPDIR/bundle/Beaver.app/Contents"
+  run find_built_app "$BATS_TEST_TMPDIR/bundle"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$BATS_TEST_TMPDIR/bundle/Beaver.app" ]
+}
+
+@test "find_built_app fails when the build directory holds no .app" {
+  mkdir -p "$BATS_TEST_TMPDIR/bundle"
+  run find_built_app "$BATS_TEST_TMPDIR/bundle"
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+}
+
+@test "find_built_app fails when the build directory does not exist" {
+  run find_built_app "$BATS_TEST_TMPDIR/never-built"
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+}
+
+@test "quit_running_app asks Beaver to quit" {
+  stub osascript "printf '%s\n' \"\$*\" > '$BATS_TEST_TMPDIR/osascript-args'"
+  only_stubs
+  run quit_running_app
+  [ "$status" -eq 0 ]
+  [[ "$(< "$BATS_TEST_TMPDIR/osascript-args")" == *'quit app "Beaver"'* ]]
+}
+
+@test "quit_running_app succeeds even when no Beaver is running" {
+  stub osascript 'exit 1'
+  only_stubs
+  run quit_running_app
+  [ "$status" -eq 0 ]
+}
+
+@test "quit_running_app reports when the app is still running after a refused quit" {
+  stub osascript 'exit 1'
+  stub pgrep 'exit 0'
+  only_stubs
+  run quit_running_app
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"still running"* ]]
+}
+
+@test "quit_running_app is silent when the app is no longer running" {
+  stub osascript 'exit 0'
+  stub pgrep 'exit 1'
+  only_stubs
+  run quit_running_app
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "install_app copies the built bundle into the install directory" {
+  mkdir -p "$BATS_TEST_TMPDIR/build/Beaver.app/Contents"
+  echo "fresh" > "$BATS_TEST_TMPDIR/build/Beaver.app/Contents/marker"
+  export BEAVER_INSTALL_DIR="$BATS_TEST_TMPDIR/Applications"
+  run install_app "$BATS_TEST_TMPDIR/build/Beaver.app"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$BEAVER_INSTALL_DIR/Beaver.app" ]
+  [ "$(< "$BEAVER_INSTALL_DIR/Beaver.app/Contents/marker")" = "fresh" ]
+}
+
+@test "install_app replaces an existing install rather than merging into it" {
+  export BEAVER_INSTALL_DIR="$BATS_TEST_TMPDIR/Applications"
+  mkdir -p "$BEAVER_INSTALL_DIR/Beaver.app/Contents"
+  echo "stale" > "$BEAVER_INSTALL_DIR/Beaver.app/Contents/marker"
+  touch "$BEAVER_INSTALL_DIR/Beaver.app/Contents/leftover-from-old-build"
+  mkdir -p "$BATS_TEST_TMPDIR/build/Beaver.app/Contents"
+  echo "fresh" > "$BATS_TEST_TMPDIR/build/Beaver.app/Contents/marker"
+  run install_app "$BATS_TEST_TMPDIR/build/Beaver.app"
+  [ "$status" -eq 0 ]
+  [ "$(< "$BEAVER_INSTALL_DIR/Beaver.app/Contents/marker")" = "fresh" ]
+  [ ! -e "$BEAVER_INSTALL_DIR/Beaver.app/Contents/leftover-from-old-build" ]
+}
+
+@test "clear_quarantine clears the flag recursively on the installed bundle" {
+  stub xattr "printf '%s\n' \"\$*\" > '$BATS_TEST_TMPDIR/xattr-args'"
+  only_stubs
+  run clear_quarantine "/Applications/Beaver.app"
+  [ "$status" -eq 0 ]
+  [ "$(< "$BATS_TEST_TMPDIR/xattr-args")" = "-cr /Applications/Beaver.app" ]
+  [ -z "$output" ]
+}
+
+@test "clear_quarantine warns instead of failing when xattr errors" {
+  stub xattr 'exit 1'
+  only_stubs
+  run clear_quarantine "/Applications/Beaver.app"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"right-click"* ]]
+}
+
+@test "print_success names the install location and the permission prompt" {
+  run print_success "/Applications/Beaver.app"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"/Applications/Beaver.app"* ]]
+  [[ "$output" == *"Screen Recording"* ]]
+}

@@ -10,9 +10,7 @@ captures never leave your machine.
 > Silicon, or [llama.cpp](https://github.com/ggml-org/llama.cpp) on Intel Macs
 > — same install, same privacy guarantee, either way.
 
-<!-- Demo assets: record with the capture flow + popover, save to docs/media/demo.gif, then uncomment.
 ![Beaver turning a screenshot region into Markdown](docs/media/demo.gif)
--->
 
 ## Install (macOS)
 
@@ -23,6 +21,23 @@ captures never leave your machine.
 
 > Unsigned builds: the first launch needs right-click → **Open** (one time) to get
 > past Gatekeeper. Signed/notarized builds open normally.
+
+### Build from source
+
+Beaver is MIT-licensed and self-buildable, so building it yourself gets you the
+same app for free. You need [Rust](https://rustup.rs), [Node.js](https://nodejs.org)
+with [pnpm](https://pnpm.io), and Xcode Command Line Tools
+(`xcode-select --install`). `install.sh` checks for all three and tells you what
+is missing.
+
+```bash
+git clone https://github.com/thomasindrias/beaver.git
+cd beaver
+./install.sh
+```
+
+It builds a release bundle and installs it into `/Applications`, replacing any
+previous install. Re-run it after `git pull` to update.
 
 ## How it works
 

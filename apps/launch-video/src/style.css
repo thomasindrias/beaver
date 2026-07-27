@@ -1,0 +1,7 @@
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/fraunces";
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
