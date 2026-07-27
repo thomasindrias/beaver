@@ -193,4 +193,51 @@ describe("SettingsPanel", () => {
       expect(invokeMock).toHaveBeenCalledWith("delete_cloud_api_key")
     );
   });
+
+  it("shows a shortcut conflict next to the shortcut field, not in the cloud panel", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_settings") return BASE_SETTINGS;
+      if (cmd === "has_cloud_api_key") return false;
+      if (cmd === "update_settings") throw new Error("'CmdOrCtrl+Shift+X' is already taken");
+      return undefined;
+    });
+    render(<SettingsPanel />);
+    // Open the cloud panel first: the bug was that an open panel captured
+    // unrelated shortcut errors.
+    fireEvent.click(await screen.findByRole("button", { name: "☁️ Cloud" }));
+    await screen.findByLabelText("Base URL");
+
+    fireEvent.click(screen.getByTestId("shortcut-field"));
+    fireEvent.keyDown(window, { key: "X", metaKey: true, shiftKey: true });
+
+    const message = await screen.findByText(/already taken/);
+    expect(message).toBeInTheDocument();
+    // The message must not be rendered inside the cloud configuration block.
+    expect(screen.getByLabelText("Base URL").closest("div")).not.toContainElement(message);
+  });
+
+  it("choosing local closes the cloud panel", async () => {
+    render(<SettingsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "☁️ Cloud" }));
+    expect(await screen.findByLabelText("Base URL")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "🔒 Local (on-device)" }));
+    await waitFor(() =>
+      expect(screen.queryByLabelText("Base URL")).not.toBeInTheDocument()
+    );
+  });
+
+  it("removing a stored key clears the stored-key indicator", async () => {
+    const afterRemoval = { ...CLOUD_SETTINGS, engine: "local" as const };
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "get_settings") return CLOUD_SETTINGS;
+      if (cmd === "has_cloud_api_key") return true;
+      if (cmd === "delete_cloud_api_key") return afterRemoval;
+      if (cmd === "update_settings") return CLOUD_SETTINGS;
+      return undefined;
+    });
+    render(<SettingsPanel />);
+    expect(await screen.findByText("Key stored")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove key" }));
+    await waitFor(() => expect(screen.queryByText("Key stored")).not.toBeInTheDocument());
+  });
 });

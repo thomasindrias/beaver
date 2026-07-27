@@ -41,7 +41,8 @@ const CLOUD_PRESETS: { label: string; base_url: string; model: string }[] = [
 export function SettingsPanel() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [recording, setRecording] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [shortcutError, setShortcutError] = useState<string | null>(null);
+  const [cloudError, setCloudError] = useState<string | null>(null);
   const [cloudOpen, setCloudOpen] = useState(false);
   const [hasKey, setHasKey] = useState(false);
   const [keyDraft, setKeyDraft] = useState("");
@@ -60,13 +61,18 @@ export function SettingsPanel() {
     hasCloudApiKey().then(setHasKey).catch(console.error);
   }, []);
 
-  const apply = useCallback(async (next: Settings) => {
+  // Returns true when the save was accepted. Callers own where a failure is
+  // reported, because this panel has two independent error surfaces and an
+  // error must appear next to the control that produced it.
+  const apply = useCallback(async (next: Settings): Promise<boolean> => {
     try {
       const saved = await updateSettings(next);
       setSettings(saved);
-      setError(null);
+      setShortcutError(null);
+      setCloudError(null);
+      return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      throw e instanceof Error ? e : new Error(String(e));
     }
   }, []);
 
@@ -76,9 +82,9 @@ export function SettingsPanel() {
       await setCloudApiKey(keyDraft);
       setKeyDraft("");
       setHasKey(true);
-      setError(null);
+      setCloudError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setCloudError(e instanceof Error ? e.message : String(e));
     }
   }, [keyDraft]);
 
@@ -92,7 +98,7 @@ export function SettingsPanel() {
       setSettings(updated);
       setHasKey(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setCloudError(e instanceof Error ? e.message : String(e));
     }
   }, []);
 
@@ -101,12 +107,16 @@ export function SettingsPanel() {
   // engine untouched.
   const enableCloud = useCallback(async () => {
     if (!settings) return;
-    await apply({
-      ...settings,
-      engine: "cloud",
-      cloud_base_url: draft.base_url,
-      cloud_model: draft.model,
-    });
+    try {
+      await apply({
+        ...settings,
+        engine: "cloud",
+        cloud_base_url: draft.base_url,
+        cloud_model: draft.model,
+      });
+    } catch (e) {
+      setCloudError(e instanceof Error ? e.message : String(e));
+    }
   }, [settings, draft, apply]);
 
   useEffect(() => {
@@ -116,7 +126,9 @@ export function SettingsPanel() {
       const accelerator = toAccelerator(e);
       if (!accelerator) return;
       setRecording(false);
-      apply({ ...settings, shortcut: accelerator });
+      apply({ ...settings, shortcut: accelerator }).catch(e =>
+        setShortcutError(e instanceof Error ? e.message : String(e))
+      );
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -141,7 +153,11 @@ export function SettingsPanel() {
               size="sm"
               variant={settings.default_format === key ? "default" : "outline"}
               aria-pressed={settings.default_format === key}
-              onClick={() => apply({ ...settings, default_format: key })}
+              onClick={() =>
+                apply({ ...settings, default_format: key }).catch(e =>
+                  setShortcutError(e instanceof Error ? e.message : String(e))
+                )
+              }
             >
               {label}
             </Button>
@@ -159,12 +175,8 @@ export function SettingsPanel() {
           >
             {recording ? "Press new shortcut…" : <Kbd>{settings.shortcut}</Kbd>}
           </button>
-          {/* The cloud panel below has its own copy of this same error; only
-              one is ever mounted at a time, so a validation failure always
-              shows next to the control that caused it and never duplicates
-              in the DOM. */}
-          {error && !cloudPanelOpen && (
-            <span className="text-[11px] text-destructive">{error}</span>
+          {shortcutError && (
+            <span className="text-[11px] text-destructive">{shortcutError}</span>
           )}
         </div>
       </Row>
@@ -177,7 +189,11 @@ export function SettingsPanel() {
               size="sm"
               variant={settings.history_retention_days === o.value ? "default" : "outline"}
               aria-pressed={settings.history_retention_days === o.value}
-              onClick={() => apply({ ...settings, history_retention_days: o.value })}
+              onClick={() =>
+                apply({ ...settings, history_retention_days: o.value }).catch(e =>
+                  setShortcutError(e instanceof Error ? e.message : String(e))
+                )
+              }
             >
               {o.label}
             </Button>
@@ -191,7 +207,9 @@ export function SettingsPanel() {
           variant={settings.update_check_enabled ? "default" : "outline"}
           aria-pressed={settings.update_check_enabled}
           onClick={() =>
-            apply({ ...settings, update_check_enabled: !settings.update_check_enabled })
+            apply({ ...settings, update_check_enabled: !settings.update_check_enabled }).catch(
+              e => setShortcutError(e instanceof Error ? e.message : String(e))
+            )
           }
         >
           {settings.update_check_enabled ? "Check automatically" : "Off"}
@@ -204,7 +222,12 @@ export function SettingsPanel() {
             size="sm"
             variant={settings.engine === "local" ? "default" : "outline"}
             aria-pressed={settings.engine === "local"}
-            onClick={() => apply({ ...settings, engine: "local" })}
+            onClick={() => {
+              setCloudOpen(false);
+              apply({ ...settings, engine: "local" }).catch(e =>
+                setShortcutError(e instanceof Error ? e.message : String(e))
+              );
+            }}
           >
             🔒 Local (on-device)
           </Button>
@@ -286,8 +309,8 @@ export function SettingsPanel() {
             </Row>
           )}
 
-          {error && (
-            <span className="text-[11px] text-destructive">{error}</span>
+          {cloudError && (
+            <span className="text-[11px] text-destructive">{cloudError}</span>
           )}
         </div>
       )}
