@@ -248,4 +248,30 @@ describe("useBeaver", () => {
     const { result } = renderHook(() => useBeaver());
     expect(result.current.engine).toBeNull();
   });
+
+  it("ignores the engine from a superseded capture", async () => {
+    // A slow cloud capture outlived by a fast local one must not repaint the
+    // indicator for the local result the user is already looking at.
+    const { result } = renderHook(() => useBeaver());
+    let resolveSlow: (v: { text: string; engine: string }) => void;
+    invokeMock.mockImplementationOnce(
+      () => new Promise(resolve => { resolveSlow = resolve; })
+    );
+    let slow: Promise<void>;
+    act(() => {
+      slow = result.current.runCapture(region);
+    });
+
+    invokeMock.mockResolvedValue(extraction("local result", "local"));
+    await act(async () => {
+      await result.current.runCapture(region);
+    });
+    expect(result.current.engine).toBe("local");
+
+    await act(async () => {
+      resolveSlow!({ text: "cloud result", engine: "cloud" });
+      await slow!.catch(() => {});
+    });
+    expect(result.current.engine).toBe("local");
+  });
 });

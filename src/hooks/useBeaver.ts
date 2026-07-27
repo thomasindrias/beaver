@@ -55,8 +55,12 @@ export function useBeaver(
     clearDwell();
   }, [clearDwell]);
 
-  const finish = useCallback(async (markdown: string, gen: number) => {
+  const finish = useCallback(async (markdown: string, resultEngine: EngineKind, gen: number) => {
     if (gen !== genRef.current) return;
+    // Committed behind the generation guard along with every other result of
+    // this capture: a superseded response must not repaint the indicator for
+    // content the user is already looking at.
+    setEngine(resultEngine);
     const ct = detectContentType(markdown);
     setContentType(ct);
     await writeToClipboard(markdown);
@@ -92,8 +96,7 @@ export function useBeaver(
     try {
       const result = await captureAndExtract(region, "markdown");
       setFormat("markdown");
-      setEngine(result.engine);
-      await finish(result.text, gen);
+      await finish(result.text, result.engine, gen);
     } catch (e) {
       fail(e, gen);
     }
@@ -106,8 +109,7 @@ export function useBeaver(
     setState("rerendering");
     try {
       const result = await reExtractCommand(next, hint);
-      setEngine(result.engine);
-      await finish(result.text, gen);
+      await finish(result.text, result.engine, gen);
     } catch (e) {
       fail(e, gen);
     }
