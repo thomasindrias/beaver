@@ -665,6 +665,17 @@ Append to the existing `#[cfg(test)] mod tests` block in `src-tauri/src/engine/m
     }
 
     #[test]
+    fn select_trims_whitespace_from_the_api_key() {
+        // A pasted key commonly carries a trailing newline. Left untrimmed it
+        // becomes an invalid Authorization header value, which surfaces as a
+        // misleading "Couldn't reach the provider" instead of a key problem.
+        match select(&cloud_settings(), Some("  sk-abc\n".to_string()), 11500) {
+            Engine::Cloud(cfg) => assert_eq!(cfg.api_key, "sk-abc"),
+            Engine::Local { .. } => panic!("expected the cloud engine"),
+        }
+    }
+
+    #[test]
     fn select_trims_whitespace_from_the_cloud_configuration() {
         let s = Settings {
             cloud_base_url: "  https://api.openai.com/v1  ".to_string(),
@@ -817,7 +828,12 @@ pub fn select(settings: &Settings, key: Option<String>, port: u16) -> Engine {
     Engine::Cloud(cloud::Config {
         base_url: base_url.to_string(),
         model: model.to_string(),
-        api_key: key,
+        // Trimmed on the way in, like the other two: a pasted key commonly
+        // carries a trailing newline, which is a control byte that
+        // `HeaderValue` rejects when reqwest builds the Authorization header.
+        // That failure would surface as "Couldn't reach the provider" and send
+        // the user hunting for a network problem that does not exist.
+        api_key: key.trim().to_string(),
     })
 }
 ```
