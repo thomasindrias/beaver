@@ -35,8 +35,24 @@ impl std::fmt::Debug for Config {
 /// Join a user-supplied base URL with the chat-completions path. Providers are
 /// inconsistent about the trailing slash — Gemini documents one, OpenAI does
 /// not — so normalize rather than concatenate.
+///
+/// A base URL may also carry a query string (Azure-style
+/// `…/v1?api-version=…`). Appending the path blindly would push
+/// `/chat/completions` inside the query component and silently send the
+/// request to the wrong endpoint, so the query is split off, the path is
+/// joined, and the query is re-attached. Surrounding whitespace is trimmed
+/// because these values are pasted by hand.
 pub fn chat_completions_url(base_url: &str) -> String {
-    format!("{}/chat/completions", base_url.trim_end_matches('/'))
+    let base = base_url.trim();
+    let (path, query) = match base.split_once('?') {
+        Some((p, q)) => (p, Some(q)),
+        None => (base, None),
+    };
+    let joined = format!("{}/chat/completions", path.trim_end_matches('/'));
+    match query {
+        Some(q) => format!("{joined}?{q}"),
+        None => joined,
+    }
 }
 
 /// Map an HTTP status to a short, user-readable cause.
@@ -263,5 +279,29 @@ mod tests {
         assert!(!rendered.contains("sk-secret-do-not-leak"), "key leaked: {rendered}");
         assert!(rendered.contains("<redacted>"));
         assert!(rendered.contains("gpt-4o-mini"));
+    }
+
+    #[test]
+    fn chat_completions_url_keeps_a_query_string_after_the_path() {
+        assert_eq!(
+            chat_completions_url("https://api.example.com/v1?api-version=2024-02-01"),
+            "https://api.example.com/v1/chat/completions?api-version=2024-02-01"
+        );
+    }
+
+    #[test]
+    fn chat_completions_url_handles_a_query_string_after_a_trailing_slash() {
+        assert_eq!(
+            chat_completions_url("https://api.example.com/v1/?api-version=2024-02-01"),
+            "https://api.example.com/v1/chat/completions?api-version=2024-02-01"
+        );
+    }
+
+    #[test]
+    fn chat_completions_url_trims_surrounding_whitespace() {
+        assert_eq!(
+            chat_completions_url("  https://api.openai.com/v1  "),
+            "https://api.openai.com/v1/chat/completions"
+        );
     }
 }
