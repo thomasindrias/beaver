@@ -7,6 +7,10 @@ export const ROADMAP_URL = `${GITHUB_URL}/blob/main/docs/ROADMAP.md`;
 export const QUALIFIER =
   "Free and open source · macOS · Apple Silicon and Intel";
 
+// Replace with your actual Buttondown username after creating an account at
+// https://buttondown.com. This placeholder will not collect real signups.
+export const BUTTONDOWN_USERNAME = "beaver-placeholder";
+
 export const brandAssets = {
   head: "/beaver-head.webp",
 } as const;

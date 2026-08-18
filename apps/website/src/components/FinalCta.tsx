@@ -1,5 +1,6 @@
+import { EmailCapture } from "./EmailCapture";
 import { Mascot } from "./Mascot";
-import { GITHUB_URL, RELEASES_URL } from "../constants";
+import { BUTTONDOWN_USERNAME, GITHUB_URL, RELEASES_URL } from "../constants";
 
 export function FinalCta() {
   return (
@@ -26,6 +27,7 @@ export function FinalCta() {
           View on GitHub
         </a>
       </div>
+      <EmailCapture username={BUTTONDOWN_USERNAME} />
     </div>
   );
 }
